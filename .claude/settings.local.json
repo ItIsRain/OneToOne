@@ -11,7 +11,11 @@
       "mcp__plugin_supabase_supabase__get_project_url",
       "mcp__plugin_supabase_supabase__get_publishable_keys",
       "mcp__plugin_supabase_supabase__execute_sql",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(npm uninstall:*)",
+      "mcp__plugin_supabase_supabase__list_tables"
     ]
   }
 }

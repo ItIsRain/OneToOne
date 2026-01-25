@@ -1,9 +1,12 @@
 export { AddClientModal } from "./AddClientModal";
+export { ClientDetailsModal } from "./ClientDetailsModal";
 export { NewEventModal } from "./NewEventModal";
 export { AddTaskModal } from "./AddTaskModal";
 export { CreateInvoiceModal } from "./CreateInvoiceModal";
 export { AddLeadModal } from "./AddLeadModal";
+export { LeadDetailsModal } from "./LeadDetailsModal";
 export { AddContactModal } from "./AddContactModal";
+export { ContactDetailsModal } from "./ContactDetailsModal";
 export { AddProjectModal } from "./AddProjectModal";
 export { AddExpenseModal } from "./AddExpenseModal";
 export { AddTeamMemberModal } from "./AddTeamMemberModal";
@@ -24,3 +27,5 @@ export { CreateApiKeyModal } from "./CreateApiKeyModal";
 export { CreateCustomReportModal } from "./CreateCustomReportModal";
 export { EventDetailsModal } from "./EventDetailsModal";
 export { EditEventModal } from "./EditEventModal";
+export { ProjectDetailsModal } from "./ProjectDetailsModal";
+export { TaskDetailsModal } from "./TaskDetailsModal";

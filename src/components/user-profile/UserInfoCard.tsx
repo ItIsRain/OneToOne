@@ -6,12 +6,22 @@ import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
 import { useAuth } from "@/context/AuthContext";
+import { isValidPhoneNumber } from "libphonenumber-js";
+
+function capitalizeName(str: string | null | undefined): string {
+  if (!str) return "-";
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
 
 export default function UserInfoCard() {
   const { isOpen, openModal, closeModal } = useModal();
   const { profile, updateProfile, loading } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -31,7 +41,36 @@ export default function UserInfoCard() {
     }
   }, [profile]);
 
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) {
+      setPhoneError("");
+      return true;
+    }
+
+    if (!isValidPhoneNumber(phone)) {
+      setPhoneError("Please enter a valid phone number with country code (e.g., +971501234567)");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const phone = e.target.value;
+    setFormData({ ...formData, phone });
+    if (phone) {
+      validatePhone(phone);
+    } else {
+      setPhoneError("");
+    }
+  };
+
   const handleSave = async () => {
+    if (formData.phone && !validatePhone(formData.phone)) {
+      return;
+    }
+
     setIsSaving(true);
     setError("");
 
@@ -76,7 +115,7 @@ export default function UserInfoCard() {
                 First Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile?.first_name || "-"}
+                {capitalizeName(profile?.first_name)}
               </p>
             </div>
 
@@ -85,7 +124,7 @@ export default function UserInfoCard() {
                 Last Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                {profile?.last_name || "-"}
+                {capitalizeName(profile?.last_name)}
               </p>
             </div>
 
@@ -188,9 +227,13 @@ export default function UserInfoCard() {
                 <Input
                   type="text"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+971 50 123 4567"
+                  onChange={handlePhoneChange}
+                  placeholder="+971501234567"
+                  error={!!phoneError}
                 />
+                {phoneError && (
+                  <p className="mt-1 text-xs text-error-500">{phoneError}</p>
+                )}
               </div>
 
               <div>
