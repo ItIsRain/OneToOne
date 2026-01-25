@@ -7,3 +7,5 @@ export { TasksOverview } from "./TasksOverview";
 export { InvoicesTable } from "./InvoicesTable";
 export { ReportsGenerator } from "./ReportsGenerator";
 export { SettingsPanel } from "./SettingsPanel";
+export { ProjectsTable } from "./ProjectsTable";
+export { TasksTable } from "./TasksTable";

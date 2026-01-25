@@ -1,10 +1,17 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { useAuth } from "@/context/AuthContext";
+
+function capitalizeName(str: string): string {
+  if (!str) return "";
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,13 +27,13 @@ export default function UserDropdown() {
   }
 
   const displayName = profile
-    ? profile.first_name
-    : user?.user_metadata?.first_name || "User";
+    ? capitalizeName(profile.first_name)
+    : capitalizeName(user?.user_metadata?.first_name) || "User";
 
   const fullName = profile
-    ? `${profile.first_name} ${profile.last_name}`
+    ? `${capitalizeName(profile.first_name)} ${capitalizeName(profile.last_name)}`
     : user?.user_metadata?.first_name && user?.user_metadata?.last_name
-    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+    ? `${capitalizeName(user.user_metadata.first_name)} ${capitalizeName(user.user_metadata.last_name)}`
     : "User";
 
   const email = profile?.email || user?.email || "";
