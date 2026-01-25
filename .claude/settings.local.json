@@ -4,7 +4,14 @@
       "Bash(npm run lint)",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(npm run build:*)",
-      "Bash(dir D:1i1.next /b)"
+      "Bash(dir D:1i1.next /b)",
+      "mcp__plugin_supabase_supabase__list_projects",
+      "mcp__plugin_supabase_supabase__apply_migration",
+      "mcp__plugin_supabase_supabase__list_migrations",
+      "mcp__plugin_supabase_supabase__get_project_url",
+      "mcp__plugin_supabase_supabase__get_publishable_keys",
+      "mcp__plugin_supabase_supabase__execute_sql",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -1,180 +1,438 @@
 "use client";
-import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+type Step = "details" | "otp" | "onboarding";
+
+const useCaseOptions = [
+  { value: "events", label: "Event Management" },
+  { value: "clients", label: "Client Portal" },
+  { value: "invoicing", label: "Invoicing & Payments" },
+  { value: "projects", label: "Project Management" },
+  { value: "other", label: "Other" },
+];
 
 export default function SignUpForm() {
+  const [step, setStep] = useState<Step>("details");
   const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Form data
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    otp: "",
+    useCase: "",
+    subdomain: "",
+  });
+
+  const updateFormData = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setError("");
+  };
+
+  const handleSendOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send OTP");
+      }
+
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, otp: formData.otp }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Invalid OTP");
+      }
+
+      setStep("onboarding");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleComplete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create account");
+      }
+
+      // Sign in the user after registration
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (signInError) {
+        console.error("Sign in error:", signInError);
+        // Still redirect - they can sign in manually
+      }
+
+      // Redirect to dashboard
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-8">
+      {["details", "otp", "onboarding"].map((s, i) => (
+        <React.Fragment key={s}>
+          <div
+            className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors ${
+              step === s
+                ? "bg-brand-500 text-white"
+                : ["details", "otp", "onboarding"].indexOf(step) > i
+                ? "bg-brand-100 text-brand-600"
+                : "bg-gray-100 text-gray-400"
+            }`}
+          >
+            {i + 1}
+          </div>
+          {i < 2 && (
+            <div
+              className={`w-12 h-0.5 ${
+                ["details", "otp", "onboarding"].indexOf(step) > i
+                  ? "bg-brand-200"
+                  : "bg-gray-100"
+              }`}
+            />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
+  const renderDetailsStep = () => (
+    <form onSubmit={handleSendOTP}>
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div>
+            <Label>
+              First Name<span className="text-error-500">*</span>
+            </Label>
+            <Input
+              type="text"
+              placeholder="Enter your first name"
+              value={formData.firstName}
+              onChange={(e) => updateFormData("firstName", e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label>
+              Last Name<span className="text-error-500">*</span>
+            </Label>
+            <Input
+              type="text"
+              placeholder="Enter your last name"
+              value={formData.lastName}
+              onChange={(e) => updateFormData("lastName", e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label>
+            Email<span className="text-error-500">*</span>
+          </Label>
+          <Input
+            type="email"
+            placeholder="Enter your email"
+            value={formData.email}
+            onChange={(e) => updateFormData("email", e.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <Label>
+            Password<span className="text-error-500">*</span>
+          </Label>
+          <div className="relative">
+            <Input
+              placeholder="Enter your password"
+              type={showPassword ? "text" : "password"}
+              value={formData.password}
+              onChange={(e) => updateFormData("password", e.target.value)}
+              required
+            />
+            <span
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
+            >
+              {showPassword ? (
+                <EyeIcon className="fill-gray-500 dark:fill-gray-400" />
+              ) : (
+                <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400" />
+              )}
+            </span>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-sm text-error-500">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Sending..." : "Continue"}
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderOTPStep = () => (
+    <form onSubmit={handleVerifyOTP}>
+      <div className="space-y-5">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-50 mb-4">
+            <svg className="w-8 h-8 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <p className="text-gray-600">
+            We sent a verification code to
+          </p>
+          <p className="font-medium text-gray-900">{formData.email}</p>
+        </div>
+
+        <div>
+          <Label>
+            Verification Code<span className="text-error-500">*</span>
+          </Label>
+          <Input
+            type="text"
+            placeholder="Enter 6-digit code"
+            value={formData.otp}
+            onChange={(e) => updateFormData("otp", e.target.value.replace(/\D/g, "").slice(0, 6))}
+            className="text-center text-lg tracking-widest"
+            required
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-error-500">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading || formData.otp.length !== 6}
+          className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Verifying..." : "Verify"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSendOTP({ preventDefault: () => {} } as React.FormEvent)}
+          className="w-full text-sm text-gray-500 hover:text-gray-700"
+        >
+          Didn&apos;t receive the code? <span className="text-brand-500">Resend</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStep("details")}
+          className="w-full text-sm text-gray-500 hover:text-gray-700"
+        >
+          ← Back to details
+        </button>
+      </div>
+    </form>
+  );
+
+  const renderOnboardingStep = () => (
+    <form onSubmit={handleComplete}>
+      <div className="space-y-5">
+        <div>
+          <Label>
+            What will you use 1i1 for?<span className="text-error-500">*</span>
+          </Label>
+          <div className="grid grid-cols-1 gap-2 mt-2">
+            {useCaseOptions.map((option) => (
+              <label
+                key={option.value}
+                className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                  formData.useCase === option.value
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="useCase"
+                  value={option.value}
+                  checked={formData.useCase === option.value}
+                  onChange={(e) => updateFormData("useCase", e.target.value)}
+                  className="sr-only"
+                />
+                <span
+                  className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${
+                    formData.useCase === option.value
+                      ? "border-brand-500"
+                      : "border-gray-300"
+                  }`}
+                >
+                  {formData.useCase === option.value && (
+                    <span className="w-2 h-2 rounded-full bg-brand-500" />
+                  )}
+                </span>
+                <span className="text-sm text-gray-700">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Label>
+            Choose your portal URL<span className="text-error-500">*</span>
+          </Label>
+          <div className="flex items-center mt-2">
+            <Input
+              type="text"
+              placeholder="yourcompany"
+              value={formData.subdomain}
+              onChange={(e) => updateFormData("subdomain", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+              className="rounded-r-none"
+              required
+            />
+            <span className="inline-flex items-center px-4 py-3 text-sm text-gray-500 bg-gray-100 border border-l-0 border-gray-200 rounded-r-lg">
+              .1i1.ae
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs text-gray-500">
+            This will be your unique portal URL
+          </p>
+        </div>
+
+        {error && (
+          <p className="text-sm text-error-500">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading || !formData.useCase || !formData.subdomain}
+          className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoading ? "Creating your portal..." : "Create My Portal"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStep("otp")}
+          className="w-full text-sm text-gray-500 hover:text-gray-700"
+        >
+          ← Back
+        </button>
+      </div>
+    </form>
+  );
+
+  const getStepTitle = () => {
+    switch (step) {
+      case "details":
+        return { title: "Create your account", subtitle: "Enter your details to get started" };
+      case "otp":
+        return { title: "Verify your email", subtitle: "We need to verify your email address" };
+      case "onboarding":
+        return { title: "Set up your portal", subtitle: "Tell us a bit about how you'll use 1i1" };
+    }
+  };
+
+  const { title, subtitle } = getStepTitle();
+
   return (
     <div className="flex flex-col flex-1 lg:w-1/2 w-full overflow-y-auto no-scrollbar">
-      <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
+      <div className="w-full max-w-md sm:pt-10 mx-auto mb-5 px-4">
         <Link
           href="/"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
           <ChevronLeftIcon />
-          Back to dashboard
+          Back to home
         </Link>
       </div>
-      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4">
         <div>
-          <div className="mb-5 sm:mb-8">
+          {renderStepIndicator()}
+
+          <div className="mb-6">
             <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign Up
+              {title}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign up!
+              {subtitle}
             </p>
           </div>
-          <div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
-              <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M18.7511 10.1944C18.7511 9.47495 18.6915 8.94995 18.5626 8.40552H10.1797V11.6527H15.1003C15.0011 12.4597 14.4654 13.675 13.2749 14.4916L13.2582 14.6003L15.9087 16.6126L16.0924 16.6305C17.7788 15.1041 18.7511 12.8583 18.7511 10.1944Z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M10.1788 18.75C12.5895 18.75 14.6133 17.9722 16.0915 16.6305L13.274 14.4916C12.5201 15.0068 11.5081 15.3666 10.1788 15.3666C7.81773 15.3666 5.81379 13.8402 5.09944 11.7305L4.99473 11.7392L2.23868 13.8295L2.20264 13.9277C3.67087 16.786 6.68674 18.75 10.1788 18.75Z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M5.10014 11.7305C4.91165 11.186 4.80257 10.6027 4.80257 9.99992C4.80257 9.3971 4.91165 8.81379 5.09022 8.26935L5.08523 8.1534L2.29464 6.02954L2.20333 6.0721C1.5982 7.25823 1.25098 8.5902 1.25098 9.99992C1.25098 11.4096 1.5982 12.7415 2.20333 13.9277L5.10014 11.7305Z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M10.1789 4.63331C11.8554 4.63331 12.9864 5.34303 13.6312 5.93612L16.1511 3.525C14.6035 2.11528 12.5895 1.25 10.1789 1.25C6.68676 1.25 3.67088 3.21387 2.20264 6.07218L5.08953 8.26943C5.81381 6.15972 7.81776 4.63331 10.1789 4.63331Z"
-                    fill="#EB4335"
-                  />
-                </svg>
-                Sign up with Google
-              </button>
-              <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 hover:text-gray-800 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                <svg
-                  width="21"
-                  className="fill-current"
-                  height="20"
-                  viewBox="0 0 21 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M15.6705 1.875H18.4272L12.4047 8.75833L19.4897 18.125H13.9422L9.59717 12.4442L4.62554 18.125H1.86721L8.30887 10.7625L1.51221 1.875H7.20054L11.128 7.0675L15.6705 1.875ZM14.703 16.475H16.2305L6.37054 3.43833H4.73137L14.703 16.475Z" />
-                </svg>
-                Sign up with X
-              </button>
-            </div>
-            <div className="relative py-3 sm:py-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-gray-800"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="p-2 text-gray-400 bg-white dark:bg-gray-900 sm:px-5 sm:py-2">
-                  Or
-                </span>
-              </div>
-            </div>
-            <form>
-              <div className="space-y-5">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  {/* <!-- First Name --> */}
-                  <div className="sm:col-span-1">
-                    <Label>
-                      First Name<span className="text-error-500">*</span>
-                    </Label>
-                    <Input
-                      type="text"
-                      id="fname"
-                      name="fname"
-                      placeholder="Enter your first name"
-                    />
-                  </div>
-                  {/* <!-- Last Name --> */}
-                  <div className="sm:col-span-1">
-                    <Label>
-                      Last Name<span className="text-error-500">*</span>
-                    </Label>
-                    <Input
-                      type="text"
-                      id="lname"
-                      name="lname"
-                      placeholder="Enter your last name"
-                    />
-                  </div>
-                </div>
-                {/* <!-- Email --> */}
-                <div>
-                  <Label>
-                    Email<span className="text-error-500">*</span>
-                  </Label>
-                  <Input
-                    type="email"
-                    id="email"
-                    name="email"
-                    placeholder="Enter your email"
-                  />
-                </div>
-                {/* <!-- Password --> */}
-                <div>
-                  <Label>
-                    Password<span className="text-error-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      placeholder="Enter your password"
-                      type={showPassword ? "text" : "password"}
-                    />
-                    <span
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
-                    >
-                      {showPassword ? (
-                        <EyeIcon className="fill-gray-500 dark:fill-gray-400" />
-                      ) : (
-                        <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400" />
-                      )}
-                    </span>
-                  </div>
-                </div>
-                {/* <!-- Checkbox --> */}
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    className="w-5 h-5"
-                    checked={isChecked}
-                    onChange={setIsChecked}
-                  />
-                  <p className="inline-block font-normal text-gray-500 dark:text-gray-400">
-                    By creating an account means you agree to the{" "}
-                    <span className="text-gray-800 dark:text-white/90">
-                      Terms and Conditions,
-                    </span>{" "}
-                    and our{" "}
-                    <span className="text-gray-800 dark:text-white">
-                      Privacy Policy
-                    </span>
-                  </p>
-                </div>
-                {/* <!-- Button --> */}
-                <div>
-                  <button className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600">
-                    Sign Up
-                  </button>
-                </div>
-              </div>
-            </form>
 
+          {step === "details" && renderDetailsStep()}
+          {step === "otp" && renderOTPStep()}
+          {step === "onboarding" && renderOnboardingStep()}
+
+          {step === "details" && (
             <div className="mt-5">
               <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                Already have an account?
+                Already have an account?{" "}
                 <Link
                   href="/signin"
                   className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
@@ -183,7 +441,7 @@ export default function SignUpForm() {
                 </Link>
               </p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

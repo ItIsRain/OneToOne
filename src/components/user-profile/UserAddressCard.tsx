@@ -1,18 +1,83 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { useAuth } from "@/context/AuthContext";
+import { GetCountries } from "react-country-state-city";
+
+type Country = {
+  id: number;
+  name: string;
+  iso2: string;
+  iso3: string;
+  phone_code: string;
+};
 
 export default function UserAddressCard() {
   const { isOpen, openModal, closeModal } = useModal();
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
+  const { profile, updateProfile, loading } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [countries, setCountries] = useState<Country[]>([]);
+
+  const [formData, setFormData] = useState({
+    country: "",
+    city: "",
+    postal_code: "",
+    tax_id: "",
+  });
+
+  useEffect(() => {
+    GetCountries().then((result: Country[]) => {
+      setCountries(result);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        country: profile.country || "",
+        city: profile.city || "",
+        postal_code: profile.postal_code || "",
+        tax_id: profile.tax_id || "",
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError("");
+
+    const result = await updateProfile(formData);
+
+    if (!result.success) {
+      setError(result.error || "Failed to save");
+    } else {
+      closeModal();
+    }
+
+    setIsSaving(false);
   };
+
+  if (loading) {
+    return (
+      <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6 animate-pulse">
+        <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-6" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i}>
+              <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+              <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
@@ -28,7 +93,7 @@ export default function UserAddressCard() {
                   Country
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  United States
+                  {profile?.country || "-"}
                 </p>
               </div>
 
@@ -37,7 +102,7 @@ export default function UserAddressCard() {
                   City/State
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Phoenix, Arizona, United States.
+                  {profile?.city || "-"}
                 </p>
               </div>
 
@@ -46,7 +111,7 @@ export default function UserAddressCard() {
                   Postal Code
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  ERT 2489
+                  {profile?.postal_code || "-"}
                 </p>
               </div>
 
@@ -55,7 +120,7 @@ export default function UserAddressCard() {
                   TAX ID
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  AS4568384
+                  {profile?.tax_id || "-"}
                 </p>
               </div>
             </div>
@@ -84,46 +149,76 @@ export default function UserAddressCard() {
           </button>
         </div>
       </div>
-      <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[700px] m-4">
+      <Modal isOpen={isOpen} onClose={closeModal} className="max-w-[500px] m-4">
         <div className="relative w-full p-4 overflow-y-auto bg-white no-scrollbar rounded-3xl dark:bg-gray-900 lg:p-11">
           <div className="px-2 pr-14">
             <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
               Edit Address
             </h4>
             <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              Update your details to keep your profile up-to-date.
+              Update your address details.
             </p>
           </div>
-          <form className="flex flex-col">
-            <div className="px-2 overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
+          <form className="flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+            <div className="px-2 overflow-y-auto custom-scrollbar space-y-5">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <div>
                   <Label>Country</Label>
-                  <Input type="text" defaultValue="United States" />
+                  <select
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    className="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  >
+                    <option value="">Select a country</option>
+                    {countries.map((country) => (
+                      <option key={country.id} value={country.name}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <Label>City/State</Label>
-                  <Input type="text" defaultValue="Arizona, United States." />
+                  <Input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    placeholder="e.g. Dubai"
+                  />
                 </div>
 
                 <div>
                   <Label>Postal Code</Label>
-                  <Input type="text" defaultValue="ERT 2489" />
+                  <Input
+                    type="text"
+                    value={formData.postal_code}
+                    onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                    placeholder="e.g. 12345"
+                  />
                 </div>
 
                 <div>
                   <Label>TAX ID</Label>
-                  <Input type="text" defaultValue="AS4568384" />
+                  <Input
+                    type="text"
+                    value={formData.tax_id}
+                    onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                    placeholder="e.g. TRN123456789"
+                  />
                 </div>
               </div>
+
+              {error && (
+                <p className="text-sm text-error-500">{error}</p>
+              )}
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
+              <Button size="sm" variant="outline" onClick={closeModal} type="button">
                 Close
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                Save Changes
+              <Button size="sm" type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </form>
