@@ -1,8 +1,66 @@
 "use client";
 import React, { useState } from "react";
 import Badge from "../ui/badge/Badge";
-import { NewEventModal, EditEventModal } from "./modals";
+import { NewEventModal, EditEventModal, JudgingModal } from "./modals";
 import { EventDetailsSidebar } from "./sidebars";
+
+// Event type icons mapping
+const eventTypeIcons: Record<string, React.ReactNode> = {
+  "Hackathon": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  "Game Jam": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+    </svg>
+  ),
+  "Keynote Speech": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+    </svg>
+  ),
+  "Panel Discussion": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  ),
+  "Tech Conference": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  "Product Launch": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+    </svg>
+  ),
+  "Fireside Chat": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+    </svg>
+  ),
+  "Design Sprint": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+    </svg>
+  ),
+  "Awards Ceremony": (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+    </svg>
+  ),
+};
+
+const getEventIcon = (type: string) => {
+  return eventTypeIcons[type] || (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  );
+};
 
 interface EventRequirements {
   problemStatement?: string;
@@ -78,7 +136,7 @@ const eventsData: Event[] = [
     endTime: "6:00 PM",
     status: "Upcoming",
     type: "Hackathon",
-    icon: "💻",
+    icon: "hackathon",
     category: "Tech Events",
     attendees: 500,
     location: "San Francisco Convention Center",
@@ -135,7 +193,7 @@ const eventsData: Event[] = [
     time: "6:00 PM",
     status: "Upcoming",
     type: "Game Jam",
-    icon: "🎮",
+    icon: "gamejam",
     category: "Tech Events",
     isVirtual: true,
     virtualPlatform: "Discord",
@@ -163,7 +221,7 @@ const eventsData: Event[] = [
     endTime: "4:00 PM",
     status: "Upcoming",
     type: "Keynote Speech",
-    icon: "🎤",
+    icon: "keynote",
     category: "Speaking & Presentations",
     attendees: 300,
     location: "Grand Ballroom, Marriott Downtown",
@@ -193,7 +251,7 @@ const eventsData: Event[] = [
     endTime: "6:00 PM",
     status: "Upcoming",
     type: "Panel Discussion",
-    icon: "👥",
+    icon: "panel",
     category: "Speaking & Presentations",
     isVirtual: true,
     virtualPlatform: "Zoom Webinar",
@@ -225,7 +283,7 @@ const eventsData: Event[] = [
     time: "8:00 AM",
     status: "In Progress",
     type: "Tech Conference",
-    icon: "🚀",
+    icon: "conference",
     category: "Tech Events",
     attendees: 1500,
     location: "Moscone Center, San Francisco",
@@ -266,7 +324,7 @@ const eventsData: Event[] = [
     time: "11:00 AM",
     status: "In Progress",
     type: "Product Launch",
-    icon: "🎉",
+    icon: "launch",
     category: "Business Events",
     attendees: 200,
     location: "TechStart HQ, Palo Alto",
@@ -287,18 +345,6 @@ const eventsData: Event[] = [
     },
   },
   {
-    id: 7,
-    title: "Investor Demo Day",
-    client: "GlobalTech Solutions",
-    date: "2025-02-05",
-    time: "10:00 AM",
-    status: "Completed",
-    type: "Demo Day",
-    icon: "📺",
-    category: "Tech Events",
-    attendees: 50,
-  },
-  {
     id: 8,
     title: "Fireside Chat with Tech Leaders",
     client: "Creative Co.",
@@ -306,7 +352,7 @@ const eventsData: Event[] = [
     time: "7:00 PM",
     status: "Completed",
     type: "Fireside Chat",
-    icon: "🔥",
+    icon: "fireside",
     category: "Speaking & Presentations",
     isVirtual: true,
     attendees: 800,
@@ -320,7 +366,7 @@ const eventsData: Event[] = [
     endTime: "5:00 PM",
     status: "Completed",
     type: "Design Sprint",
-    icon: "🎨",
+    icon: "design",
     category: "Creative Events",
     attendees: 30,
     location: "Innovation Lab, Downtown",
@@ -348,7 +394,7 @@ const eventsData: Event[] = [
     endTime: "10:00 PM",
     status: "Upcoming",
     type: "Awards Ceremony",
-    icon: "🏆",
+    icon: "awards",
     category: "Networking & Social",
     attendees: 400,
     location: "The Ritz-Carlton, San Francisco",
@@ -388,7 +434,6 @@ const eventTypeColors: Record<string, "primary" | "success" | "warning" | "error
   "Panel Discussion": "success",
   "Fireside Chat": "success",
   "Product Launch": "warning",
-  "Demo Day": "warning",
   "Design Sprint": "light",
   "Awards Ceremony": "error",
 };
@@ -398,8 +443,19 @@ export const EventsHub = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isJudgingModalOpen, setIsJudgingModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [filter, setFilter] = useState<"all" | "tech" | "speaking" | "business" | "creative" | "social">("all");
+
+  // Check if event type supports judging
+  const supportsJudging = (type: string) => {
+    return type === "Hackathon" || type === "Game Jam";
+  };
+
+  const handleOpenJudging = (event: Event) => {
+    setSelectedEvent(event);
+    setIsJudgingModalOpen(true);
+  };
 
   const handleViewEvent = (event: Event) => {
     setSelectedEvent(event);
@@ -498,22 +554,43 @@ export const EventsHub = () => {
       {/* Filter Pills */}
       <div className="flex flex-wrap gap-2 mb-6">
         {[
-          { key: "all", label: "All Events" },
-          { key: "tech", label: "💻 Tech" },
-          { key: "speaking", label: "🎤 Speaking" },
-          { key: "business", label: "📈 Business" },
-          { key: "creative", label: "🎨 Creative" },
-          { key: "social", label: "🤝 Social" },
+          { key: "all", label: "All Events", icon: null },
+          { key: "tech", label: "Tech", icon: (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          )},
+          { key: "speaking", label: "Speaking", icon: (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          )},
+          { key: "business", label: "Business", icon: (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          )},
+          { key: "creative", label: "Creative", icon: (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+          )},
+          { key: "social", label: "Social", icon: (
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          )},
         ].map((item) => (
           <button
             key={item.key}
             onClick={() => setFilter(item.key as typeof filter)}
-            className={`px-3 py-1.5 text-theme-xs font-medium rounded-full transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-theme-xs font-medium rounded-full transition-colors ${
               filter === item.key
                 ? "bg-brand-500 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
             }`}
           >
+            {item.icon}
             {item.label}
           </button>
         ))}
@@ -527,8 +604,8 @@ export const EventsHub = () => {
               className="flex flex-col gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between hover:border-brand-200 dark:hover:border-brand-500/30 transition-colors"
             >
               <div className="flex items-start gap-4 flex-1">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-2xl dark:bg-gray-800 shrink-0">
-                  {event.icon}
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 shrink-0">
+                  {getEventIcon(event.type)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1 flex-wrap">
@@ -551,7 +628,10 @@ export const EventsHub = () => {
                     </Badge>
                     {event.isVirtual && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs dark:bg-blue-500/10 dark:text-blue-400">
-                        🌐 Virtual
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                        Virtual
                       </span>
                     )}
                   </div>
@@ -581,6 +661,18 @@ export const EventsHub = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {supportsJudging(event.type) && (
+                    <button
+                      onClick={() => handleOpenJudging(event)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-500/10 dark:text-purple-400 dark:hover:bg-purple-500/20 text-theme-xs font-medium transition-colors"
+                      title="Manage judging for this event"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                      Judging
+                    </button>
+                  )}
                   <button
                     onClick={() => handleViewEvent(event)}
                     className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium"
@@ -650,6 +742,18 @@ export const EventsHub = () => {
       event={selectedEvent}
       onSave={handleSaveEvent}
     />
+    {selectedEvent && (
+      <JudgingModal
+        isOpen={isJudgingModalOpen}
+        onClose={() => {
+          setIsJudgingModalOpen(false);
+          setSelectedEvent(null);
+        }}
+        eventId={String(selectedEvent.id)}
+        eventTitle={selectedEvent.title}
+        eventType={selectedEvent.type}
+      />
+    )}
     </>
   );
 };

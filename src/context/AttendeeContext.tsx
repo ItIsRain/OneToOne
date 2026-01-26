@@ -84,7 +84,7 @@ export function AttendeeProvider({
 
   const storageKey = `attendee_token_${eventSlug}`;
 
-  const refreshSession = useCallback(async () => {
+  const refreshSession = useCallback(async (signal?: AbortSignal) => {
     const storedToken = localStorage.getItem(storageKey);
     if (!storedToken) {
       setIsLoading(false);
@@ -96,10 +96,14 @@ export function AttendeeProvider({
         headers: {
           Authorization: `Bearer ${storedToken}`,
         },
+        signal,
       });
+
+      if (signal?.aborted) return;
 
       if (response.ok) {
         const data = await response.json();
+        if (signal?.aborted) return;
         setAttendee(data.attendee);
         setTeam(data.team);
         setTeamRole(data.teamRole);
@@ -111,15 +115,24 @@ export function AttendeeProvider({
         setAttendee(null);
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error("Error refreshing session:", error);
       localStorage.removeItem(storageKey);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [eventSlug, storageKey]);
 
   useEffect(() => {
-    refreshSession();
+    const abortController = new AbortController();
+    refreshSession(abortController.signal);
+    return () => {
+      abortController.abort();
+    };
   }, [refreshSession]);
 
   const login = async (email: string, password: string) => {

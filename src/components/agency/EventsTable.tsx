@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { AddEventModal } from "./modals";
+import { AddEventModal, JudgingModal } from "./modals";
 import { EventDetailsSidebar } from "./sidebars";
 
 interface EventRequirements {
@@ -154,10 +154,16 @@ export const EventsTable = () => {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
+  const [judgingEvent, setJudgingEvent] = useState<Event | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Check if event type supports judging (hackathons and game jams)
+  const supportsJudging = (eventType?: string) => {
+    return eventType === "hackathon" || eventType === "game_jam";
+  };
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -557,6 +563,20 @@ export const EventsTable = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-1">
+                        {supportsJudging(event.event_type) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setJudgingEvent(event);
+                            }}
+                            className="p-1.5 rounded-lg text-purple-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                            title="Manage judging"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                          </button>
+                        )}
                         {event.slug && (
                           <button
                             onClick={(e) => {
@@ -690,6 +710,14 @@ export const EventsTable = () => {
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {supportsJudging(event.event_type) && (
+                          <button
+                            onClick={() => setJudgingEvent(event)}
+                            className="text-purple-500 hover:text-purple-600 text-sm font-medium"
+                          >
+                            Judging
+                          </button>
+                        )}
                         {event.slug && (
                           <button
                             onClick={() => copyEventLink(event)}
@@ -747,6 +775,17 @@ export const EventsTable = () => {
         onEdit={handleEditEvent}
         onDelete={handleDeleteEvent}
       />
+
+      {/* Judging Modal */}
+      {judgingEvent && (
+        <JudgingModal
+          isOpen={!!judgingEvent}
+          onClose={() => setJudgingEvent(null)}
+          eventId={judgingEvent.id}
+          eventTitle={judgingEvent.title}
+          eventType={judgingEvent.event_type || ""}
+        />
+      )}
     </div>
   );
 };

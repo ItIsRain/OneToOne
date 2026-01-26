@@ -97,7 +97,16 @@ export async function GET(
       throw error;
     }
 
-    return NextResponse.json(event);
+    // Get actual attendees count from event_attendees table
+    const { count: actualAttendeesCount } = await supabase
+      .from("event_attendees")
+      .select("*", { count: "exact", head: true })
+      .eq("event_id", event.id);
+
+    return NextResponse.json({
+      ...event,
+      attendees_count: actualAttendeesCount || 0
+    });
   } catch (error) {
     console.error("Error fetching event:", error);
     return NextResponse.json(

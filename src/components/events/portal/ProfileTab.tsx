@@ -8,15 +8,22 @@ interface ProfileTabProps {
   attendee: Attendee;
   eventColor: string;
   requirements?: Record<string, unknown>;
+  eventType?: string;
 }
 
-export const ProfileTab: React.FC<ProfileTabProps> = ({ attendee, eventColor, requirements = {} }) => {
+export const ProfileTab: React.FC<ProfileTabProps> = ({ attendee, eventColor, requirements = {}, eventType = "hackathon" }) => {
   const { updateProfile } = useAttendee();
+
+  // Check if this is a competition event (hackathon/game_jam)
+  const isCompetitionEvent = ["hackathon", "game_jam"].includes(eventType);
 
   // Check if this is a solo event (no teams needed)
   const minTeamSize = (requirements.team_size_min as number) || 1;
   const maxTeamSize = (requirements.team_size_max as number) || 5;
   const isSoloEvent = minTeamSize === 1 && maxTeamSize === 1;
+
+  // Show team-related sections only for competition events with teams
+  const showTeamSections = isCompetitionEvent && !isSoloEvent;
   const [formData, setFormData] = useState({
     name: attendee.name || "",
     company: attendee.company || "",
@@ -81,7 +88,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ attendee, eventColor, re
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{attendee.name}</h2>
               <p className="text-gray-500 dark:text-gray-400 mb-3">{attendee.email}</p>
-              {formData.looking_for_team && (
+              {isCompetitionEvent && formData.looking_for_team && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -159,48 +166,50 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ attendee, eventColor, re
             </div>
           </div>
 
-          {/* Skills Section */}
-          <div>
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              Skills & Expertise
-            </h4>
+          {/* Skills Section - Only for competition events */}
+          {isCompetitionEvent && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Your Skills
-              </label>
-              <input
-                type="text"
-                value={formData.skills}
-                onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                className={inputClasses}
-                style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
-                placeholder="React, Python, Machine Learning, UI/UX Design..."
-              />
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Separate skills with commas. These help teammates find you.
-              </p>
-            </div>
-
-            {/* Skill Preview */}
-            {formData.skills && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {formData.skills.split(",").map((skill, i) => (
-                  skill.trim() && (
-                    <span
-                      key={i}
-                      className="px-3 py-1.5 text-sm font-medium rounded-lg"
-                      style={{ backgroundColor: `${eventColor}15`, color: eventColor }}
-                    >
-                      {skill.trim()}
-                    </span>
-                  )
-                ))}
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                Skills & Expertise
+              </h4>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Your Skills
+                </label>
+                <input
+                  type="text"
+                  value={formData.skills}
+                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
+                  className={inputClasses}
+                  style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                  placeholder="React, Python, Machine Learning, UI/UX Design..."
+                />
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  Separate skills with commas. These help teammates find you.
+                </p>
               </div>
-            )}
-          </div>
+
+              {/* Skill Preview */}
+              {formData.skills && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {formData.skills.split(",").map((skill, i) => (
+                    skill.trim() && (
+                      <span
+                        key={i}
+                        className="px-3 py-1.5 text-sm font-medium rounded-lg"
+                        style={{ backgroundColor: `${eventColor}15`, color: eventColor }}
+                      >
+                        {skill.trim()}
+                      </span>
+                    )
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bio Section */}
           <div>
@@ -228,8 +237,8 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ attendee, eventColor, re
             </div>
           </div>
 
-          {/* Team Preferences - Only show for team events */}
-          {!isSoloEvent && (
+          {/* Team Preferences - Only show for competition events with teams */}
+          {showTeamSections && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

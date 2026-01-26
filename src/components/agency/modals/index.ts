@@ -37,3 +37,4 @@ export { CreateFolderModal } from "./CreateFolderModal";
 export { AddAnnouncementModal } from "./AddAnnouncementModal";
 export { AddGoalModal } from "./AddGoalModal";
 export { AddBookmarkModal } from "./AddBookmarkModal";
+export { JudgingModal } from "./JudgingModal";
