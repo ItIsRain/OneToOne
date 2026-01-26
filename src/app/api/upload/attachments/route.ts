@@ -41,6 +41,14 @@ async function getSupabaseClient() {
   );
 }
 
+// Sanitize filename for Cloudinary public_id
+function sanitizePublicId(fileName: string): string {
+  return fileName
+    .replace(/\.[^/.]+$/, "") // Remove extension
+    .replace(/[^a-zA-Z0-9-_]/g, "_") // Replace special chars with underscore
+    .substring(0, 50); // Limit length
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await getSupabaseClient();
@@ -60,6 +68,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_URL) {
+      return NextResponse.json({ error: "Cloudinary not configured" }, { status: 500 });
+    }
+
     // Determine resource type based on file type
     const resourceType = fileType?.startsWith("image/")
       ? "image"
@@ -67,11 +80,15 @@ export async function POST(request: Request) {
       ? "video"
       : "raw";
 
+    // Sanitize the filename for public_id
+    const sanitizedName = sanitizePublicId(fileName || "file");
+    const publicId = `${Date.now()}-${sanitizedName}`;
+
     // Upload to Cloudinary
     const uploadResult = await cloudinary.uploader.upload(file, {
       folder: "attachments",
       resource_type: resourceType,
-      public_id: `${Date.now()}-${fileName?.replace(/\.[^/.]+$/, "") || "file"}`,
+      public_id: publicId,
       // Preserve original file extension for raw files
       ...(resourceType === "raw" && { format: fileName?.split(".").pop() }),
     });
@@ -85,7 +102,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -109,6 +127,11 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_URL) {
+      return NextResponse.json({ error: "Cloudinary not configured" }, { status: 500 });
+    }
+
     const uploadPromises = files.map(async ({ file, fileName, fileType }) => {
       const resourceType = fileType?.startsWith("image/")
         ? "image"
@@ -116,10 +139,13 @@ export async function PUT(request: Request) {
         ? "video"
         : "raw";
 
+      const sanitizedName = sanitizePublicId(fileName || "file");
+      const publicId = `${Date.now()}-${sanitizedName}`;
+
       const uploadResult = await cloudinary.uploader.upload(file, {
         folder: "attachments",
         resource_type: resourceType,
-        public_id: `${Date.now()}-${fileName?.replace(/\.[^/.]+$/, "") || "file"}`,
+        public_id: publicId,
         ...(resourceType === "raw" && { format: fileName?.split(".").pop() }),
       });
 
@@ -137,6 +163,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ attachments: results });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Upload failed";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

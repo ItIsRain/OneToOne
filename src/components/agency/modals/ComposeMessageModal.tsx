@@ -91,7 +91,9 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
           const data = await response.json();
           setAttachments((prev) => [...prev, data]);
         } else {
-          console.error("Failed to upload:", file.name);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Failed to upload:", file.name, errorData.error || response.statusText);
+          alert(`Failed to upload ${file.name}: ${errorData.error || "Unknown error"}`);
         }
 
         setUploadingFiles((prev) => prev.filter((name) => name !== file.name));

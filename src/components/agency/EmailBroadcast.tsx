@@ -331,13 +331,16 @@ export const EmailBroadcast = () => {
           const data = await response.json();
           setAttachments((prev) => [...prev, data]);
         } else {
-          console.error("Failed to upload:", file.name);
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Failed to upload:", file.name, errorData.error || response.statusText);
+          alert(`Failed to upload ${file.name}: ${errorData.error || "Unknown error"}`);
         }
 
         setUploadingFiles((prev) => prev.filter((name) => name !== file.name));
       }
     } catch (error) {
       console.error("Upload error:", error);
+      alert("Upload failed. Please try again.");
       setUploadingFiles([]);
     }
 
