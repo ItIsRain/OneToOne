@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+
+// Use service role for public judge access (no auth required - token-based)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // GET - Get judge dashboard data
 export async function GET(
@@ -8,7 +14,6 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
-    const supabase = await createClient();
 
     // Find judge by access token
     const { data: judge, error: judgeError } = await supabase
