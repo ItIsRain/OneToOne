@@ -284,7 +284,44 @@ export const EmailBroadcast = () => {
   };
 
   const handleSelectTemplate = (templateId: string) => {
-    setFormData({ ...formData, template: templateId });
+    let templateContent = "";
+    let templateSubject = "";
+    let templatePreheader = "";
+
+    switch (templateId) {
+      case "announcement":
+        templateSubject = "Important Announcement";
+        templatePreheader = "We have some exciting news to share with you";
+        templateContent = `Dear {{name}},\n\nWe have an important announcement to share with you.\n\n[Your announcement content here]\n\nThank you for your continued support.\n\nBest regards,\nThe Team`;
+        break;
+      case "newsletter":
+        templateSubject = "Monthly Newsletter";
+        templatePreheader = "Your monthly update is here";
+        templateContent = `Hi {{name}},\n\nWelcome to this month's newsletter!\n\n📰 What's New\n[Share your updates here]\n\n🎯 Upcoming Events\n[List upcoming events]\n\n💡 Tips & Resources\n[Share helpful content]\n\nStay connected,\nThe Team`;
+        break;
+      case "reminder":
+        templateSubject = "Friendly Reminder";
+        templatePreheader = "Don't forget about this important reminder";
+        templateContent = `Hi {{name}},\n\nThis is a friendly reminder about [topic].\n\n📅 When: [Date/Time]\n📍 Where: [Location/Link]\n\nPlease let us know if you have any questions.\n\nBest regards,\nThe Team`;
+        break;
+      case "followup":
+        templateSubject = "Following Up";
+        templatePreheader = "We wanted to follow up with you";
+        templateContent = `Hi {{name}},\n\nThank you for [meeting/attending/etc.]. We wanted to follow up and [share next steps/get your feedback/etc.].\n\n[Your follow-up content here]\n\nLooking forward to hearing from you.\n\nBest regards,\nThe Team`;
+        break;
+      default:
+        // Blank template
+        templateContent = `Dear {{name}},\n\n[Your message here]\n\nBest regards,\nThe Team`;
+        break;
+    }
+
+    setFormData({
+      ...formData,
+      template: templateId,
+      subject: templateSubject,
+      preheader: templatePreheader,
+      content: templateContent,
+    });
     setCurrentStep(2);
   };
 
@@ -314,19 +351,41 @@ export const EmailBroadcast = () => {
         selectedEventId: eventId,
         subject: `You're Invited: ${event.title}`,
         preheader: `Join us for ${event.title} on ${formattedDate}`,
-        content: `Dear [Name],\n\nWe are excited to invite you to ${event.title}!\n\n📅 Date: ${formattedDate}\n⏰ Time: ${formattedTime}\n📍 Location: ${location}\n\n${event.description || "We look forward to seeing you there!"}\n\nBest regards,\nThe Team`,
+        content: `Dear {{name}},\n\nWe are excited to invite you to ${event.title}!\n\n📅 Date: ${formattedDate}\n⏰ Time: ${formattedTime}\n📍 Location: ${location}\n\n${event.description || "We look forward to seeing you there!"}\n\nBest regards,\nThe Team`,
         ctaText: "RSVP Now",
         ctaUrl: "",
       });
     }
   };
 
+  // Helper function to replace template variables with recipient data
+  const personalizeContent = (content: string, recipient: Recipient) => {
+    return content
+      .replace(/\{\{name\}\}/gi, recipient.name)
+      .replace(/\{\{email\}\}/gi, recipient.email)
+      .replace(/\{\{first_name\}\}/gi, recipient.name.split(" ")[0])
+      .replace(/\{\{type\}\}/gi, recipient.type);
+  };
+
   const handleSendBroadcast = () => {
     const selectedRecipients = recipients.filter((r) => r.selected);
-    console.log("Sending broadcast:", {
-      recipients: selectedRecipients,
-      ...formData,
-    });
+
+    // Prepare personalized emails for each recipient
+    const preparedEmails = selectedRecipients.map((recipient) => ({
+      to: recipient.email,
+      toName: recipient.name,
+      subject: personalizeContent(formData.subject, recipient),
+      preheader: personalizeContent(formData.preheader, recipient),
+      content: personalizeContent(formData.content, recipient),
+      ctaText: formData.ctaText,
+      ctaUrl: formData.ctaUrl,
+    }));
+
+    console.log("Prepared emails for sending:", preparedEmails);
+
+    // TODO: Send to email service API
+    // Example: await fetch('/api/email/broadcast', { method: 'POST', body: JSON.stringify({ emails: preparedEmails }) });
+
     setIsModalOpen(false);
     // Reset selections
     setRecipients(recipients.map((r) => ({ ...r, selected: false })));
@@ -820,6 +879,24 @@ export const EmailBroadcast = () => {
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Available variables:</span>
+                  {[
+                    { var: "{{name}}", desc: "Full name" },
+                    { var: "{{first_name}}", desc: "First name" },
+                    { var: "{{email}}", desc: "Email address" },
+                  ].map((item) => (
+                    <button
+                      key={item.var}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, content: formData.content + item.var })}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                      title={item.desc}
+                    >
+                      <code>{item.var}</code>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
