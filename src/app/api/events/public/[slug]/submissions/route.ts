@@ -9,12 +9,18 @@ interface SubmissionWithRelations {
   project_url?: string;
   demo_url?: string;
   video_url?: string;
+  repository_url?: string;
+  presentation_url?: string;
+  solution?: string;
+  files?: { name: string; size: number; url: string }[];
   technologies?: string[];
   categories?: string[];
   screenshots?: string[];
   status: string;
   submitted_at?: string;
   created_at: string;
+  team_id?: string | null;
+  attendee_id?: string | null;
   team?: { id: string; name: string; logo_url?: string } | null;
   attendee?: { id: string; name: string; avatar_url?: string } | null;
 }
@@ -57,6 +63,7 @@ export async function GET(
       .select(`
         id, title, description, project_url, demo_url, video_url,
         technologies, categories, screenshots, status, submitted_at, created_at,
+        repository_url, team_id, attendee_id, solution, files, presentation_url,
         team:team_id(id, name, logo_url),
         attendee:attendee_id(id, name, avatar_url)
       `)
@@ -79,8 +86,10 @@ export async function GET(
     const typedSubmissions = (submissions || []) as unknown as SubmissionWithRelations[];
     const filteredSubmissions = typedSubmissions.filter(sub => {
       if (sub.status === "draft") {
-        return sub.attendee?.id === attendeeId ||
-               (sub.team && attendeeId); // Team members can see their team's drafts
+        // Check direct attendee_id field or nested attendee.id
+        const isOwner = sub.attendee_id === attendeeId || sub.attendee?.id === attendeeId;
+        const isTeamMember = sub.team_id && attendeeId; // Team members can see their team's drafts
+        return isOwner || isTeamMember;
       }
       return true;
     });
@@ -188,10 +197,11 @@ export async function POST(
       demo_url,
       video_url,
       repository_url,
-      presentation_url,
       technologies,
       categories,
       screenshots,
+      solution,
+      files,
     } = body;
 
     // Create submission
@@ -207,10 +217,11 @@ export async function POST(
         demo_url,
         video_url,
         repository_url,
-        presentation_url,
         technologies: technologies || [],
         categories: categories || [],
         screenshots: screenshots || [],
+        solution: solution || null,
+        files: files || [],
         status: "draft",
       })
       .select()

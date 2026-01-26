@@ -26,6 +26,8 @@ interface Team {
   max_members: number;
   is_open: boolean;
   looking_for_members: boolean;
+  join_type?: "open" | "invite_only" | "code";
+  join_code?: string;
 }
 
 interface EventInfo {
@@ -35,6 +37,8 @@ interface EventInfo {
   event_type: string;
   color?: string;
   requirements?: Record<string, unknown>;
+  start_date?: string;
+  end_date?: string;
 }
 
 interface AttendeeContextType {

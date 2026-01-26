@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import Link from "next/link";
 import { DetailsSidebar, InfoRow, Section, StatsGrid, StatItem } from "@/components/ui/DetailsSidebar";
 import Badge from "@/components/ui/badge/Badge";
 
@@ -458,6 +459,62 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
             )}
           </div>
         </div>
+
+        {/* Event Management */}
+        {event.registration_required && (
+          <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+            <h4 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+              <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Event Management
+            </h4>
+            <div className="space-y-2">
+              <Link
+                href={`/dashboard/events/${event.id}/attendees`}
+                className="w-full flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  <div className="text-left">
+                    <p className="font-medium">Manage Attendees</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {event.attendees_count || 0} registered
+                    </p>
+                  </div>
+                </div>
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+
+              {/* Submissions link - only for hackathon/game_jam */}
+              {(event.event_type === "hackathon" || event.event_type === "game_jam") && (
+                <Link
+                  href={`/dashboard/events/${event.id}/submissions`}
+                  className="w-full flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-gray-700 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="h-5 w-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div className="text-left">
+                      <p className="font-medium">Manage Submissions</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        View & mark winners
+                      </p>
+                    </div>
+                  </div>
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Client */}
         {event.client && (

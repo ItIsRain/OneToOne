@@ -11,6 +11,18 @@ export async function GET(
     const { slug, teamId } = await params;
     const supabase = await createClient();
 
+    // Check if requester is authenticated (to show join_code to leaders only)
+    const authHeader = request.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
+    let currentAttendeeId: string | null = null;
+
+    if (token) {
+      const payload = await verifyToken(token);
+      if (payload) {
+        currentAttendeeId = payload.attendeeId;
+      }
+    }
+
     // Get event
     const { data: event } = await supabase
       .from("events")
@@ -40,7 +52,21 @@ export async function GET(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ team });
+    // Check if current user is the team leader
+    const isLeader = currentAttendeeId && team.members?.some(
+      (m: { attendee: { id: string } | null; role: string; status: string }) =>
+        m.attendee?.id === currentAttendeeId && m.role === "leader" && m.status === "active"
+    );
+
+    // Format response - only include join_code for team leaders
+    const teamResponse = {
+      ...team,
+      join_type: team.join_type || (team.is_open ? 'open' : 'invite_only'),
+      // Only expose join_code to team leaders
+      join_code: isLeader ? team.join_code : undefined,
+    };
+
+    return NextResponse.json({ team: teamResponse });
   } catch (error) {
     console.error("Get team error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -85,19 +111,44 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name, description, skills_needed, is_open, looking_for_members, logo_url } = body;
+    const { name, description, skills_needed, is_open, looking_for_members, logo_url, join_type, join_code, generate_new_code } = body;
+
+    // Build update data
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Only update fields that are provided
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (skills_needed !== undefined) updateData.skills_needed = skills_needed;
+    if (looking_for_members !== undefined) updateData.looking_for_members = looking_for_members;
+    if (logo_url !== undefined) updateData.logo_url = logo_url;
+
+    // Handle join_type and join_code
+    if (join_type) {
+      updateData.join_type = join_type;
+      updateData.is_open = join_type === 'open';
+
+      if (join_type === 'code') {
+        if (generate_new_code) {
+          // Generate a new join code
+          updateData.join_code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        } else if (join_code) {
+          updateData.join_code = join_code.toUpperCase();
+        }
+      } else {
+        // Clear join code for non-code join types
+        updateData.join_code = null;
+      }
+    } else if (is_open !== undefined) {
+      updateData.is_open = is_open;
+      updateData.join_type = is_open ? 'open' : 'invite_only';
+    }
 
     const { data: team, error } = await supabase
       .from("event_teams")
-      .update({
-        name,
-        description,
-        skills_needed,
-        is_open,
-        looking_for_members,
-        logo_url,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq("id", teamId)
       .select()
       .single();
@@ -179,6 +230,7 @@ export async function POST(
         return NextResponse.json({ error: "Team not found" }, { status: 404 });
       }
 
+      // Check if team is open for joining
       if (!team.is_open) {
         return NextResponse.json(
           { error: "This team is not accepting new members" },
@@ -236,7 +288,7 @@ export async function POST(
 
       // If leader, need to transfer leadership or delete team
       if (membership.role === "leader") {
-        // Check if there are other members
+        // Check if there are other active members
         const { data: otherMembers } = await supabase
           .from("event_team_members")
           .select("id, attendee_id")
@@ -252,12 +304,33 @@ export async function POST(
             .update({ role: "leader" })
             .eq("id", otherMembers[0].id);
         } else {
-          // Delete the team if no other members
-          await supabase.from("event_teams").delete().eq("id", teamId);
+          // First mark the current member as left
+          await supabase
+            .from("event_team_members")
+            .update({ status: "left" })
+            .eq("id", membership.id);
+
+          // Then delete the team (no other active members)
+          const { error: deleteError } = await supabase
+            .from("event_teams")
+            .delete()
+            .eq("id", teamId);
+
+          if (deleteError) {
+            console.error("Error deleting team:", deleteError);
+          }
+
+          // Update attendee
+          await supabase
+            .from("event_attendees")
+            .update({ looking_for_team: true })
+            .eq("id", payload.attendeeId);
+
+          return NextResponse.json({ success: true, message: "Left team successfully. Team was deleted." });
         }
       }
 
-      // Remove from team
+      // Remove from team (for non-leaders, or leaders when there are other members)
       await supabase
         .from("event_team_members")
         .update({ status: "left" })

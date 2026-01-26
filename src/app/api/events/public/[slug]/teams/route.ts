@@ -31,10 +31,11 @@ export async function GET(
       .from("event_teams")
       .select(`
         id, name, description, logo_url, max_members, is_open,
-        looking_for_members, skills_needed, created_at,
+        looking_for_members, skills_needed, created_at, join_type, join_code,
         members:event_team_members(
           id,
           role,
+          status,
           attendee:attendee_id(id, name, avatar_url, skills)
         )
       `)
@@ -47,11 +48,20 @@ export async function GET(
     }
 
     // Filter to only active members and format response
-    const formattedTeams = teams?.map(team => ({
-      ...team,
-      members: (team.members || []).filter((m: { attendee: unknown }) => m.attendee),
-      memberCount: (team.members || []).filter((m: { attendee: unknown }) => m.attendee).length,
-    }));
+    const formattedTeams = teams?.map(team => {
+      const activeMembers = (team.members || []).filter(
+        (m: { attendee: unknown; status?: string }) => m.attendee && m.status === 'active'
+      );
+      return {
+        ...team,
+        // Use actual join_type from DB, fallback to is_open for backwards compatibility
+        join_type: team.join_type || (team.is_open ? 'open' : 'invite_only'),
+        // Don't expose join_code in list view
+        join_code: undefined,
+        members: activeMembers,
+        memberCount: activeMembers.length,
+      };
+    });
 
     return NextResponse.json({ teams: formattedTeams || [] });
   } catch (error) {
@@ -108,11 +118,21 @@ export async function POST(
       );
     }
 
-    const { name, description, skills_needed, max_members } = body;
+    const { name, description, skills_needed, max_members, join_type } = body;
 
     // Get max team size from event requirements
     const requirements = event.requirements as Record<string, unknown> || {};
     const maxTeamSize = (requirements.team_size_max as number) || max_members || 5;
+
+    // Determine is_open based on join_type (if provided)
+    const validJoinTypes = ['open', 'code', 'invite_only'];
+    const teamJoinType = validJoinTypes.includes(join_type) ? join_type : 'open';
+    const isOpen = teamJoinType === 'open';
+
+    // Generate join code if join_type is 'code'
+    const joinCode = teamJoinType === 'code'
+      ? Math.random().toString(36).substring(2, 8).toUpperCase()
+      : null;
 
     // Create team
     const { data: team, error: teamError } = await supabase
@@ -123,9 +143,11 @@ export async function POST(
         description: description || null,
         skills_needed: skills_needed || [],
         max_members: maxTeamSize,
-        is_open: true,
+        is_open: isOpen,
         looking_for_members: true,
         created_by: payload.attendeeId,
+        join_type: teamJoinType,
+        join_code: joinCode,
       })
       .select()
       .single();

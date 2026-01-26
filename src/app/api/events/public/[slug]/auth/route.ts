@@ -212,7 +212,7 @@ export async function GET(
     // Get event
     const { data: event } = await supabase
       .from("events")
-      .select("id, title, slug, event_type, requirements, color")
+      .select("id, title, slug, event_type, requirements, color, start_date, end_date")
       .eq("slug", slug)
       .single();
 
@@ -241,7 +241,7 @@ export async function GET(
       .select(`
         role,
         team:team_id (
-          id, name, description, logo_url, max_members, is_open, looking_for_members
+          id, name, description, logo_url, max_members, is_open, looking_for_members, join_type, join_code
         )
       `)
       .eq("attendee_id", attendee.id)

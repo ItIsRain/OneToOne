@@ -34,8 +34,7 @@ export async function GET(
             attendee:attendee_id(id, name, avatar_url, company)
           )
         ),
-        attendee:attendee_id(id, name, avatar_url, company, bio),
-        files:event_submission_files(id, file_name, file_url, file_size, file_type, uploaded_at)
+        attendee:attendee_id(id, name, avatar_url, company, bio)
       `)
       .eq("id", submissionId)
       .eq("event_id", event.id)
@@ -118,10 +117,25 @@ export async function PATCH(
 
     // Check if submission deadline has passed for final submissions
     const requirements = event.requirements as Record<string, unknown> || {};
-    const submissionDeadline = requirements.submission_deadline as string;
+    const submissionDeadline = (requirements.submission_deadline || requirements.submissionDeadline) as string;
 
     const body = await request.json();
-    const { action, ...updateData } = body;
+    const { action } = body;
+
+    // Extract the fields to update
+    const safeUpdateData: Record<string, unknown> = {};
+    if (body.title !== undefined) safeUpdateData.title = body.title;
+    if (body.description !== undefined) safeUpdateData.description = body.description;
+    if (body.project_url !== undefined) safeUpdateData.project_url = body.project_url;
+    if (body.demo_url !== undefined) safeUpdateData.demo_url = body.demo_url;
+    if (body.video_url !== undefined) safeUpdateData.video_url = body.video_url;
+    if (body.repository_url !== undefined) safeUpdateData.repository_url = body.repository_url;
+    if (body.presentation_url !== undefined) safeUpdateData.presentation_url = body.presentation_url;
+    if (body.technologies !== undefined) safeUpdateData.technologies = body.technologies;
+    if (body.categories !== undefined) safeUpdateData.categories = body.categories;
+    if (body.screenshots !== undefined) safeUpdateData.screenshots = body.screenshots;
+    if (body.solution !== undefined) safeUpdateData.solution = body.solution;
+    if (body.files !== undefined) safeUpdateData.files = body.files;
 
     if (action === "submit") {
       // Final submission
@@ -133,14 +147,14 @@ export async function PATCH(
       }
 
       // Validate required fields
-      if (!updateData.title?.trim()) {
+      if (!body.title?.trim()) {
         return NextResponse.json({ error: "Title is required" }, { status: 400 });
       }
 
       const { data: updated, error: updateError } = await supabase
         .from("event_submissions")
         .update({
-          ...updateData,
+          ...safeUpdateData,
           status: "submitted",
           submitted_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -167,7 +181,7 @@ export async function PATCH(
       const { data: updated, error: updateError } = await supabase
         .from("event_submissions")
         .update({
-          ...updateData,
+          ...safeUpdateData,
           updated_at: new Date().toISOString(),
         })
         .eq("id", submissionId)
