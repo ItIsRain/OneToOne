@@ -38,3 +38,5 @@ export { AddAnnouncementModal } from "./AddAnnouncementModal";
 export { AddGoalModal } from "./AddGoalModal";
 export { AddBookmarkModal } from "./AddBookmarkModal";
 export { JudgingModal } from "./JudgingModal";
+export { MessageDetailsModal } from "./MessageDetailsModal";
+export { EmailDetailsModal } from "./EmailDetailsModal";

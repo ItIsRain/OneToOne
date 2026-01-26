@@ -26,6 +26,11 @@ export { FilesTable } from "./FilesTable";
 export { ContractsTable } from "./ContractsTable";
 export { TemplatesTable } from "./TemplatesTable";
 export { SharedFilesTable } from "./SharedFilesTable";
+export { MessagesTable } from "./MessagesTable";
+export { MessagesChat } from "./MessagesChat";
+export { EmailsTable } from "./EmailsTable";
+export { NotificationsTable } from "./NotificationsTable";
+export { EmailBroadcast } from "./EmailBroadcast";
 
 // Sidebars
 export * from "./sidebars";

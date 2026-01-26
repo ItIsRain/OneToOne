@@ -1,57 +1,116 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
-// Feature data
+// Feature data with SVG icon names
 const features = [
   {
-    icon: "👥",
+    id: "crm",
     title: "CRM & Client Management",
-    description: "Track clients, manage leads, organize contacts, and visualize your sales pipeline. Never lose a potential customer again.",
+    description: "Track clients, manage leads, organize contacts, and visualize your sales pipeline with powerful analytics.",
     highlights: ["Lead Pipeline", "Client Profiles", "Contact Management", "Deal Tracking"],
   },
   {
-    icon: "📋",
+    id: "projects",
     title: "Project Management",
-    description: "Organize tasks, visualize workflows with Kanban boards, and track project timelines. Keep your team aligned and productive.",
+    description: "Organize tasks, visualize workflows with Kanban boards, and track project timelines effortlessly.",
     highlights: ["Kanban Boards", "Task Assignment", "Timeline Views", "Progress Tracking"],
   },
   {
-    icon: "🎉",
+    id: "events",
     title: "Event Management",
-    description: "Plan and execute events of any scale. From conferences to product launches, manage every detail in one place.",
+    description: "Plan and execute events of any scale. From conferences to product launches, manage every detail.",
     highlights: ["Calendar View", "Venue Management", "Booking System", "Attendee Tracking"],
   },
   {
-    icon: "💰",
+    id: "finance",
     title: "Finance & Invoicing",
-    description: "Create invoices, track expenses, manage budgets, and monitor payments. Complete financial visibility at your fingertips.",
+    description: "Create invoices, track expenses, manage budgets, and monitor payments with complete visibility.",
     highlights: ["Invoice Creation", "Expense Tracking", "Budget Management", "Payment Processing"],
   },
   {
-    icon: "👨‍💼",
+    id: "team",
     title: "Team Management",
-    description: "Manage team members, define roles and permissions, track time, and handle payroll. Build a high-performing team.",
+    description: "Manage team members, define roles and permissions, track time, and streamline payroll operations.",
     highlights: ["Role-Based Access", "Time Tracking", "Payroll Management", "Performance Insights"],
   },
   {
-    icon: "📁",
+    id: "documents",
     title: "Document Management",
     description: "Store, organize, and share documents securely. Manage contracts and templates with version control.",
     highlights: ["File Storage", "Contract Management", "Template Library", "Secure Sharing"],
   },
 ];
 
+// Feature Icons Component
+const FeatureIcon = ({ id, className = "" }: { id: string; className?: string }) => {
+  const icons: Record<string, React.ReactNode> = {
+    crm: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+    projects: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+    events: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+        <path d="M8 14h.01" />
+        <path d="M12 14h.01" />
+        <path d="M16 14h.01" />
+        <path d="M8 18h.01" />
+        <path d="M12 18h.01" />
+      </svg>
+    ),
+    finance: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23" />
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      </svg>
+    ),
+    team: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+        <path d="M2 17l10 5 10-5" />
+        <path d="M2 12l10 5 10-5" />
+      </svg>
+    ),
+    documents: (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    ),
+  };
+  return icons[id] || null;
+};
+
 const eventTypes = [
   "Conferences", "Workshops", "Product Launches", "Corporate Meetings",
   "Weddings", "Networking Events", "Award Ceremonies", "Team Building",
+  "Seminars", "Trade Shows", "Galas", "Fundraisers",
 ];
 
 const stats = [
-  { value: "10,000+", label: "Active Organizations" },
-  { value: "50M+", label: "Tasks Completed" },
-  { value: "99.9%", label: "Uptime Guarantee" },
-  { value: "24/7", label: "Support Available" },
+  { display: "10+", label: "Active Organizations" },
+  { display: "1K+", label: "Tasks Completed" },
+  { display: "100%", label: "Secure & Private" },
+  { display: "24/7", label: "Support Available" },
 ];
 
 const testimonials = [
@@ -60,18 +119,42 @@ const testimonials = [
     author: "Sarah Chen",
     role: "CEO, Digital Spark Agency",
     avatar: "SC",
+    rating: 5,
   },
   {
     quote: "The event management features are incredible. We planned our entire annual conference with 500+ attendees using just this platform.",
     author: "Michael Roberts",
     role: "Event Director, TechCorp",
     avatar: "MR",
+    rating: 5,
   },
   {
     quote: "Finally, a tool that understands what agencies need. The invoicing and client management alone saved us 20 hours a week.",
     author: "Emma Williams",
     role: "Operations Manager, Creative Hub",
     avatar: "EW",
+    rating: 5,
+  },
+  {
+    quote: "The CRM pipeline view changed our sales process entirely. We can now see exactly where each deal stands at a glance.",
+    author: "David Park",
+    role: "Sales Director, GrowthLabs",
+    avatar: "DP",
+    rating: 5,
+  },
+  {
+    quote: "Document management was always our weak point. Now everything is organized, searchable, and secure. Game changer!",
+    author: "Lisa Thompson",
+    role: "COO, MediaWorks",
+    avatar: "LT",
+    rating: 5,
+  },
+  {
+    quote: "We run 50+ events per year. One To One makes coordination effortless. Our team efficiency improved by 40%.",
+    author: "James Wilson",
+    role: "Founder, EventPro",
+    avatar: "JW",
+    rating: 5,
   },
 ];
 
@@ -147,6 +230,77 @@ const faqs = [
     answer: "All plans include email support. Professional plans get priority support with faster response times. Enterprise customers get a dedicated account manager and 24/7 phone support.",
   },
 ];
+
+// Animated Counter Component
+function AnimatedCounter({ value, suffix, duration = 2000 }: { value: number; suffix: string; duration?: number }) {
+  const [count, setCount] = useState(value);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          setCount(0);
+
+          let startTime: number;
+          const animate = (currentTime: number) => {
+            if (!startTime) startTime = currentTime;
+            const progress = Math.min((currentTime - startTime) / duration, 1);
+            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+            setCount(Math.floor(easeOutQuart * value));
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              setCount(value);
+            }
+          };
+          requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasAnimated, value, duration]);
+
+  const formattedCount = count >= 1000 ? count.toLocaleString() : count;
+
+  return <span ref={ref}>{formattedCount}{suffix}</span>;
+}
+
+// Marquee Component for Event Types and Testimonials
+function Marquee({ children, direction = "left", speed = 30 }: { children: React.ReactNode; direction?: "left" | "right"; speed?: number }) {
+  return (
+    <div className="relative overflow-hidden">
+      <div
+        className="flex gap-4"
+        style={{
+          animation: `marquee-${direction} ${speed}s linear infinite`,
+        }}
+      >
+        {children}
+        {children}
+      </div>
+      <style jsx>{`
+        @keyframes marquee-left {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @keyframes marquee-right {
+          0% { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -226,10 +380,9 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
         {/* Background gradient */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-50 via-white to-emerald-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950" />
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-lime-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         </div>
@@ -342,383 +495,737 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-900 border-y border-gray-200 dark:border-gray-800">
+      {/* Stats Section - Minimal & Elegant */}
+      <section className="py-20 bg-gray-50 dark:bg-gray-900/50 border-y border-gray-100 dark:border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
             {stats.map((stat, idx) => (
-              <div key={idx} className="text-center">
-                <p className="text-3xl sm:text-4xl font-bold text-lime-500">{stat.value}</p>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
+              <div key={idx} className="text-center group">
+                <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white tracking-tight">
+                  {stat.display}
+                </p>
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-lime-500" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 lg:py-32">
+      {/* Features Section - Premium Bento Grid */}
+      <section id="features" className="py-24 lg:py-32 relative overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+        {/* Subtle Background */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(132,204,22,0.1),transparent)]" />
+        </div>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <p className="text-lime-500 font-semibold mb-4">FEATURES</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
-              Everything you need to run your organization
+          <div className="max-w-3xl mx-auto mb-20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+              <span className="text-xs font-semibold tracking-widest text-gray-500 dark:text-gray-400 uppercase">Features</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white text-center leading-tight">
+              Powerful tools, unified platform
             </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Six powerful modules working together seamlessly. Replace your scattered tools with one unified platform.
+            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 text-center max-w-2xl mx-auto">
+              Six integrated modules designed to work together. Stop switching between apps and manage everything from one place.
             </p>
           </div>
 
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, idx) => (
-              <div
-                key={idx}
-                className="group p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-lime-500 dark:hover:border-lime-500 transition-all hover:shadow-xl hover:shadow-lime-500/5"
-              >
-                <div className="w-12 h-12 bg-lime-100 dark:bg-lime-900/30 rounded-xl flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
-                  {feature.icon}
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  {feature.description}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {feature.highlights.map((highlight, hidx) => (
-                    <span
-                      key={hidx}
-                      className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full"
-                    >
-                      {highlight}
-                    </span>
-                  ))}
+          {/* Bento Grid - Asymmetric Layout */}
+          <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
+            {/* First row - 2 large cards */}
+            <div className="lg:col-span-2 group">
+              <div className="h-full bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 lg:p-10 transition-all duration-500 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-2xl hover:shadow-gray-200/50 dark:hover:shadow-none relative overflow-hidden">
+                {/* Subtle gradient on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-lime-500/5 via-transparent to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between mb-8">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-lime-500 transition-colors duration-300">
+                      <FeatureIcon id="crm" className="w-7 h-7 text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors duration-300" />
+                    </div>
+                    <svg className="w-5 h-5 text-gray-300 dark:text-gray-700 group-hover:text-lime-500 transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                    </svg>
+                  </div>
+
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                    {features[0].title}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed max-w-lg">
+                    {features[0].description}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    {features[0].highlights.map((h, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm rounded-full">
+                        {h}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="group">
+              <div className="h-full bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 transition-all duration-500 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-2xl hover:shadow-gray-200/50 dark:hover:shadow-none relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="relative z-10">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center group-hover:bg-violet-500 transition-colors duration-300">
+                      <FeatureIcon id="projects" className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors duration-300" />
+                    </div>
+                    <svg className="w-5 h-5 text-gray-300 dark:text-gray-700 group-hover:text-violet-500 transition-colors duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                    </svg>
+                  </div>
+
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    {features[1].title}
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-6">
+                    {features[1].description}
+                  </p>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {features[1].highlights.slice(0, 3).map((h, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full">
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Second row - 3 equal cards */}
+            {features.slice(2, 5).map((feature, idx) => {
+              const colors = [
+                { bg: "group-hover:bg-orange-500", text: "group-hover:text-orange-500", gradient: "from-orange-500/5 to-red-500/5" },
+                { bg: "group-hover:bg-emerald-500", text: "group-hover:text-emerald-500", gradient: "from-emerald-500/5 to-teal-500/5" },
+                { bg: "group-hover:bg-blue-500", text: "group-hover:text-blue-500", gradient: "from-blue-500/5 to-indigo-500/5" },
+              ];
+              const color = colors[idx];
+
+              return (
+                <div key={idx} className="group">
+                  <div className="h-full bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-8 transition-all duration-500 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-2xl hover:shadow-gray-200/50 dark:hover:shadow-none relative overflow-hidden">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${color.gradient} via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+
+                    <div className="relative z-10">
+                      <div className="flex items-start justify-between mb-6">
+                        <div className={`w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center ${color.bg} transition-colors duration-300`}>
+                          <FeatureIcon id={feature.id} className="w-6 h-6 text-gray-600 dark:text-gray-400 group-hover:text-white transition-colors duration-300" />
+                        </div>
+                        <svg className={`w-5 h-5 text-gray-300 dark:text-gray-700 ${color.text} transition-colors duration-300`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H7M17 7V17" />
+                        </svg>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        {feature.title}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-6">
+                        {feature.description}
+                      </p>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {feature.highlights.slice(0, 3).map((h, i) => (
+                          <span key={i} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded-full">
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Last row - Full width card */}
+            <div className="lg:col-span-3 group">
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-900 rounded-3xl p-8 lg:p-10 transition-all duration-500 hover:shadow-2xl hover:shadow-gray-900/20 relative overflow-hidden">
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-lime-500/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
+
+                <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                        <FeatureIcon id="documents" className="w-6 h-6 text-lime-400" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-white">
+                        {features[5].title}
+                      </h3>
+                    </div>
+                    <p className="text-gray-400 leading-relaxed max-w-2xl">
+                      {features[5].description}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {features[5].highlights.map((h, i) => (
+                      <span key={i} className="px-4 py-2 bg-white/10 text-gray-300 text-sm rounded-full border border-white/10">
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Event Types Section */}
-      <section className="py-20 bg-gradient-to-br from-lime-500 to-emerald-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+      {/* Event Types Section - Infinite Marquee */}
+      <section className="py-20 relative overflow-hidden bg-gray-900">
+        {/* Animated Background */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-lime-900/20 via-gray-900 to-gray-900" />
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-lime-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="relative z-10">
+          <div className="text-center mb-12 px-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
               Built for Every Type of Event
             </h2>
-            <p className="text-lime-100 text-lg max-w-2xl mx-auto">
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
               From intimate workshops to large-scale conferences, One To One handles it all.
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-3">
-            {eventTypes.map((type, idx) => (
-              <span
-                key={idx}
-                className="px-5 py-2.5 bg-white/10 backdrop-blur text-white rounded-full text-sm font-medium hover:bg-white/20 transition-colors cursor-default"
-              >
-                {type}
-              </span>
-            ))}
+
+          {/* Marquee Rows */}
+          <div className="space-y-4">
+            <Marquee direction="left" speed={40}>
+              {eventTypes.map((type, idx) => (
+                <span
+                  key={idx}
+                  className="px-6 py-3 bg-white/5 backdrop-blur-sm border border-white/10 text-white rounded-full text-sm font-medium hover:bg-white/10 hover:border-lime-500/50 transition-all cursor-default whitespace-nowrap"
+                >
+                  {type}
+                </span>
+              ))}
+            </Marquee>
+            <Marquee direction="right" speed={35}>
+              {[...eventTypes].reverse().map((type, idx) => (
+                <span
+                  key={idx}
+                  className="px-6 py-3 bg-lime-500/10 backdrop-blur-sm border border-lime-500/20 text-lime-300 rounded-full text-sm font-medium hover:bg-lime-500/20 hover:border-lime-500/40 transition-all cursor-default whitespace-nowrap"
+                >
+                  {type}
+                </span>
+              ))}
+            </Marquee>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section id="how-it-works" className="py-20 lg:py-32">
+      {/* How It Works Section - Refined Timeline */}
+      <section id="how-it-works" className="py-24 lg:py-32 relative bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <p className="text-lime-500 font-semibold mb-4">HOW IT WORKS</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
-              Get started in minutes
+          {/* Section Header */}
+          <div className="max-w-3xl mx-auto mb-20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+              <span className="text-xs font-semibold tracking-widest text-gray-500 dark:text-gray-400 uppercase">How it works</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white text-center leading-tight">
+              Up and running in minutes
             </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Simple setup, powerful results. Here's how easy it is to transform your organization.
+            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 text-center max-w-2xl mx-auto">
+              Three simple steps to transform how your organization operates.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "01",
-                title: "Create Your Account",
-                description: "Sign up in seconds with your email. No credit card required for the free trial.",
-              },
-              {
-                step: "02",
-                title: "Set Up Your Workspace",
-                description: "Customize your organization profile, invite team members, and configure your preferences.",
-              },
-              {
-                step: "03",
-                title: "Start Managing",
-                description: "Import your data or start fresh. Begin managing clients, projects, and events immediately.",
-              },
-            ].map((item, idx) => (
-              <div key={idx} className="relative">
-                {idx < 2 && (
-                  <div className="hidden md:block absolute top-8 left-full w-full h-0.5 bg-gradient-to-r from-lime-500 to-transparent -translate-x-8" />
-                )}
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-lime-100 dark:bg-lime-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <span className="text-2xl font-bold text-lime-500">{item.step}</span>
+          {/* Steps */}
+          <div className="relative">
+            {/* Connection Line - Desktop */}
+            <div className="hidden lg:block absolute top-[60px] left-[calc(16.666%-12px)] right-[calc(16.666%-12px)] h-px">
+              <div className="h-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800" />
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-12 lg:gap-8">
+              {[
+                {
+                  step: "01",
+                  title: "Create your account",
+                  description: "Sign up with your email in seconds. No credit card required — start your 14-day free trial instantly.",
+                },
+                {
+                  step: "02",
+                  title: "Configure your workspace",
+                  description: "Set up your organization profile, invite team members, and customize settings to match your workflow.",
+                },
+                {
+                  step: "03",
+                  title: "Start managing",
+                  description: "Import existing data or start fresh. Everything you need is ready — clients, projects, events, and more.",
+                },
+              ].map((item, idx) => (
+                <div key={idx} className="relative">
+                  {/* Step indicator */}
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center relative z-10">
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">{item.step}</span>
+                      </div>
+                      {/* Active dot */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-3 h-3 rounded-full bg-lime-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                    <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800 lg:hidden" />
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                    {item.title}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {item.description}
-                  </p>
+
+                  {/* Content */}
+                  <div className="lg:pr-8">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                      {item.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  {/* Decorative arrow - Desktop only */}
+                  {idx < 2 && (
+                    <div className="hidden lg:block absolute top-[54px] -right-4 z-20">
+                      <svg className="w-8 h-8 text-gray-300 dark:text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="mt-16 text-center">
+            <a
+              href="/signup"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium rounded-full hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+            >
+              Get started for free
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </a>
           </div>
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <p className="text-lime-500 font-semibold mb-4">TESTIMONIALS</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+      {/* Testimonials Section - Infinite Marquee Cards */}
+      <section className="py-20 lg:py-32 bg-gray-50 dark:bg-gray-900/50 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-lime-100 dark:bg-lime-900/30 rounded-full mb-6">
+              <span className="text-sm font-semibold text-lime-700 dark:text-lime-400">TESTIMONIALS</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
               Loved by teams everywhere
             </h2>
+            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400">
+              See what our customers have to say about their experience with One To One.
+            </p>
           </div>
+        </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, idx) => (
+        {/* Testimonial Marquee */}
+        <div className="space-y-6">
+          <Marquee direction="left" speed={50}>
+            {testimonials.slice(0, 3).map((testimonial, idx) => (
               <div
                 key={idx}
-                className="bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700"
+                className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg"
               >
+                {/* Stars */}
                 <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <span key={i} className="text-yellow-400">★</span>
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <svg key={i} className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
                   ))}
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+
+                <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed line-clamp-4">
                   "{testimonial.quote}"
                 </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-lime-100 dark:bg-lime-900/30 rounded-full flex items-center justify-center text-lime-600 dark:text-lime-400 font-semibold text-sm">
+
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-lime-400 to-emerald-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
                     {testimonial.avatar}
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                    <p className="font-semibold text-gray-900 dark:text-white">
                       {testimonial.author}
                     </p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {testimonial.role}
                     </p>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
+          </Marquee>
+
+          <Marquee direction="right" speed={45}>
+            {testimonials.slice(3).map((testimonial, idx) => (
+              <div
+                key={idx}
+                className="w-[400px] flex-shrink-0 bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg"
+              >
+                {/* Stars */}
+                <div className="flex gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <svg key={i} className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+
+                <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed line-clamp-4">
+                  "{testimonial.quote}"
+                </p>
+
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-violet-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                    {testimonial.avatar}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {testimonial.author}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {testimonial.role}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </Marquee>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 lg:py-32">
+      {/* Pricing Section - Premium Design */}
+      <section id="pricing" className="py-24 lg:py-32 relative bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <p className="text-lime-500 font-semibold mb-4">PRICING</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+          {/* Section Header */}
+          <div className="max-w-3xl mx-auto mb-16">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+              <span className="text-xs font-semibold tracking-widest text-gray-500 dark:text-gray-400 uppercase">Pricing</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white text-center leading-tight">
               Simple, transparent pricing
             </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 text-center max-w-2xl mx-auto">
               Choose the plan that fits your organization. All plans include a 14-day free trial.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto items-start">
             {pricingPlans.map((plan, idx) => (
               <div
                 key={idx}
-                className={`relative rounded-2xl p-8 ${
+                className={`relative bg-white dark:bg-gray-900 rounded-2xl transition-all duration-300 ${
                   plan.popular
-                    ? "bg-lime-500 text-white ring-4 ring-lime-500/20"
-                    : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+                    ? "border-2 border-gray-900 dark:border-white lg:-mt-4 lg:mb-4 shadow-xl"
+                    : "border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
                 }`}
               >
+                {/* Popular badge */}
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gray-900 text-white text-sm font-medium rounded-full">
-                    Most Popular
+                  <div className="absolute -top-3 left-6">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-full">
+                      Most popular
+                    </span>
                   </div>
                 )}
-                <h3 className={`text-xl font-semibold ${plan.popular ? "text-white" : "text-gray-900 dark:text-white"}`}>
-                  {plan.name}
-                </h3>
-                <div className="mt-4 flex items-baseline">
-                  <span className={`text-4xl font-bold ${plan.popular ? "text-white" : "text-gray-900 dark:text-white"}`}>
-                    ${plan.price}
-                  </span>
-                  <span className={`ml-2 ${plan.popular ? "text-lime-100" : "text-gray-500 dark:text-gray-400"}`}>
-                    /month
-                  </span>
+
+                <div className="p-8">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {plan.name}
+                  </h3>
+
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    {plan.description}
+                  </p>
+
+                  <div className="mt-6 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+                      ${plan.price}
+                    </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      /month
+                    </span>
+                  </div>
+
+                  <button
+                    className={`mt-6 w-full py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                      plan.popular
+                        ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+
+                  <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
+                    <p className="text-xs font-medium uppercase tracking-wider mb-4 text-gray-400 dark:text-gray-500">
+                      What's included
+                    </p>
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, fidx) => (
+                        <li key={fidx} className="flex items-start gap-3">
+                          <svg className={`w-5 h-5 flex-shrink-0 ${plan.popular ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {feature}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <p className={`mt-2 text-sm ${plan.popular ? "text-lime-100" : "text-gray-600 dark:text-gray-400"}`}>
-                  {plan.description}
-                </p>
-                <ul className="mt-6 space-y-3">
-                  {plan.features.map((feature, fidx) => (
-                    <li key={fidx} className="flex items-center gap-2 text-sm">
-                      <span className={plan.popular ? "text-white" : "text-lime-500"}>✓</span>
-                      <span className={plan.popular ? "text-white" : "text-gray-600 dark:text-gray-400"}>
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  className={`mt-8 w-full py-3 rounded-xl font-semibold transition-colors ${
-                    plan.popular
-                      ? "bg-white text-lime-600 hover:bg-lime-50"
-                      : "bg-lime-500 text-white hover:bg-lime-600"
-                  }`}
-                >
-                  {plan.cta}
-                </button>
               </div>
             ))}
           </div>
+
+          {/* Trust note */}
+          <p className="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
+            All plans include SSL security, daily backups, and 99.9% uptime SLA.
+          </p>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section id="faq" className="py-20 bg-gray-50 dark:bg-gray-900">
+      {/* FAQ Section - Animated Accordion */}
+      <section id="faq" className="py-20 lg:py-32 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <p className="text-lime-500 font-semibold mb-4">FAQ</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-lime-100 dark:bg-lime-900/30 rounded-full mb-6">
+              <span className="text-sm font-semibold text-lime-700 dark:text-lime-400">FAQ</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
               Frequently asked questions
             </h2>
+            <p className="mt-6 text-lg text-gray-600 dark:text-gray-400">
+              Everything you need to know about One To One.
+            </p>
           </div>
 
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
               <div
                 key={idx}
-                className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+                className={`bg-white dark:bg-gray-800 rounded-2xl border overflow-hidden transition-all duration-300 ${
+                  openFaq === idx
+                    ? "border-lime-500 shadow-lg shadow-lime-500/10"
+                    : "border-gray-200 dark:border-gray-700 hover:border-lime-500/50"
+                }`}
               >
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left"
+                  className="w-full px-6 py-5 flex items-center justify-between text-left"
                 >
-                  <span className="font-medium text-gray-900 dark:text-white">
+                  <span className="font-semibold text-gray-900 dark:text-white pr-4">
                     {faq.question}
                   </span>
-                  <span className={`text-gray-500 transition-transform ${openFaq === idx ? "rotate-180" : ""}`}>
-                    ▼
-                  </span>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                    openFaq === idx
+                      ? "bg-lime-500 text-white rotate-180"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-500"
+                  }`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </button>
-                {openFaq === idx && (
-                  <div className="px-6 pb-4">
-                    <p className="text-gray-600 dark:text-gray-400">
+                <div className={`overflow-hidden transition-all duration-300 ${
+                  openFaq === idx ? "max-h-96" : "max-h-0"
+                }`}>
+                  <div className="px-6 pb-5">
+                    <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
                       {faq.answer}
                     </p>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 lg:py-32">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-6">
-            Ready to transform your organization?
+      {/* CTA Section - Spotlight Effect */}
+      <section className="py-20 lg:py-32 relative overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gray-900">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-lime-900/40 via-gray-900 to-gray-900" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px]" />
+          {/* Animated Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-lime-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-lime-500/20 rounded-full mb-8 border border-lime-500/30">
+            <span className="w-2 h-2 bg-lime-400 rounded-full animate-pulse" />
+            <span className="text-sm font-medium text-lime-300">Start your free trial today</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
+            Ready to transform
+            <span className="block bg-gradient-to-r from-lime-400 to-emerald-400 bg-clip-text text-transparent">
+              your organization?
+            </span>
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
+
+          <p className="text-lg text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
             Join thousands of organizations already using One To One to streamline their operations.
             Start your free trial today — no credit card required.
           </p>
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/signup"
-              className="w-full sm:w-auto px-8 py-4 bg-lime-500 text-white font-semibold rounded-xl hover:bg-lime-600 transition-all hover:shadow-lg hover:shadow-lime-500/25"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-lime-500 to-emerald-500 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-lime-500/30 transition-all duration-300 hover:-translate-y-1"
             >
               Start Your Free Trial
             </Link>
             <Link
               href="/contact"
-              className="w-full sm:w-auto px-8 py-4 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white font-semibold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300"
             >
               Talk to Sales
             </Link>
           </div>
+
+          {/* Trust Badges */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-gray-500">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-lime-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span className="text-sm">SOC 2 Compliant</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-lime-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="text-sm">256-bit Encryption</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-lime-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm">GDPR Ready</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
+      {/* Footer - Modern Design */}
+      <footer className="bg-gray-950 text-white pt-20 pb-8 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-8 pb-12 border-b border-gray-800">
             {/* Logo & Description */}
             <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-lime-500 rounded-lg flex items-center justify-center">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-lime-500/20">
                   <span className="text-white font-bold text-sm">1:1</span>
                 </div>
                 <span className="font-bold text-xl">One To One</span>
               </div>
-              <p className="text-gray-400 text-sm mb-4 max-w-xs">
+              <p className="text-gray-400 text-sm mb-6 leading-relaxed max-w-xs">
                 The all-in-one platform for managing your organization's clients, projects, events, and finances.
               </p>
-              <div className="flex gap-4">
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">𝕏</a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">in</a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">▶</a>
+              <div className="flex gap-3">
+                {[
+                  { icon: "𝕏", href: "#" },
+                  { icon: "in", href: "#" },
+                  { icon: "▶", href: "#" },
+                  { icon: "📷", href: "#" },
+                ].map((social, idx) => (
+                  <a
+                    key={idx}
+                    href={social.href}
+                    className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 hover:bg-lime-500 hover:text-white transition-all duration-300"
+                  >
+                    {social.icon}
+                  </a>
+                ))}
               </div>
             </div>
 
             {/* Product Links */}
             <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Changelog</a></li>
+              <h4 className="font-semibold mb-4 text-white">Product</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-lime-400 transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-lime-400 transition-colors">Pricing</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Integrations</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Changelog</a></li>
               </ul>
             </div>
 
             {/* Company Links */}
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+              <h4 className="font-semibold mb-4 text-white">Company</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-lime-400 transition-colors">About</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Careers</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Contact</a></li>
               </ul>
             </div>
 
-            {/* Support Links */}
+            {/* Resources Links */}
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+              <h4 className="font-semibold mb-4 text-white">Resources</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Help Center</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Documentation</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">API Reference</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Status</a></li>
+              </ul>
+            </div>
+
+            {/* Legal Links */}
+            <div>
+              <h4 className="font-semibold mb-4 text-white">Legal</h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Terms of Service</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</a></li>
+                <li><a href="#" className="hover:text-lime-400 transition-colors">Security</a></li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-400">
+          {/* Bottom Bar */}
+          <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">
               © 2025 One To One. All rights reserved.
             </p>
-            <div className="flex gap-6 text-sm text-gray-400">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-white transition-colors">Cookie Policy</a>
+            <div className="flex items-center gap-6">
+              <span className="text-xs text-gray-600">Made with</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lime-500">♥</span>
+                <span className="text-xs text-gray-500">for teams everywhere</span>
+              </div>
             </div>
           </div>
         </div>
