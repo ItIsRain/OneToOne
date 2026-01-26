@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -11,6 +11,52 @@ import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
+
+interface Event {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_date: string;
+  end_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  status: string;
+  event_type: string;
+  is_virtual: boolean;
+  virtual_link: string | null;
+  venue?: {
+    id: string;
+    name: string;
+    address: string | null;
+    city: string | null;
+  } | null;
+}
+
+interface Client {
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+}
+
+interface TeamMember {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  email: string;
+  job_title: string | null;
+  status: string;
+}
+
+interface Lead {
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+}
 
 interface Recipient {
   id: string;
@@ -30,54 +76,6 @@ interface BroadcastHistory {
   template?: string;
 }
 
-const mockRecipients: Recipient[] = [
-  { id: "1", name: "Sarah Johnson", email: "sarah@acmecorp.com", type: "client", selected: false },
-  { id: "2", name: "Michael Chen", email: "michael@techstart.io", type: "client", selected: false },
-  { id: "3", name: "Emily Davis", email: "emily@company.com", type: "team", selected: false },
-  { id: "4", name: "James Wilson", email: "james@company.com", type: "team", selected: false },
-  { id: "5", name: "Lisa Thompson", email: "lisa@innovate.co", type: "client", selected: false },
-  { id: "6", name: "David Park", email: "david@growthlabs.com", type: "lead", selected: false },
-  { id: "7", name: "Anna Martinez", email: "anna@enterprise.com", type: "client", selected: false },
-  { id: "8", name: "Robert Brown", email: "robert@company.com", type: "team", selected: false },
-];
-
-const mockHistory: BroadcastHistory[] = [
-  {
-    id: "1",
-    subject: "Annual Gala Event Invitation",
-    recipientCount: 156,
-    sentAt: "Jan 25, 2025 at 10:30 AM",
-    status: "sent",
-    openRate: 68,
-    template: "event",
-  },
-  {
-    id: "2",
-    subject: "Product Launch Announcement",
-    recipientCount: 89,
-    sentAt: "Jan 20, 2025 at 2:00 PM",
-    status: "sent",
-    openRate: 72,
-    template: "announcement",
-  },
-  {
-    id: "3",
-    subject: "Q1 Newsletter",
-    recipientCount: 234,
-    sentAt: "Scheduled for Feb 1, 2025",
-    status: "scheduled",
-    template: "newsletter",
-  },
-  {
-    id: "4",
-    subject: "Workshop Registration Open",
-    recipientCount: 0,
-    sentAt: "Draft",
-    status: "draft",
-    template: "event",
-  },
-];
-
 const emailTemplates = [
   { id: "blank", name: "Blank Email", description: "Start from scratch" },
   { id: "event", name: "Event Invitation", description: "Invite recipients to an event" },
@@ -90,8 +88,9 @@ const emailTemplates = [
 export const EmailBroadcast = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [recipients, setRecipients] = useState<Recipient[]>(mockRecipients);
-  const [history] = useState<BroadcastHistory[]>(mockHistory);
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const [recipientFilter, setRecipientFilter] = useState<"all" | "clients" | "team" | "leads">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectAll, setSelectAll] = useState(false);
@@ -101,13 +100,114 @@ export const EmailBroadcast = () => {
     subject: "",
     preheader: "",
     content: "",
-    eventName: "",
-    eventDate: "",
-    eventTime: "",
-    eventLocation: "",
+    selectedEventId: "",
     ctaText: "",
     ctaUrl: "",
   });
+
+  // Mock history - in production this would come from the database
+  const [history] = useState<BroadcastHistory[]>([
+    {
+      id: "1",
+      subject: "Annual Gala Event Invitation",
+      recipientCount: 156,
+      sentAt: "Jan 25, 2025 at 10:30 AM",
+      status: "sent",
+      openRate: 68,
+      template: "event",
+    },
+    {
+      id: "2",
+      subject: "Product Launch Announcement",
+      recipientCount: 89,
+      sentAt: "Jan 20, 2025 at 2:00 PM",
+      status: "sent",
+      openRate: 72,
+      template: "announcement",
+    },
+  ]);
+
+  // Fetch all data
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [clientsRes, teamRes, leadsRes, eventsRes] = await Promise.all([
+        fetch("/api/clients"),
+        fetch("/api/team/members"),
+        fetch("/api/leads"),
+        fetch("/api/events"),
+      ]);
+
+      const recipientsList: Recipient[] = [];
+
+      // Process clients
+      if (clientsRes.ok) {
+        const clientsData = await clientsRes.json();
+        const clients: Client[] = clientsData.clients || [];
+        clients.forEach((client) => {
+          if (client.email && client.status === "active") {
+            recipientsList.push({
+              id: `client-${client.id}`,
+              name: client.name,
+              email: client.email,
+              type: "client",
+              selected: false,
+            });
+          }
+        });
+      }
+
+      // Process team members
+      if (teamRes.ok) {
+        const teamData = await teamRes.json();
+        const members: TeamMember[] = teamData.members || [];
+        members.forEach((member) => {
+          if (member.email && member.status !== "inactive") {
+            recipientsList.push({
+              id: `team-${member.id}`,
+              name: `${member.first_name}${member.last_name ? ` ${member.last_name}` : ""}`,
+              email: member.email,
+              type: "team",
+              selected: false,
+            });
+          }
+        });
+      }
+
+      // Process leads
+      if (leadsRes.ok) {
+        const leadsData = await leadsRes.json();
+        const leads: Lead[] = leadsData.leads || [];
+        leads.forEach((lead) => {
+          if (lead.email) {
+            recipientsList.push({
+              id: `lead-${lead.id}`,
+              name: lead.name,
+              email: lead.email,
+              type: "lead",
+              selected: false,
+            });
+          }
+        });
+      }
+
+      // Process events
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        setEvents(eventsData || []);
+      }
+
+      setRecipients(recipientsList);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const selectedCount = recipients.filter((r) => r.selected).length;
   const totalSent = history.filter((h) => h.status === "sent").reduce((acc, h) => acc + h.recipientCount, 0);
@@ -146,10 +246,7 @@ export const EmailBroadcast = () => {
       subject: "",
       preheader: "",
       content: "",
-      eventName: "",
-      eventDate: "",
-      eventTime: "",
-      eventLocation: "",
+      selectedEventId: "",
       ctaText: "",
       ctaUrl: "",
     });
@@ -161,9 +258,43 @@ export const EmailBroadcast = () => {
     setCurrentStep(2);
   };
 
+  const handleSelectEvent = (eventId: string) => {
+    const event = events.find((e) => e.id === eventId);
+    if (event) {
+      const eventDate = new Date(event.start_date);
+      const formattedDate = eventDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const formattedTime = event.start_time || eventDate.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+
+      const location = event.is_virtual
+        ? `Virtual Event${event.virtual_link ? ` - ${event.virtual_link}` : ""}`
+        : event.venue
+          ? `${event.venue.name}${event.venue.address ? `, ${event.venue.address}` : ""}${event.venue.city ? `, ${event.venue.city}` : ""}`
+          : event.location || "TBA";
+
+      setFormData({
+        ...formData,
+        selectedEventId: eventId,
+        subject: `You're Invited: ${event.title}`,
+        preheader: `Join us for ${event.title} on ${formattedDate}`,
+        content: `Dear [Name],\n\nWe are excited to invite you to ${event.title}!\n\n📅 Date: ${formattedDate}\n⏰ Time: ${formattedTime}\n📍 Location: ${location}\n\n${event.description || "We look forward to seeing you there!"}\n\nBest regards,\nThe Team`,
+        ctaText: "RSVP Now",
+        ctaUrl: "",
+      });
+    }
+  };
+
   const handleSendBroadcast = () => {
+    const selectedRecipients = recipients.filter((r) => r.selected);
     console.log("Sending broadcast:", {
-      recipients: recipients.filter((r) => r.selected),
+      recipients: selectedRecipients,
       ...formData,
     });
     setIsModalOpen(false);
@@ -197,6 +328,40 @@ export const EmailBroadcast = () => {
         return "light";
     }
   };
+
+  const selectedEvent = events.find((e) => e.id === formData.selectedEventId);
+  const upcomingEvents = events.filter((e) => {
+    const eventDate = new Date(e.start_date);
+    return eventDate >= new Date() && e.status !== "cancelled";
+  });
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="animate-pulse flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl bg-gray-200 dark:bg-gray-700" />
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -234,12 +399,12 @@ export const EmailBroadcast = () => {
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning-100 dark:bg-warning-500/20">
               <svg className="w-6 h-6 text-warning-600 dark:text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Avg. Open Rate</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">70%</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Upcoming Events</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{upcomingEvents.length}</p>
             </div>
           </div>
         </div>
@@ -257,7 +422,7 @@ export const EmailBroadcast = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <input
                 type="text"
@@ -300,79 +465,103 @@ export const EmailBroadcast = () => {
           </div>
         </div>
 
-        <div className="max-w-full overflow-x-auto">
-          <Table>
-            <TableHeader className="border-gray-100 dark:border-gray-800 border-y">
-              <TableRow>
-                <TableCell
-                  isHeader
-                  className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 w-10"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
-                  />
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
-                  Name
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
-                  Email
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                >
-                  Type
-                </TableCell>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {filteredRecipients.map((recipient) => (
-                <TableRow key={recipient.id} className={recipient.selected ? "bg-brand-50/30 dark:bg-brand-500/5" : ""}>
-                  <TableCell className="py-3">
+        {recipients.length === 0 ? (
+          <div className="text-center py-12">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+              No recipients found
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Add clients, team members, or leads with email addresses to send broadcasts.
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-full overflow-x-auto">
+            <Table>
+              <TableHeader className="border-gray-100 dark:border-gray-800 border-y">
+                <TableRow>
+                  <TableCell
+                    isHeader
+                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400 w-10"
+                  >
                     <input
                       type="checkbox"
-                      checked={recipient.selected}
-                      onChange={() => handleToggleRecipient(recipient.id)}
+                      checked={selectAll}
+                      onChange={handleSelectAll}
                       className="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
                     />
                   </TableCell>
-                  <TableCell className="py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 font-semibold text-sm dark:bg-gray-800 dark:text-gray-400">
-                        {recipient.name.split(" ").map((n) => n[0]).join("")}
-                      </div>
-                      <span className="font-medium text-gray-900 dark:text-white text-theme-sm">
-                        {recipient.name}
-                      </span>
-                    </div>
+                  <TableCell
+                    isHeader
+                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                  >
+                    Name
                   </TableCell>
-                  <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
-                    {recipient.email}
+                  <TableCell
+                    isHeader
+                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                  >
+                    Email
                   </TableCell>
-                  <TableCell className="py-3">
-                    <Badge
-                      size="sm"
-                      color={getTypeColor(recipient.type) as "success" | "warning" | "primary" | "light"}
-                    >
-                      {recipient.type.charAt(0).toUpperCase() + recipient.type.slice(1)}
-                    </Badge>
+                  <TableCell
+                    isHeader
+                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                  >
+                    Type
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+
+              <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {filteredRecipients.map((recipient) => (
+                  <TableRow key={recipient.id} className={recipient.selected ? "bg-brand-50/30 dark:bg-brand-500/5" : ""}>
+                    <TableCell className="py-3">
+                      <input
+                        type="checkbox"
+                        checked={recipient.selected}
+                        onChange={() => handleToggleRecipient(recipient.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600"
+                      />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-600 font-semibold text-sm dark:bg-gray-800 dark:text-gray-400">
+                          {recipient.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                        </div>
+                        <span className="font-medium text-gray-900 dark:text-white text-theme-sm">
+                          {recipient.name}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
+                      {recipient.email}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge
+                        size="sm"
+                        color={getTypeColor(recipient.type) as "success" | "warning" | "primary" | "light"}
+                      >
+                        {recipient.type.charAt(0).toUpperCase() + recipient.type.slice(1)}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       {/* Broadcast History */}
@@ -415,40 +604,22 @@ export const EmailBroadcast = () => {
             <Table>
               <TableHeader className="border-gray-100 dark:border-gray-800 border-y">
                 <TableRow>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Subject
                   </TableCell>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Recipients
                   </TableCell>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Status
                   </TableCell>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Open Rate
                   </TableCell>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Sent
                   </TableCell>
-                  <TableCell
-                    isHeader
-                    className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-                  >
+                  <TableCell isHeader className="py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                     Actions
                   </TableCell>
                 </TableRow>
@@ -458,25 +629,15 @@ export const EmailBroadcast = () => {
                 {history.map((broadcast) => (
                   <TableRow key={broadcast.id}>
                     <TableCell className="py-3">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white text-theme-sm">
-                          {broadcast.subject}
-                        </p>
-                        {broadcast.template && (
-                          <p className="text-theme-xs text-gray-500 dark:text-gray-400">
-                            Template: {broadcast.template}
-                          </p>
-                        )}
-                      </div>
+                      <p className="font-medium text-gray-900 dark:text-white text-theme-sm">
+                        {broadcast.subject}
+                      </p>
                     </TableCell>
                     <TableCell className="py-3 text-gray-700 text-theme-sm dark:text-gray-300">
-                      {broadcast.recipientCount > 0 ? broadcast.recipientCount : "-"}
+                      {broadcast.recipientCount}
                     </TableCell>
                     <TableCell className="py-3">
-                      <Badge
-                        size="sm"
-                        color={getStatusColor(broadcast.status) as "success" | "warning" | "light"}
-                      >
+                      <Badge size="sm" color={getStatusColor(broadcast.status) as "success" | "warning" | "light"}>
                         {broadcast.status.charAt(0).toUpperCase() + broadcast.status.slice(1)}
                       </Badge>
                     </TableCell>
@@ -491,11 +652,6 @@ export const EmailBroadcast = () => {
                         <button className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                           View
                         </button>
-                        {broadcast.status === "draft" && (
-                          <button className="text-brand-500 hover:text-brand-600">
-                            Edit
-                          </button>
-                        )}
                         <button className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                           Duplicate
                         </button>
@@ -543,44 +699,16 @@ export const EmailBroadcast = () => {
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">
-                    {template.id === "blank" && (
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    )}
-                    {template.id === "event" && (
-                      <svg className="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                    {template.id === "announcement" && (
-                      <svg className="w-5 h-5 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                      </svg>
-                    )}
-                    {template.id === "newsletter" && (
-                      <svg className="w-5 h-5 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                      </svg>
-                    )}
-                    {template.id === "reminder" && (
-                      <svg className="w-5 h-5 text-error-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                    {template.id === "followup" && (
-                      <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                    )}
+                    {template.id === "blank" && <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+                    {template.id === "event" && <svg className="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                    {template.id === "announcement" && <svg className="w-5 h-5 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>}
+                    {template.id === "newsletter" && <svg className="w-5 h-5 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>}
+                    {template.id === "reminder" && <svg className="w-5 h-5 text-error-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    {template.id === "followup" && <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>}
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      {template.name}
-                    </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {template.description}
-                    </p>
+                    <h4 className="font-medium text-gray-900 dark:text-white">{template.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{template.description}</p>
                   </div>
                 </div>
               </button>
@@ -588,6 +716,46 @@ export const EmailBroadcast = () => {
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); handleSendBroadcast(); }} className="space-y-5 max-h-[50vh] overflow-y-auto pr-2">
+            {formData.template === "event" && (
+              <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 space-y-4">
+                <h4 className="font-medium text-gray-900 dark:text-white">Select Event</h4>
+                <select
+                  value={formData.selectedEventId}
+                  onChange={(e) => handleSelectEvent(e.target.value)}
+                  className="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                >
+                  <option value="">Choose an event...</option>
+                  {upcomingEvents.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.title} - {new Date(event.start_date).toLocaleDateString()}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedEvent && (
+                  <div className="mt-3 p-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-100 dark:bg-brand-500/20">
+                        <svg className="w-5 h-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-gray-900 dark:text-white">{selectedEvent.title}</h5>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {new Date(selectedEvent.start_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                          {selectedEvent.start_time && ` at ${selectedEvent.start_time}`}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {selectedEvent.is_virtual ? "Virtual Event" : selectedEvent.venue?.name || selectedEvent.location || "Location TBA"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-5">
               <div>
                 <Label htmlFor="subject">Subject Line *</Label>
@@ -610,55 +778,11 @@ export const EmailBroadcast = () => {
                 <p className="mt-1 text-xs text-gray-500">This appears next to the subject in most email clients</p>
               </div>
 
-              {formData.template === "event" && (
-                <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 space-y-4">
-                  <h4 className="font-medium text-gray-900 dark:text-white">Event Details</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="eventName">Event Name</Label>
-                      <Input
-                        id="eventName"
-                        placeholder="Annual Gala 2025"
-                        value={formData.eventName}
-                        onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="eventLocation">Location</Label>
-                      <Input
-                        id="eventLocation"
-                        placeholder="Grand Ballroom, City Hotel"
-                        value={formData.eventLocation}
-                        onChange={(e) => setFormData({ ...formData, eventLocation: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="eventDate">Date</Label>
-                      <Input
-                        id="eventDate"
-                        type="date"
-                        value={formData.eventDate}
-                        onChange={(e) => setFormData({ ...formData, eventDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="eventTime">Time</Label>
-                      <Input
-                        id="eventTime"
-                        type="time"
-                        value={formData.eventTime}
-                        onChange={(e) => setFormData({ ...formData, eventTime: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div>
                 <Label htmlFor="content">Email Content *</Label>
                 <textarea
                   id="content"
-                  rows={6}
+                  rows={8}
                   className="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                   placeholder="Write your email content here..."
                   value={formData.content}
@@ -706,7 +830,7 @@ export const EmailBroadcast = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!formData.subject || !formData.content}
+                  disabled={!formData.subject || !formData.content || (formData.template === "event" && !formData.selectedEventId)}
                   className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50"
                 >
                   Send to {selectedCount} Recipients
