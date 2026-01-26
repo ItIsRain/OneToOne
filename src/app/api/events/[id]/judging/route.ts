@@ -10,7 +10,7 @@ async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("tenant_id")
+    .select("tenant_id, email")
     .eq("id", user.id)
     .single();
 
@@ -46,7 +46,7 @@ export async function GET(
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event } = access;
+    const { event, profile, user } = access;
 
     // Get judges
     const { data: judges } = await supabase
@@ -55,40 +55,79 @@ export async function GET(
       .eq("event_id", id)
       .order("created_at", { ascending: false });
 
-    // Get submission count
-    const { count: submissionCount } = await supabase
+    // Get all submissions for this event
+    const { data: submissions } = await supabase
       .from("event_submissions")
-      .select("*", { count: "exact", head: true })
+      .select("id, title")
       .eq("event_id", id)
       .eq("status", "submitted");
 
-    // Get scores count
-    const submissionIds = (await supabase
-      .from("event_submissions")
-      .select("id")
-      .eq("event_id", id)
-    ).data?.map(s => s.id) || [];
+    const submissionCount = submissions?.length || 0;
+    const submissionIds = submissions?.map(s => s.id) || [];
+    const submissionMap = new Map(submissions?.map(s => [s.id, s.title]) || []);
 
-    let scoresCount = 0;
+    // Get all scores for these submissions
+    let allScores: any[] = [];
     if (submissionIds.length > 0) {
-      const { count } = await supabase
+      const { data: scores } = await supabase
         .from("submission_scores")
-        .select("*", { count: "exact", head: true })
+        .select("*")
         .in("submission_id", submissionIds);
-      scoresCount = count || 0;
+      allScores = scores || [];
     }
+
+    // Build judges with their scores
+    const judgesWithScores = (judges || []).map(judge => {
+      const judgeScores = allScores.filter(s => s.judge_id === judge.id);
+      const scoresWithTitles = judgeScores.map(score => ({
+        submission_id: score.submission_id,
+        submission_title: submissionMap.get(score.submission_id) || "Unknown",
+        total_score: score.total_score,
+        scored_at: score.scored_at,
+      }));
+
+      const avgScore = judgeScores.length > 0
+        ? judgeScores.reduce((sum, s) => sum + (s.total_score || 0), 0) / judgeScores.length
+        : 0;
+
+      const completionPercent = submissionCount > 0
+        ? Math.round((judgeScores.length / submissionCount) * 100)
+        : 0;
+
+      return {
+        ...judge,
+        scores: scoresWithTitles,
+        scores_submitted: judgeScores.length,
+        average_score: Math.round(avgScore * 10) / 10,
+        completion_percent: completionPercent,
+      };
+    });
+
+    const scoresCount = allScores.length;
+
+    // Check if current user is a judge and get their judging URL
+    const userEmail = profile.email || user.email;
+    const userJudge = judgesWithScores.find(j => j.email.toLowerCase() === userEmail?.toLowerCase());
+    const userJudgingUrl = userJudge?.access_token
+      ? `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/judge/${userJudge.access_token}`
+      : null;
 
     return NextResponse.json({
       judging_status: event.judging_status || "not_started",
       judging_started_at: event.judging_started_at,
       submissions_locked: event.submissions_locked || false,
       judging_criteria: event.requirements?.judging_criteria || [],
-      judges: judges || [],
+      judges: judgesWithScores,
       stats: {
-        total_submissions: submissionCount || 0,
+        total_submissions: submissionCount,
         total_judges: judges?.length || 0,
         total_scores: scoresCount,
         active_judges: judges?.filter(j => j.status === "active").length || 0,
+      },
+      currentUser: {
+        email: userEmail,
+        isJudge: !!userJudge,
+        judgingUrl: userJudgingUrl,
       },
     });
   } catch (error) {
