@@ -287,6 +287,68 @@ export const MessagesChat = () => {
     fileInputRef.current?.click();
   };
 
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !selectedContact) return;
+
+    const files = Array.from(e.target.files);
+    setIsUploading(true);
+
+    try {
+      for (const file of files) {
+        const base64 = await convertToBase64(file);
+
+        const response = await fetch("/api/upload/attachments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file: base64,
+            fileName: file.name,
+            fileType: file.type,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Add file message to chat
+          const fileMessage: ChatMessage = {
+            id: Date.now().toString(),
+            senderId: "me",
+            content: file.type.startsWith("image/") ? "" : file.name,
+            timestamp: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            status: "sent",
+            type: file.type.startsWith("image/") ? "image" : "file",
+            fileName: file.name,
+            fileUrl: data.url,
+          };
+          setMessages((prev) => [...prev, fileMessage]);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          alert(`Failed to upload ${file.name}: ${errorData.error || "Unknown error"}`);
+        }
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Failed to upload file. Please try again.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const filteredContacts = contacts.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -457,14 +519,51 @@ export const MessagesChat = () => {
                       className={`flex ${message.senderId === "me" ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                        className={`max-w-[70%] rounded-2xl ${
+                          message.type === "image" ? "p-1" : "px-4 py-2.5"
+                        } ${
                           message.senderId === "me"
                             ? "bg-brand-50 text-gray-900 dark:bg-brand-500/[0.15] dark:text-white rounded-br-md"
                             : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md shadow-sm border border-gray-100 dark:border-gray-700"
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                        <div className={`flex items-center justify-end gap-1 mt-1 ${message.senderId === "me" ? "text-gray-500 dark:text-gray-400" : "text-gray-400"}`}>
+                        {/* Image Message */}
+                        {message.type === "image" && message.fileUrl && (
+                          <a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={message.fileUrl}
+                              alt={message.fileName || "Image"}
+                              className="rounded-xl max-w-full max-h-64 object-cover"
+                            />
+                          </a>
+                        )}
+
+                        {/* File Message */}
+                        {message.type === "file" && message.fileUrl && (
+                          <a
+                            href={message.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-900 transition-colors"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{message.fileName}</p>
+                              <p className="text-xs text-gray-500">Click to download</p>
+                            </div>
+                          </a>
+                        )}
+
+                        {/* Text Message */}
+                        {message.type === "text" && (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
+
+                        <div className={`flex items-center justify-end gap-1 mt-1 ${message.type === "image" ? "px-2 pb-1" : ""} ${message.senderId === "me" ? "text-gray-500 dark:text-gray-400" : "text-gray-400"}`}>
                           <span className="text-xs">{message.timestamp}</span>
                           {message.senderId === "me" && (
                             <span className="text-xs">
@@ -511,13 +610,28 @@ export const MessagesChat = () => {
                   <button
                     type="button"
                     onClick={handleFileAttach}
-                    className="p-2.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                    disabled={isUploading}
+                    className={`p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 ${isUploading ? "text-brand-500" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"}`}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
+                    {isUploading ? (
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                    )}
                   </button>
-                  <input ref={fileInputRef} type="file" className="hidden" multiple />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={handleFileChange}
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                  />
 
                   <div className="flex-1 relative">
                     <input
