@@ -1,57 +1,121 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { ProjectTimeline } from "@/components/agency/ProjectTimeline";
 
-const timelineItems = [
-  { id: 1, project: "Website Redesign", milestone: "Discovery Phase", date: "Jan 1 - Jan 15", status: "completed" },
-  { id: 2, project: "Website Redesign", milestone: "Design Phase", date: "Jan 16 - Feb 5", status: "completed" },
-  { id: 3, project: "Website Redesign", milestone: "Development", date: "Feb 6 - Mar 1", status: "current" },
-  { id: 4, project: "Website Redesign", milestone: "Testing & QA", date: "Mar 2 - Mar 15", status: "upcoming" },
-  { id: 5, project: "Mobile App", milestone: "Planning", date: "Jan 10 - Jan 20", status: "completed" },
-  { id: 6, project: "Mobile App", milestone: "UI/UX Design", date: "Jan 21 - Feb 10", status: "current" },
-  { id: 7, project: "Mobile App", milestone: "Development", date: "Feb 11 - Apr 1", status: "upcoming" },
-];
+interface Project {
+  id: string;
+  name: string;
+  project_code: string;
+  color: string;
+}
 
 export default function TimelinePage() {
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch("/api/projects");
+        if (response.ok) {
+          const data = await response.json();
+          setProjects(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      }
+    };
+    fetchProjects();
+  }, []);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Project Timeline</h1>
-        <p className="text-gray-500 dark:text-gray-400">View milestones across all projects</p>
-      </div>
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+            Project Timeline
+          </h1>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
+            Visualize tasks and milestones across time
+          </p>
+        </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="space-y-6">
-          {timelineItems.map((item, index) => (
-            <div key={item.id} className="flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className={`w-4 h-4 rounded-full ${
-                  item.status === "completed" ? "bg-success-500" :
-                  item.status === "current" ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
-                }`} />
-                {index < timelineItems.length - 1 && (
-                  <div className="w-0.5 h-full bg-gray-200 dark:bg-gray-700 my-2" />
-                )}
-              </div>
-              <div className="flex-1 pb-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="font-medium text-gray-800 dark:text-white/90">{item.milestone}</h4>
-                    <p className="text-sm text-gray-500">{item.project}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    item.status === "completed" ? "bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400" :
-                    item.status === "current" ? "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400" :
-                    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                  }`}>
-                    {item.status === "completed" ? "Completed" : item.status === "current" ? "In Progress" : "Upcoming"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400 mt-1">{item.date}</p>
-              </div>
-            </div>
-          ))}
+        {/* View Toggle */}
+        <div className="flex items-center gap-3">
+          {/* Quick Project Pills */}
+          <div className="hidden items-center gap-2 lg:flex">
+            <button
+              onClick={() => setSelectedProject(null)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                !selectedProject
+                  ? "bg-brand-500 text-white shadow-lg shadow-brand-500/30"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              }`}
+            >
+              All Projects
+            </button>
+            {projects.slice(0, 4).map((project) => (
+              <button
+                key={project.id}
+                onClick={() => setSelectedProject(project.id)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedProject === project.id
+                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/30"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                }`}
+              >
+                <div
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: project.color || "#6366f1" }}
+                />
+                {project.project_code}
+              </button>
+            ))}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+            <a
+              href="/dashboard/projects/kanban"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-all"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 4a1 1 0 011-1h3a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h3a1 1 0 011 1v12a1 1 0 01-1 1H9a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h3a1 1 0 011 1v12a1 1 0 01-1 1h-3a1 1 0 01-1-1V4z" />
+              </svg>
+              Board
+            </a>
+            <button
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium bg-brand-500 text-white shadow-sm transition-all"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Timeline
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Info Banner */}
+      <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-gradient-to-r from-brand-50 to-brand-100/50 p-4 dark:border-brand-500/20 dark:from-brand-500/10 dark:to-brand-500/5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500/10 dark:bg-brand-500/20">
+          <svg className="h-5 w-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-brand-800 dark:text-brand-300">
+            Gantt-style timeline view for your projects
+          </p>
+          <p className="text-xs text-brand-600 dark:text-brand-400">
+            Navigate through time, switch between day/week/month views, and track task progress
+          </p>
+        </div>
+      </div>
+
+      {/* Timeline Component */}
+      <ProjectTimeline projectId={selectedProject || undefined} />
     </div>
   );
 }

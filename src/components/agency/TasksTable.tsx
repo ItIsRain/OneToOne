@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import { AddTaskModal, TaskDetailsModal } from "@/components/agency/modals";
+import { AddTaskModal } from "@/components/agency/modals";
+import { TaskDetailsSidebar } from "@/components/agency/sidebars";
 
 interface Task {
   id: string;
@@ -540,14 +541,12 @@ export const TasksTable: React.FC = () => {
         }}
       />
 
-      {selectedTask && (
-        <TaskDetailsModal
-          isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-          task={selectedTask}
-          onUpdate={fetchTasks}
-        />
-      )}
+      <TaskDetailsSidebar
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        task={selectedTask}
+        onUpdate={fetchTasks}
+      />
     </div>
   );
 };

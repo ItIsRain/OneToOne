@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface Option {
   value: string;
@@ -11,6 +11,7 @@ interface SelectProps {
   onChange: (value: string) => void;
   className?: string;
   defaultValue?: string;
+  value?: string; // Controlled mode
 }
 
 const Select: React.FC<SelectProps> = ({
@@ -19,14 +20,28 @@ const Select: React.FC<SelectProps> = ({
   onChange,
   className = "",
   defaultValue = "",
+  value,
 }) => {
-  // Manage the selected value
-  const [selectedValue, setSelectedValue] = useState<string>(defaultValue);
+  // Support both controlled and uncontrolled modes
+  const [internalValue, setInternalValue] = useState<string>(defaultValue);
+
+  // Use controlled value if provided, otherwise use internal state
+  const selectedValue = value !== undefined ? value : internalValue;
+
+  // Sync internal value with defaultValue changes (for uncontrolled mode)
+  useEffect(() => {
+    if (value === undefined && defaultValue) {
+      setInternalValue(defaultValue);
+    }
+  }, [defaultValue, value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setSelectedValue(value);
-    onChange(value); // Trigger parent handler
+    const newValue = e.target.value;
+    if (value === undefined) {
+      // Uncontrolled mode - update internal state
+      setInternalValue(newValue);
+    }
+    onChange(newValue); // Trigger parent handler
   };
 
   return (

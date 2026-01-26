@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import Badge from "../ui/badge/Badge";
-import { AddContactModal, ContactDetailsModal } from "./modals";
+import { AddContactModal } from "./modals";
+import { ContactDetailsSidebar } from "./sidebars";
 
 export interface Contact {
   id: string;
@@ -397,7 +398,7 @@ export const ContactsTable = () => {
         contact={editingContact}
       />
 
-      <ContactDetailsModal
+      <ContactDetailsSidebar
         isOpen={!!viewingContact}
         onClose={() => setViewingContact(null)}
         contact={viewingContact}
@@ -405,6 +406,7 @@ export const ContactsTable = () => {
           setViewingContact(null);
           handleEditContact(contact);
         }}
+        onDelete={handleDeleteContact}
       />
     </>
   );

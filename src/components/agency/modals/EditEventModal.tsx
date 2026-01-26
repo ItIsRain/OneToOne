@@ -70,7 +70,7 @@ interface EventData {
   endDate?: string;
   time: string;
   endTime?: string;
-  status: string;
+  status: "Upcoming" | "In Progress" | "Completed" | "Cancelled";
   type: string;
   icon: string;
   category: string;

@@ -57,10 +57,9 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Events",
     subItems: [
-      { name: "Calendar", path: "/dashboard/events/calendar" },
       { name: "All Events", path: "/dashboard/events" },
+      { name: "Calendar", path: "/dashboard/events/calendar" },
       { name: "Venues", path: "/dashboard/events/venues" },
-      { name: "Bookings", path: "/dashboard/events/bookings" },
     ],
   },
   {

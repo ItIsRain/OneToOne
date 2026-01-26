@@ -8,7 +8,8 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { AddClientModal, ClientDetailsModal } from "./modals";
+import { AddClientModal } from "./modals";
+import { ClientDetailsSidebar } from "./sidebars";
 
 export interface Client {
   id: string;
@@ -345,7 +346,7 @@ export const ClientsTable = () => {
         client={editingClient}
       />
 
-      <ClientDetailsModal
+      <ClientDetailsSidebar
         isOpen={!!viewingClient}
         onClose={() => setViewingClient(null)}
         client={viewingClient}
@@ -353,6 +354,7 @@ export const ClientsTable = () => {
           setViewingClient(null);
           handleEditClient(client);
         }}
+        onDelete={handleDeleteClient}
       />
     </>
   );

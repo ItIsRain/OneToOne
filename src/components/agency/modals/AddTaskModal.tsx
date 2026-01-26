@@ -358,7 +358,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
           <Input
             id="estimated_hours"
             type="number"
-            step="0.5"
+            step={0.5}
             placeholder="e.g. 4"
             value={formData.estimated_hours}
             onChange={(e) => setFormData({ ...formData, estimated_hours: e.target.value })}

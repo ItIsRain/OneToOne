@@ -8,7 +8,8 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { AddLeadModal, LeadDetailsModal } from "./modals";
+import { AddLeadModal } from "./modals";
+import { LeadDetailsSidebar } from "./sidebars";
 
 export interface Lead {
   id: string;
@@ -434,7 +435,7 @@ export const LeadsTable = () => {
         lead={editingLead}
       />
 
-      <LeadDetailsModal
+      <LeadDetailsSidebar
         isOpen={!!viewingLead}
         onClose={() => setViewingLead(null)}
         lead={viewingLead}
@@ -442,6 +443,7 @@ export const LeadsTable = () => {
           setViewingLead(null);
           handleEditLead(lead);
         }}
+        onDelete={handleDeleteLead}
       />
     </>
   );

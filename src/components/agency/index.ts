@@ -9,3 +9,9 @@ export { ReportsGenerator } from "./ReportsGenerator";
 export { SettingsPanel } from "./SettingsPanel";
 export { ProjectsTable } from "./ProjectsTable";
 export { TasksTable } from "./TasksTable";
+export { KanbanBoard } from "./KanbanBoard";
+export { ProjectTimeline } from "./ProjectTimeline";
+export { EventsTable } from "./EventsTable";
+
+// Sidebars
+export * from "./sidebars";

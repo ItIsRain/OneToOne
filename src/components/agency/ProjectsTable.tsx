@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import { AddProjectModal, ProjectDetailsModal } from "@/components/agency/modals";
+import { AddProjectModal } from "@/components/agency/modals";
+import { ProjectDetailsSidebar } from "@/components/agency/sidebars";
 
 interface Project {
   id: string;
@@ -511,14 +512,17 @@ export const ProjectsTable: React.FC = () => {
         }}
       />
 
-      {selectedProject && (
-        <ProjectDetailsModal
-          isOpen={!!selectedProject}
-          onClose={() => setSelectedProject(null)}
-          project={selectedProject}
-          onUpdate={fetchProjects}
-        />
-      )}
+      <ProjectDetailsSidebar
+        isOpen={!!selectedProject}
+        onClose={() => setSelectedProject(null)}
+        project={selectedProject}
+        onEdit={(project) => {
+          setSelectedProject(null);
+          // Open edit modal
+          setIsAddModalOpen(true);
+        }}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };

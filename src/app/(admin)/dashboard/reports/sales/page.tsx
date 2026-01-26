@@ -29,22 +29,30 @@ export default function SalesReportsPage() {
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <p className="text-sm text-gray-500">Total Revenue</p>
           <h3 className="text-2xl font-bold text-gray-800 dark:text-white/90 mt-1">$206,000</h3>
-          <Badge color="success" className="mt-2"><ArrowUpIcon /> +18.2%</Badge>
+          <div className="mt-2">
+            <Badge color="success"><ArrowUpIcon /> +18.2%</Badge>
+          </div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <p className="text-sm text-gray-500">Deals Closed</p>
           <h3 className="text-2xl font-bold text-gray-800 dark:text-white/90 mt-1">56</h3>
-          <Badge color="success" className="mt-2"><ArrowUpIcon /> +12 this month</Badge>
+          <div className="mt-2">
+            <Badge color="success"><ArrowUpIcon /> +12 this month</Badge>
+          </div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <p className="text-sm text-gray-500">Avg Deal Size</p>
           <h3 className="text-2xl font-bold text-gray-800 dark:text-white/90 mt-1">$3,678</h3>
-          <Badge color="success" className="mt-2"><ArrowUpIcon /> +5.4%</Badge>
+          <div className="mt-2">
+            <Badge color="success"><ArrowUpIcon /> +5.4%</Badge>
+          </div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <p className="text-sm text-gray-500">Conversion Rate</p>
           <h3 className="text-2xl font-bold text-gray-800 dark:text-white/90 mt-1">30%</h3>
-          <Badge color="error" className="mt-2"><ArrowDownIcon /> -2.1%</Badge>
+          <div className="mt-2">
+            <Badge color="error"><ArrowDownIcon /> -2.1%</Badge>
+          </div>
         </div>
       </div>
 

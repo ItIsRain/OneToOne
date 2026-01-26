@@ -29,3 +29,4 @@ export { EventDetailsModal } from "./EventDetailsModal";
 export { EditEventModal } from "./EditEventModal";
 export { ProjectDetailsModal } from "./ProjectDetailsModal";
 export { TaskDetailsModal } from "./TaskDetailsModal";
+export { AddEventModal } from "./AddEventModal";

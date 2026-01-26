@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import Badge from "../ui/badge/Badge";
-import { NewEventModal, EventDetailsModal, EditEventModal } from "./modals";
+import { NewEventModal, EditEventModal } from "./modals";
+import { EventDetailsSidebar } from "./sidebars";
 
 interface EventRequirements {
   problemStatement?: string;
@@ -616,10 +617,28 @@ export const EventsHub = () => {
     </div>
 
     <NewEventModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    <EventDetailsModal
+    <EventDetailsSidebar
       isOpen={isDetailsModalOpen}
       onClose={() => setIsDetailsModalOpen(false)}
-      event={selectedEvent}
+      event={selectedEvent ? {
+        id: String(selectedEvent.id),
+        title: selectedEvent.title,
+        description: selectedEvent.description,
+        location: selectedEvent.location,
+        start_date: selectedEvent.date,
+        end_date: selectedEvent.endDate,
+        start_time: selectedEvent.time,
+        end_time: selectedEvent.endTime,
+        status: selectedEvent.status.toLowerCase().replace(" ", "_") as "upcoming" | "in_progress" | "completed" | "cancelled",
+        event_type: selectedEvent.type?.toLowerCase().replace(/ /g, "_"),
+        category: selectedEvent.category,
+        icon: selectedEvent.icon,
+        is_virtual: selectedEvent.isVirtual,
+        virtual_platform: selectedEvent.virtualPlatform,
+        attendees_count: selectedEvent.attendees,
+        requirements: selectedEvent.requirements,
+        client: selectedEvent.client ? { id: "mock", name: selectedEvent.client, company: selectedEvent.client } : null,
+      } : null}
       onEdit={handleEditEvent}
     />
     <EditEventModal

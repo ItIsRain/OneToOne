@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { AddLeadModal, LeadDetailsModal } from "./modals";
+import { AddLeadModal } from "./modals";
+import { LeadDetailsSidebar } from "./sidebars";
 import type { Lead } from "./LeadsTable";
 
 interface PipelineStage {
@@ -487,7 +488,7 @@ export const SalesPipeline = () => {
         lead={editingLead}
       />
 
-      <LeadDetailsModal
+      <LeadDetailsSidebar
         isOpen={!!viewingLead}
         onClose={() => setViewingLead(null)}
         lead={viewingLead}
