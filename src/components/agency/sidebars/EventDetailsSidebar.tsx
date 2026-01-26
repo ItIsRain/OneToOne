@@ -69,13 +69,14 @@ interface Event {
   max_attendees?: number;
   confirmed_attendees?: number;
   is_public?: boolean;
+  is_published?: boolean;
   registration_required?: boolean;
   registration_deadline?: string;
   ticket_price?: number;
   currency?: string;
   tags?: string[];
   notes?: string;
-  requirements?: EventRequirements;
+  requirements?: Record<string, unknown>;
   contact_name?: string;
   contact_email?: string;
   contact_phone?: string;
@@ -125,26 +126,12 @@ const statusConfig: Record<string, { label: string; color: "primary" | "success"
 };
 
 const eventTypeConfig: Record<string, { label: string; icon: string }> = {
-  general: { label: "General", icon: "📅" },
-  meeting: { label: "Meeting", icon: "👥" },
-  conference: { label: "Conference", icon: "🎤" },
-  workshop: { label: "Workshop", icon: "🔧" },
-  webinar: { label: "Webinar", icon: "💻" },
+  general: { label: "General Event", icon: "📅" },
   hackathon: { label: "Hackathon", icon: "💻" },
+  workshop: { label: "Workshop", icon: "🔧" },
+  meetup: { label: "Meetup", icon: "🤝" },
   game_jam: { label: "Game Jam", icon: "🎮" },
-  keynote: { label: "Keynote", icon: "🎙️" },
-  panel: { label: "Panel Discussion", icon: "🗣️" },
-  fireside_chat: { label: "Fireside Chat", icon: "🔥" },
-  product_launch: { label: "Product Launch", icon: "🚀" },
-  demo_day: { label: "Demo Day", icon: "📊" },
-  design_sprint: { label: "Design Sprint", icon: "🎨" },
-  awards: { label: "Awards Ceremony", icon: "🏆" },
-  networking: { label: "Networking", icon: "🤝" },
-  training: { label: "Training", icon: "📚" },
-  team_building: { label: "Team Building", icon: "🎯" },
-  client_meeting: { label: "Client Meeting", icon: "💼" },
-  deadline: { label: "Deadline", icon: "⏰" },
-  milestone: { label: "Milestone", icon: "🏁" },
+  demo_day: { label: "Demo Day", icon: "🚀" },
 };
 
 const platformConfig: Record<string, string> = {
@@ -170,6 +157,9 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   if (!event) return null;
+
+  // Cast requirements to EventRequirements for type-safe access
+  const requirements = (event.requirements || {}) as EventRequirements;
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
@@ -218,6 +208,42 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
       }
     } catch (error) {
       console.error("Error updating status:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleTogglePublish = async () => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/events/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_published: !event.is_published }),
+      });
+      if (response.ok && onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error("Error toggling publish:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleTogglePublic = async () => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/events/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_public: !event.is_public }),
+      });
+      if (response.ok && onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error("Error toggling public:", error);
     } finally {
       setIsUpdating(false);
     }
@@ -369,6 +395,70 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
           </div>
         </div>
 
+        {/* Quick Actions - Publish & Public */}
+        <div className="p-4 rounded-xl bg-gradient-to-r from-brand-50 to-purple-50 dark:from-brand-500/10 dark:to-purple-500/10 border border-brand-100 dark:border-brand-500/20">
+          <h4 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+            <svg className="h-4 w-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Quick Actions
+          </h4>
+          <div className="space-y-3">
+            {/* Publish Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Published</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Make event live and accessible</p>
+              </div>
+              <button
+                onClick={handleTogglePublish}
+                disabled={isUpdating}
+                className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 ${
+                  event.is_published ? "bg-success-500" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    event.is_published ? "translate-x-5" : ""
+                  }`}
+                />
+              </button>
+            </div>
+            {/* Public Toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Public Event</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Visible to anyone with the link</p>
+              </div>
+              <button
+                onClick={handleTogglePublic}
+                disabled={isUpdating}
+                className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-50 ${
+                  event.is_public ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    event.is_public ? "translate-x-5" : ""
+                  }`}
+                />
+              </button>
+            </div>
+            {/* Edit Button */}
+            {onEdit && (
+              <button
+                onClick={() => onEdit(event)}
+                className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Event
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Client */}
         {event.client && (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50">
@@ -457,22 +547,27 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
           </Section>
         )}
 
-        {/* Registration */}
-        {(event.registration_required || event.ticket_price) && (
-          <Section title="Registration">
-            <InfoRow label="Required" value={event.registration_required ? "Yes" : "No"} />
-            {event.registration_deadline && (
-              <InfoRow label="Deadline" value={formatDateTime(event.registration_deadline)} />
-            )}
-            {event.ticket_price && (
-              <InfoRow
-                label="Ticket Price"
-                value={`${event.currency || "USD"} ${event.ticket_price.toFixed(2)}`}
-              />
-            )}
-            <InfoRow label="Public Event" value={event.is_public ? "Yes" : "No"} />
-          </Section>
-        )}
+        {/* Registration & Visibility */}
+        <Section title="Visibility & Registration">
+          <div className="flex items-center gap-2 mb-3">
+            <Badge size="sm" color={event.is_published ? "success" : "light"}>
+              {event.is_published ? "Published" : "Draft"}
+            </Badge>
+            <Badge size="sm" color={event.is_public ? "primary" : "light"}>
+              {event.is_public ? "Public" : "Private"}
+            </Badge>
+          </div>
+          <InfoRow label="Registration" value={event.registration_required ? "Required" : "Not required"} />
+          {event.registration_deadline && (
+            <InfoRow label="Deadline" value={formatDateTime(event.registration_deadline)} />
+          )}
+          {event.ticket_price && (
+            <InfoRow
+              label="Ticket Price"
+              value={`${event.currency || "USD"} ${event.ticket_price.toFixed(2)}`}
+            />
+          )}
+        </Section>
 
         {/* Assignee */}
         <Section title="Assignment">
@@ -558,20 +653,20 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
         )}
 
         {/* Requirements - Type specific */}
-        {event.requirements && Object.keys(event.requirements).length > 0 && (
+        {Object.keys(requirements).length > 0 && (
           <Section title="Event Details" collapsible defaultOpen={false}>
             {/* Hackathon specific */}
-            {event.requirements.problemStatement && (
+            {requirements.problemStatement && (
               <div className="mb-3">
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Challenge</p>
-                <p className="text-sm text-gray-800 dark:text-gray-200">{event.requirements.problemStatement}</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">{requirements.problemStatement}</p>
               </div>
             )}
-            {event.requirements.prizes && event.requirements.prizes.length > 0 && (
+            {requirements.prizes && requirements.prizes.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Prizes</p>
                 <div className="space-y-1">
-                  {event.requirements.prizes.map((prize, i) => (
+                  {requirements.prizes.map((prize, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span className="text-gray-600 dark:text-gray-400">{prize.place}</span>
                       <span className="font-medium text-gray-800 dark:text-white">{prize.prize}</span>
@@ -582,24 +677,24 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
             )}
 
             {/* Speaker specific */}
-            {event.requirements.speakerName && (
-              <InfoRow label="Speaker" value={event.requirements.speakerName} />
+            {requirements.speakerName && (
+              <InfoRow label="Speaker" value={requirements.speakerName} />
             )}
-            {event.requirements.talkDuration && (
-              <InfoRow label="Duration" value={event.requirements.talkDuration} />
+            {requirements.talkDuration && (
+              <InfoRow label="Duration" value={requirements.talkDuration} />
             )}
 
             {/* Workshop specific */}
-            {event.requirements.skillLevel && (
-              <InfoRow label="Skill Level" value={event.requirements.skillLevel} />
+            {requirements.skillLevel && (
+              <InfoRow label="Skill Level" value={requirements.skillLevel} />
             )}
-            {event.requirements.maxParticipants && (
-              <InfoRow label="Max Participants" value={event.requirements.maxParticipants} />
+            {requirements.maxParticipants && (
+              <InfoRow label="Max Participants" value={requirements.maxParticipants} />
             )}
 
             {/* General */}
-            {event.requirements.dressCode && (
-              <InfoRow label="Dress Code" value={event.requirements.dressCode} />
+            {requirements.dressCode && (
+              <InfoRow label="Dress Code" value={requirements.dressCode} />
             )}
           </Section>
         )}

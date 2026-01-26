@@ -1,0 +1,293 @@
+import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+async function getSupabaseClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignore in Server Components
+          }
+        },
+      },
+    }
+  );
+}
+
+// GET - Fetch single invoice with items
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Fetch invoice with related data
+    const { data: invoice, error } = await supabase
+      .from("invoices")
+      .select(`
+        *,
+        client:clients(id, name, email, phone, company, address, city, country),
+        project:projects(id, name, project_code),
+        event:events(id, title),
+        items:invoice_items(*)
+      `)
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Fetch payments for this invoice
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("invoice_id", id)
+      .order("payment_date", { ascending: false });
+
+    return NextResponse.json({ invoice: { ...invoice, payments: payments || [] } });
+  } catch (error) {
+    console.error("Get invoice error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+// PATCH - Update invoice
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    const body = await request.json();
+
+    // Fields that should be null when empty (UUIDs and optional fields)
+    const nullableUuidFields = ["client_id", "project_id", "event_id"];
+    const nullableDateFields = ["issue_date", "due_date", "sent_date", "paid_at"];
+    const nullableStringFields = ["notes", "terms_and_conditions", "footer_note", "po_number", "reference_number"];
+
+    // Convert empty strings to null for nullable fields
+    nullableUuidFields.forEach((field) => {
+      if (body[field] === "") body[field] = null;
+    });
+    nullableDateFields.forEach((field) => {
+      if (body[field] === "") body[field] = null;
+    });
+    nullableStringFields.forEach((field) => {
+      if (body[field] === "") body[field] = null;
+    });
+
+    // Build update object with allowed fields
+    const allowedFields = [
+      "client_id", "project_id", "event_id", "title", "invoice_number",
+      "subtotal", "tax_rate", "tax_amount", "discount_type", "discount_value",
+      "discount_amount", "total", "amount", "amount_paid", "currency", "status",
+      "issue_date", "due_date", "sent_date", "paid_at", "payment_terms",
+      "notes", "terms_and_conditions", "footer_note",
+      "billing_name", "billing_email", "billing_address", "billing_city", "billing_country",
+      "po_number", "reference_number", "tags"
+    ];
+
+    const updates: Record<string, unknown> = {};
+    allowedFields.forEach((field) => {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    });
+
+    // Recalculate totals if financial fields changed
+    if (body.subtotal !== undefined || body.tax_rate !== undefined || body.discount_value !== undefined) {
+      const subtotal = parseFloat(body.subtotal) || 0;
+      const taxRate = parseFloat(body.tax_rate) || 0;
+      const taxAmount = subtotal * (taxRate / 100);
+      const discountValue = parseFloat(body.discount_value) || 0;
+      const discountType = body.discount_type || 'fixed';
+      const discountAmount = discountType === 'percentage'
+        ? subtotal * (discountValue / 100)
+        : discountValue;
+      const total = subtotal + taxAmount - discountAmount;
+
+      updates.tax_amount = taxAmount;
+      updates.discount_amount = discountAmount;
+      updates.total = total;
+      updates.amount = total; // Backward compatibility
+    }
+
+    // Handle status transitions
+    if (body.status === 'sent' && !body.sent_date) {
+      updates.sent_date = new Date().toISOString();
+    }
+    if (body.status === 'paid' && !body.paid_at) {
+      updates.paid_at = new Date().toISOString();
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data: invoice, error } = await supabase
+      .from("invoices")
+      .update(updates)
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .select(`
+        *,
+        client:clients(id, name, email, company),
+        project:projects(id, name, project_code),
+        event:events(id, title)
+      `)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Update items if provided
+    if (body.items && Array.isArray(body.items)) {
+      // Delete existing items
+      await supabase
+        .from("invoice_items")
+        .delete()
+        .eq("invoice_id", id);
+
+      // Insert new items
+      if (body.items.length > 0) {
+        const itemsData = body.items.map((item: Record<string, unknown>, index: number) => ({
+          invoice_id: id,
+          description: item.description,
+          quantity: parseFloat(item.quantity as string) || 1,
+          unit_price: parseFloat(item.unit_price as string) || 0,
+          unit: item.unit || 'unit',
+          amount: (parseFloat(item.quantity as string) || 1) * (parseFloat(item.unit_price as string) || 0),
+          discount_type: item.discount_type || 'fixed',
+          discount_value: parseFloat(item.discount_value as string) || 0,
+          tax_rate: parseFloat(item.tax_rate as string) || 0,
+          sort_order: index,
+          notes: item.notes || null,
+        }));
+
+        await supabase.from("invoice_items").insert(itemsData);
+      }
+    }
+
+    return NextResponse.json({ invoice });
+  } catch (error) {
+    console.error("Update invoice error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+// DELETE - Delete invoice
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Delete invoice items first (cascade should handle this, but being explicit)
+    await supabase
+      .from("invoice_items")
+      .delete()
+      .eq("invoice_id", id);
+
+    // Delete the invoice
+    const { error } = await supabase
+      .from("invoices")
+      .delete()
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete invoice error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}

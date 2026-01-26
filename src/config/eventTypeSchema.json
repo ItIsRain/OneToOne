@@ -1,0 +1,417 @@
+{
+  "version": "1.0.0",
+  "description": "OneToOne Event Management - Dynamic Event Type Schema for UAE Startup Ecosystem",
+
+  "sharedFields": [
+    "title", "description", "start_date", "end_date", "start_time", "end_time",
+    "timezone", "is_virtual", "location", "virtual_platform", "virtual_link",
+    "color", "cover_image", "max_attendees", "registration_required",
+    "registration_deadline", "is_public", "is_published", "tags"
+  ],
+
+  "eventTypes": {
+    "general": {
+      "label": "General Event",
+      "icon": "calendar",
+      "color": "#6b7280",
+      "description": "A standard event with basic settings",
+      "defaultDuration": 2,
+      "capacityDefault": 50,
+      "fields": [
+        { "id": "notes", "type": "textarea", "label": "Internal Notes", "adminOnly": true },
+        { "id": "action_items", "type": "checklist", "label": "Action Items" },
+        { "id": "attachments", "type": "file", "label": "Attachments" },
+        { "id": "follow_up_date", "type": "date", "label": "Follow-up Date" }
+      ],
+      "flows": ["registration"],
+      "integrations": ["calendar", "email"]
+    },
+
+    "meeting": {
+      "label": "Meeting",
+      "icon": "users",
+      "color": "#3b82f6",
+      "description": "Business meetings with agenda and attendees",
+      "defaultDuration": 1,
+      "capacityDefault": 20,
+      "tabs": ["basic", "agenda", "participants", "notes"],
+      "fields": [
+        { "id": "meeting_type", "type": "select", "label": "Meeting Type", "options": ["standup", "planning", "review", "brainstorm", "one_on_one", "all_hands", "board", "external"] },
+        { "id": "agenda_items", "type": "sortable-list", "label": "Agenda Items" },
+        { "id": "speakers", "type": "person-list", "label": "Speakers / Presenters" },
+        { "id": "required_attendees", "type": "multiselect", "label": "Required Attendees" },
+        { "id": "optional_attendees", "type": "multiselect", "label": "Optional Attendees" },
+        { "id": "rsvp_required", "type": "toggle", "label": "RSVP Required", "default": true },
+        { "id": "meeting_minutes", "type": "rich-text", "label": "Meeting Minutes", "adminOnly": true },
+        { "id": "action_items", "type": "checklist", "label": "Action Items" },
+        { "id": "pre_read_materials", "type": "file", "label": "Pre-read Materials" },
+        { "id": "recurring", "type": "select", "label": "Recurring Meeting", "options": ["none", "daily", "weekly", "biweekly", "monthly"] }
+      ],
+      "flows": ["registration", "feedback"],
+      "integrations": ["calendar", "email", "slack", "teams"]
+    },
+
+    "workshop": {
+      "label": "Workshop",
+      "icon": "tool",
+      "color": "#f59e0b",
+      "description": "Hands-on learning sessions with materials and exercises",
+      "defaultDuration": 4,
+      "capacityDefault": 30,
+      "tabs": ["basic", "curriculum", "materials", "instructor"],
+      "fields": [
+        { "id": "skill_level", "type": "select", "label": "Skill Level", "required": true, "options": ["beginner", "intermediate", "advanced", "all"], "showPublic": true },
+        { "id": "prerequisites", "type": "sortable-list", "label": "Prerequisites", "showPublic": true },
+        { "id": "learning_outcomes", "type": "sortable-list", "label": "Learning Outcomes", "showPublic": true },
+        { "id": "curriculum_modules", "type": "key-value-list", "label": "Curriculum Modules", "showPublic": true },
+        { "id": "hands_on_exercises", "type": "rich-text", "label": "Hands-on Exercises" },
+        { "id": "materials_provided", "type": "sortable-list", "label": "Materials Provided", "showPublic": true },
+        { "id": "materials_to_bring", "type": "sortable-list", "label": "Materials to Bring", "showPublic": true },
+        { "id": "resource_files", "type": "file", "label": "Resource Files", "maxSize": 50 },
+        { "id": "instructor_info", "type": "person-list", "label": "Instructor", "showPublic": true },
+        { "id": "certification_offered", "type": "toggle", "label": "Certificate of Completion", "showPublic": true },
+        { "id": "software_requirements", "type": "sortable-list", "label": "Software Requirements", "showPublic": true }
+      ],
+      "flows": ["registration", "certificates", "feedback"],
+      "integrations": ["calendar", "email", "certificates"]
+    },
+
+    "hackathon": {
+      "label": "Hackathon",
+      "icon": "code",
+      "color": "#8b5cf6",
+      "description": "Coding competition with teams, submissions, and prizes",
+      "defaultDuration": 48,
+      "capacityDefault": 200,
+      "tabs": ["basic", "challenge", "teams", "submissions", "judging", "prizes"],
+      "fields": [
+        { "id": "hackathon_format", "type": "select", "label": "Hackathon Format", "options": ["in_person", "virtual", "hybrid"], "showPublic": true },
+        { "id": "duration_hours", "type": "select", "label": "Duration (Hours)", "options": ["12", "24", "36", "48", "72", "week"], "default": "48", "showPublic": true },
+        { "id": "problem_statement", "type": "rich-text", "label": "Problem Statement", "required": true, "showPublic": true },
+        { "id": "themes", "type": "sortable-list", "label": "Hackathon Themes/Tracks", "showPublic": true },
+        { "id": "tech_requirements", "type": "multiselect", "label": "Technology Requirements", "options": ["any", "web", "mobile", "ai_ml", "blockchain", "iot", "cloud"], "showPublic": true },
+        { "id": "team_size_min", "type": "number", "label": "Minimum Team Size", "default": 2, "min": 1, "max": 10, "showPublic": true },
+        { "id": "team_size_max", "type": "number", "label": "Maximum Team Size", "default": 5, "min": 1, "max": 10, "showPublic": true },
+        { "id": "allow_solo", "type": "toggle", "label": "Allow Solo Participants", "default": true, "showPublic": true },
+        { "id": "team_formation_help", "type": "toggle", "label": "Team Formation Assistance", "default": true },
+        { "id": "submission_deadline", "type": "datetime", "label": "Submission Deadline", "required": true, "showPublic": true },
+        { "id": "submission_requirements", "type": "sortable-list", "label": "Submission Requirements", "showPublic": true },
+        { "id": "allowed_file_types", "type": "multiselect", "label": "Allowed Submission Files", "options": ["github", "video", "presentation", "zip", "figma", "devpost"] },
+        { "id": "judging_criteria", "type": "key-value-list", "label": "Judging Criteria", "description": "Criteria and weights", "showPublic": true },
+        { "id": "judges", "type": "person-list", "label": "Judges", "showPublic": true },
+        { "id": "judging_type", "type": "select", "label": "Judging Method", "options": ["panel", "public", "hybrid"], "default": "panel" },
+        { "id": "prizes", "type": "key-value-list", "label": "Prize Categories", "showPublic": true },
+        { "id": "total_prize_pool", "type": "currency", "label": "Total Prize Pool", "showPublic": true },
+        { "id": "sponsors", "type": "person-list", "label": "Sponsors", "showPublic": true },
+        { "id": "mentors_available", "type": "toggle", "label": "Mentors Available", "default": true, "showPublic": true },
+        { "id": "mentors", "type": "person-list", "label": "Mentors", "conditional": "mentors_available", "showPublic": true },
+        { "id": "rules", "type": "rich-text", "label": "Rules & Guidelines", "showPublic": true }
+      ],
+      "flows": ["registration", "submissions", "voting", "leaderboard", "certificates"],
+      "integrations": ["calendar", "email", "slack", "discord", "devpost", "github"]
+    },
+
+    "game_jam": {
+      "label": "Game Jam",
+      "icon": "gamepad",
+      "color": "#ec4899",
+      "description": "Game development competition with themes and voting",
+      "defaultDuration": 48,
+      "capacityDefault": 100,
+      "tabs": ["basic", "theme", "rules", "submissions", "judging"],
+      "fields": [
+        { "id": "jam_duration", "type": "select", "label": "Jam Duration", "options": ["24", "48", "72", "week", "month"], "default": "48", "showPublic": true },
+        { "id": "theme", "type": "text", "label": "Jam Theme", "showPublic": true },
+        { "id": "theme_reveal_time", "type": "datetime", "label": "Theme Reveal Time", "showPublic": true },
+        { "id": "optional_themes", "type": "sortable-list", "label": "Optional/Bonus Themes" },
+        { "id": "allowed_engines", "type": "multiselect", "label": "Allowed Game Engines", "options": ["any", "unity", "unreal", "godot", "gamemaker", "construct", "rpgmaker", "custom", "no_engine"], "showPublic": true },
+        { "id": "asset_rules", "type": "select", "label": "Asset Rules", "options": ["all_original", "premade_allowed", "limited_premade"], "showPublic": true },
+        { "id": "team_rules", "type": "select", "label": "Team Rules", "options": ["solo_only", "teams_only", "both"], "default": "both", "showPublic": true },
+        { "id": "max_team_size", "type": "number", "label": "Max Team Size", "default": 4, "showPublic": true },
+        { "id": "submission_platform", "type": "select", "label": "Submission Platform", "options": ["itch", "gamejolt", "custom", "github"], "default": "itch", "showPublic": true },
+        { "id": "itch_jam_link", "type": "url", "label": "itch.io Jam Page", "conditional": "submission_platform:itch", "showPublic": true },
+        { "id": "required_platforms", "type": "multiselect", "label": "Required Build Platforms", "options": ["web", "windows", "mac", "linux", "android", "ios"], "showPublic": true },
+        { "id": "judging_categories", "type": "key-value-list", "label": "Judging Categories", "showPublic": true },
+        { "id": "voting_period_days", "type": "number", "label": "Voting Period (Days)", "default": 7 },
+        { "id": "community_voting", "type": "toggle", "label": "Community Voting", "default": true },
+        { "id": "prizes", "type": "key-value-list", "label": "Prizes", "showPublic": true }
+      ],
+      "flows": ["registration", "submissions", "voting", "leaderboard"],
+      "integrations": ["calendar", "email", "discord", "itch.io"]
+    },
+
+    "panel": {
+      "label": "Panel Discussion",
+      "icon": "message-square",
+      "color": "#06b6d4",
+      "description": "Moderated discussion with multiple panelists",
+      "defaultDuration": 1.5,
+      "capacityDefault": 100,
+      "tabs": ["basic", "panelists", "topics", "audience"],
+      "fields": [
+        { "id": "panel_topic", "type": "text", "label": "Panel Topic", "required": true, "showPublic": true },
+        { "id": "moderator", "type": "person-list", "label": "Moderator", "required": true, "showPublic": true },
+        { "id": "panelists", "type": "person-list", "label": "Panelists", "required": true, "showPublic": true },
+        { "id": "discussion_points", "type": "sortable-list", "label": "Discussion Points", "showPublic": true },
+        { "id": "opening_question", "type": "textarea", "label": "Opening Question" },
+        { "id": "audience_qa", "type": "toggle", "label": "Audience Q&A", "default": true, "showPublic": true },
+        { "id": "qa_duration", "type": "number", "label": "Q&A Duration (minutes)", "default": 15, "conditional": "audience_qa" },
+        { "id": "pre_submit_questions", "type": "toggle", "label": "Pre-submit Questions", "default": true },
+        { "id": "live_polling", "type": "toggle", "label": "Live Polling", "default": false },
+        { "id": "poll_questions", "type": "sortable-list", "label": "Poll Questions", "conditional": "live_polling" },
+        { "id": "recording_available", "type": "toggle", "label": "Recording Available", "default": true, "showPublic": true }
+      ],
+      "flows": ["registration", "feedback"],
+      "integrations": ["calendar", "email", "slido", "mentimeter"]
+    },
+
+    "fireside_chat": {
+      "label": "Fireside Chat",
+      "icon": "flame",
+      "color": "#f97316",
+      "description": "Intimate conversation between host and guest",
+      "defaultDuration": 1,
+      "capacityDefault": 50,
+      "tabs": ["basic", "speakers", "content", "interaction"],
+      "fields": [
+        { "id": "chat_topic", "type": "text", "label": "Conversation Topic", "required": true, "showPublic": true },
+        { "id": "host", "type": "person-list", "label": "Host / Interviewer", "required": true, "showPublic": true },
+        { "id": "guest", "type": "person-list", "label": "Guest Speaker", "required": true, "showPublic": true },
+        { "id": "guest_background", "type": "rich-text", "label": "Guest Background", "showPublic": true },
+        { "id": "key_topics", "type": "sortable-list", "label": "Key Topics to Cover", "showPublic": true },
+        { "id": "suggested_questions", "type": "sortable-list", "label": "Prepared Questions", "adminOnly": true },
+        { "id": "audience_questions", "type": "toggle", "label": "Allow Audience Questions", "default": true, "showPublic": true },
+        { "id": "question_moderation", "type": "toggle", "label": "Moderate Questions", "default": true, "conditional": "audience_questions" },
+        { "id": "intimate_setting", "type": "toggle", "label": "Intimate Setting", "default": true },
+        { "id": "networking_after", "type": "toggle", "label": "Networking Opportunity After", "default": true, "showPublic": true }
+      ],
+      "flows": ["registration", "feedback"],
+      "integrations": ["calendar", "email"]
+    },
+
+    "demo_day": {
+      "label": "Demo Day",
+      "icon": "presentation",
+      "color": "#22c55e",
+      "description": "Startup pitch event with investor audience",
+      "defaultDuration": 4,
+      "capacityDefault": 150,
+      "tabs": ["basic", "pitches", "investors", "feedback"],
+      "fields": [
+        { "id": "demo_day_type", "type": "select", "label": "Demo Day Type", "options": ["accelerator", "incubator", "competition", "internal", "open"], "showPublic": true },
+        { "id": "cohort_name", "type": "text", "label": "Cohort/Batch Name", "showPublic": true },
+        { "id": "pitch_duration", "type": "number", "label": "Pitch Duration (minutes)", "default": 5, "showPublic": true },
+        { "id": "qa_per_pitch", "type": "number", "label": "Q&A Per Pitch (minutes)", "default": 3, "showPublic": true },
+        { "id": "presenting_startups", "type": "person-list", "label": "Presenting Startups", "showPublic": true },
+        { "id": "pitch_order", "type": "sortable-list", "label": "Pitch Order", "adminOnly": true },
+        { "id": "pitch_deck_required", "type": "toggle", "label": "Pitch Deck Required", "default": true },
+        { "id": "investor_attendees", "type": "person-list", "label": "Invited Investors", "adminOnly": true },
+        { "id": "investor_rsvp", "type": "toggle", "label": "Investor RSVP Required", "default": true },
+        { "id": "investment_stage_focus", "type": "multiselect", "label": "Investment Stage Focus", "options": ["pre_seed", "seed", "series_a", "series_b"], "showPublic": true },
+        { "id": "industries", "type": "multiselect", "label": "Industries/Verticals", "options": ["fintech", "healthtech", "edtech", "ecommerce", "saas", "ai", "cleantech", "proptech", "logistics"], "showPublic": true },
+        { "id": "feedback_forms", "type": "toggle", "label": "Investor Feedback Forms", "default": true },
+        { "id": "meeting_scheduling", "type": "toggle", "label": "Enable Meeting Scheduling", "default": true },
+        { "id": "networking_session", "type": "toggle", "label": "Networking Session", "default": true, "showPublic": true },
+        { "id": "networking_duration", "type": "number", "label": "Networking Duration (minutes)", "default": 60, "conditional": "networking_session" }
+      ],
+      "flows": ["registration", "feedback"],
+      "integrations": ["calendar", "email", "calendly", "crm"]
+    },
+
+    "awards": {
+      "label": "Awards Ceremony",
+      "icon": "award",
+      "color": "#eab308",
+      "description": "Recognition event with nominees and voting",
+      "defaultDuration": 3,
+      "capacityDefault": 200,
+      "tabs": ["basic", "categories", "nominees", "voting", "ceremony"],
+      "fields": [
+        { "id": "awards_name", "type": "text", "label": "Awards Name", "required": true, "showPublic": true },
+        { "id": "awards_edition", "type": "text", "label": "Edition/Year", "showPublic": true },
+        { "id": "award_categories", "type": "sortable-list", "label": "Award Categories", "showPublic": true },
+        { "id": "category_details", "type": "key-value-list", "label": "Category Descriptions", "showPublic": true },
+        { "id": "nomination_open", "type": "datetime", "label": "Nominations Open", "showPublic": true },
+        { "id": "nomination_close", "type": "datetime", "label": "Nominations Close", "showPublic": true },
+        { "id": "self_nomination", "type": "toggle", "label": "Allow Self-Nomination", "default": true },
+        { "id": "nomination_fee", "type": "currency", "label": "Nomination Fee" },
+        { "id": "nominees_list", "type": "person-list", "label": "Nominees", "showPublic": true },
+        { "id": "voting_enabled", "type": "toggle", "label": "Public Voting", "default": true, "showPublic": true },
+        { "id": "voting_start", "type": "datetime", "label": "Voting Starts", "conditional": "voting_enabled", "showPublic": true },
+        { "id": "voting_end", "type": "datetime", "label": "Voting Ends", "conditional": "voting_enabled", "showPublic": true },
+        { "id": "voting_weight", "type": "number", "label": "Public Vote Weight (%)", "default": 50, "conditional": "voting_enabled" },
+        { "id": "jury_members", "type": "person-list", "label": "Jury Members", "showPublic": true },
+        { "id": "dress_code", "type": "select", "label": "Dress Code", "options": ["formal", "semi_formal", "business", "smart_casual", "casual"], "showPublic": true },
+        { "id": "ceremony_host", "type": "person-list", "label": "Ceremony Host/MC", "showPublic": true },
+        { "id": "entertainment", "type": "sortable-list", "label": "Entertainment" },
+        { "id": "dinner_included", "type": "toggle", "label": "Dinner/Reception", "default": true, "showPublic": true },
+        { "id": "menu_options", "type": "multiselect", "label": "Menu Options", "options": ["standard", "vegetarian", "vegan", "halal", "gluten_free"], "conditional": "dinner_included" }
+      ],
+      "flows": ["registration", "voting", "certificates"],
+      "integrations": ["calendar", "email", "voting_platform"]
+    },
+
+    "training": {
+      "label": "Training Session",
+      "icon": "book-open",
+      "color": "#14b8a6",
+      "description": "Educational training with assessments and certification",
+      "defaultDuration": 8,
+      "capacityDefault": 25,
+      "tabs": ["basic", "curriculum", "assessment", "certification"],
+      "fields": [
+        { "id": "training_type", "type": "select", "label": "Training Type", "options": ["onboarding", "technical", "soft_skills", "compliance", "leadership", "product", "sales", "custom"], "showPublic": true },
+        { "id": "skill_level", "type": "select", "label": "Target Skill Level", "options": ["beginner", "intermediate", "advanced", "all"], "showPublic": true },
+        { "id": "prerequisites", "type": "sortable-list", "label": "Prerequisites", "showPublic": true },
+        { "id": "learning_objectives", "type": "sortable-list", "label": "Learning Objectives", "showPublic": true },
+        { "id": "modules", "type": "key-value-list", "label": "Training Modules", "showPublic": true },
+        { "id": "training_materials", "type": "file", "label": "Training Materials", "maxSize": 100 },
+        { "id": "trainers", "type": "person-list", "label": "Trainers/Facilitators", "showPublic": true },
+        { "id": "assessment_required", "type": "toggle", "label": "Assessment Required", "default": true },
+        { "id": "assessment_type", "type": "multiselect", "label": "Assessment Type", "options": ["quiz", "practical", "presentation", "project", "observation"], "conditional": "assessment_required" },
+        { "id": "passing_score", "type": "number", "label": "Passing Score (%)", "default": 70, "conditional": "assessment_required" },
+        { "id": "quiz_questions", "type": "rich-text", "label": "Quiz Questions", "conditional": "assessment_required", "adminOnly": true },
+        { "id": "retake_allowed", "type": "toggle", "label": "Allow Retakes", "default": true, "conditional": "assessment_required" },
+        { "id": "max_retakes", "type": "number", "label": "Max Retake Attempts", "default": 2, "conditional": "retake_allowed" },
+        { "id": "certification_offered", "type": "toggle", "label": "Certificate Offered", "default": true, "showPublic": true },
+        { "id": "certificate_name", "type": "text", "label": "Certificate Name", "conditional": "certification_offered", "showPublic": true },
+        { "id": "certificate_validity", "type": "number", "label": "Certificate Validity (months)", "conditional": "certification_offered" },
+        { "id": "accreditation", "type": "text", "label": "Accreditation Body", "conditional": "certification_offered", "showPublic": true },
+        { "id": "cpe_credits", "type": "number", "label": "CPE/PDU Credits", "conditional": "certification_offered", "showPublic": true }
+      ],
+      "flows": ["registration", "certificates", "feedback"],
+      "integrations": ["calendar", "email", "lms", "certificates"]
+    },
+
+    "team_building": {
+      "label": "Team Building",
+      "icon": "target",
+      "color": "#f43f5e",
+      "description": "Team activities and bonding events",
+      "defaultDuration": 4,
+      "capacityDefault": 50,
+      "tabs": ["basic", "activities", "groups", "logistics"],
+      "fields": [
+        { "id": "activity_type", "type": "select", "label": "Activity Type", "options": ["outdoor", "indoor", "virtual", "escape_room", "sports", "creative", "volunteer", "retreat", "dinner", "mixed"], "showPublic": true },
+        { "id": "team_objectives", "type": "multiselect", "label": "Team Building Objectives", "options": ["communication", "collaboration", "trust", "problem_solving", "creativity", "morale", "onboarding", "celebration"], "showPublic": true },
+        { "id": "activities_list", "type": "key-value-list", "label": "Planned Activities", "showPublic": true },
+        { "id": "icebreakers", "type": "sortable-list", "label": "Icebreaker Activities" },
+        { "id": "main_activity", "type": "rich-text", "label": "Main Activity Description", "showPublic": true },
+        { "id": "competition_element", "type": "toggle", "label": "Competition Element", "default": true },
+        { "id": "prizes", "type": "sortable-list", "label": "Prizes for Winners", "conditional": "competition_element" },
+        { "id": "group_size", "type": "number", "label": "Group/Team Size", "default": 5 },
+        { "id": "group_formation", "type": "select", "label": "Group Formation", "options": ["random", "department", "self_select", "pre_assigned"] },
+        { "id": "mix_levels", "type": "toggle", "label": "Mix Seniority Levels", "default": true },
+        { "id": "facilitator", "type": "person-list", "label": "Facilitator/Organizer" },
+        { "id": "external_vendor", "type": "text", "label": "External Vendor" },
+        { "id": "physical_requirements", "type": "select", "label": "Physical Requirements", "options": ["none", "light", "moderate", "intensive"], "showPublic": true },
+        { "id": "what_to_wear", "type": "text", "label": "What to Wear", "showPublic": true },
+        { "id": "what_to_bring", "type": "sortable-list", "label": "What to Bring", "showPublic": true },
+        { "id": "meals_included", "type": "multiselect", "label": "Meals Included", "options": ["breakfast", "lunch", "dinner", "snacks"], "showPublic": true },
+        { "id": "transportation", "type": "toggle", "label": "Transportation Provided", "default": false, "showPublic": true },
+        { "id": "pickup_location", "type": "text", "label": "Pickup Location", "conditional": "transportation", "showPublic": true }
+      ],
+      "flows": ["registration", "feedback"],
+      "integrations": ["calendar", "email"]
+    },
+
+    "client_meeting": {
+      "label": "Client Meeting",
+      "icon": "briefcase",
+      "color": "#0ea5e9",
+      "description": "External client meetings with agenda and follow-ups",
+      "defaultDuration": 1,
+      "capacityDefault": 10,
+      "tabs": ["basic", "client", "agenda", "followup"],
+      "fields": [
+        { "id": "meeting_purpose", "type": "select", "label": "Meeting Purpose", "options": ["discovery", "proposal", "kickoff", "review", "demo", "negotiation", "support", "quarterly", "renewal", "escalation"] },
+        { "id": "client_company", "type": "text", "label": "Client Company", "required": true },
+        { "id": "client_contacts", "type": "person-list", "label": "Client Attendees" },
+        { "id": "our_attendees", "type": "person-list", "label": "Our Team Attendees" },
+        { "id": "account_manager", "type": "select", "label": "Account Manager" },
+        { "id": "deal_value", "type": "currency", "label": "Deal Value", "adminOnly": true },
+        { "id": "agenda_items", "type": "sortable-list", "label": "Agenda Items" },
+        { "id": "objectives", "type": "sortable-list", "label": "Meeting Objectives" },
+        { "id": "presentation_materials", "type": "file", "label": "Presentation Materials", "maxSize": 50 },
+        { "id": "competitor_info", "type": "textarea", "label": "Competitor Intelligence", "adminOnly": true },
+        { "id": "meeting_notes", "type": "rich-text", "label": "Meeting Notes", "adminOnly": true },
+        { "id": "action_items", "type": "checklist", "label": "Action Items" },
+        { "id": "next_steps", "type": "textarea", "label": "Next Steps" },
+        { "id": "follow_up_date", "type": "date", "label": "Follow-up Date" },
+        { "id": "outcome", "type": "select", "label": "Meeting Outcome", "options": ["positive", "neutral", "negative", "closed_won", "closed_lost"], "adminOnly": true },
+        { "id": "send_summary", "type": "toggle", "label": "Send Meeting Summary", "default": true }
+      ],
+      "flows": ["feedback"],
+      "integrations": ["calendar", "email", "crm", "slack"]
+    }
+  },
+
+  "uiRecommendations": {
+    "formLayout": {
+      "desktop": "tabs-left",
+      "mobile": "tabs-top",
+      "maxWidth": "4xl"
+    },
+    "fieldRendering": {
+      "groupByTab": true,
+      "showConditionalFields": "animate",
+      "validationMode": "onBlur",
+      "autoSave": true,
+      "autoSaveDelay": 2000
+    },
+    "colorCoding": {
+      "required": "red",
+      "optional": "gray",
+      "adminOnly": "purple"
+    },
+    "responsiveness": {
+      "singleColumnBreakpoint": "md",
+      "twoColumnBreakpoint": "lg"
+    }
+  },
+
+  "flowDefinitions": {
+    "registration": {
+      "description": "Allow attendees to register for the event",
+      "features": ["registration_form", "waitlist", "confirmation_email", "reminder_emails", "qr_code_tickets"]
+    },
+    "submissions": {
+      "description": "Accept project submissions from participants",
+      "features": ["submission_form", "file_uploads", "team_submissions", "deadline_enforcement", "submission_review"]
+    },
+    "voting": {
+      "description": "Enable voting on submissions or nominees",
+      "features": ["public_voting", "jury_voting", "weighted_voting", "voting_deadline", "results_dashboard"]
+    },
+    "leaderboard": {
+      "description": "Display rankings and scores",
+      "features": ["real_time_updates", "category_rankings", "point_system", "badges"]
+    },
+    "certificates": {
+      "description": "Issue certificates to participants",
+      "features": ["certificate_templates", "auto_generation", "verification_qr", "linkedin_integration"]
+    },
+    "feedback": {
+      "description": "Collect feedback from attendees",
+      "features": ["post_event_survey", "nps_score", "speaker_ratings", "analytics_dashboard"]
+    }
+  },
+
+  "integrations": {
+    "calendar": { "name": "Calendar Integration", "platforms": ["google_calendar", "outlook", "apple_calendar"] },
+    "email": { "name": "Email Notifications", "platforms": ["sendgrid", "mailchimp", "resend"] },
+    "slack": { "name": "Slack Integration", "features": ["notifications", "rsvp", "reminders"] },
+    "teams": { "name": "Microsoft Teams", "features": ["meeting_links", "notifications"] },
+    "discord": { "name": "Discord Integration", "features": ["server_channels", "notifications"] },
+    "devpost": { "name": "Devpost", "features": ["submission_sync", "judging"] },
+    "github": { "name": "GitHub", "features": ["repo_verification", "contribution_tracking"] },
+    "crm": { "name": "CRM Integration", "platforms": ["salesforce", "hubspot", "pipedrive"] },
+    "certificates": { "name": "Certificate Generation", "platforms": ["certifier", "accredible", "custom"] },
+    "lms": { "name": "Learning Management", "platforms": ["moodle", "canvas", "custom"] },
+    "calendly": { "name": "Calendly", "features": ["meeting_scheduling"] },
+    "slido": { "name": "Slido", "features": ["live_qa", "polling"] },
+    "mentimeter": { "name": "Mentimeter", "features": ["interactive_presentations", "polling"] },
+    "itch.io": { "name": "itch.io", "features": ["game_submissions", "jam_pages"] },
+    "voting_platform": { "name": "Voting Platform", "features": ["secure_voting", "analytics"] }
+  }
+}

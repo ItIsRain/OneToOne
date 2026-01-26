@@ -1,95 +1,140 @@
 "use client";
-import React, { useState } from "react";
-import { FolderIcon, FileIcon } from "@/icons";
+import React, { useState, useCallback } from "react";
 import { UploadFileModal } from "@/components/agency/modals";
-
-const files = [
-  { id: 1, name: "Q4 Financial Report.pdf", type: "pdf", size: "2.4 MB", modified: "Jan 25, 2025", shared: true },
-  { id: 2, name: "Brand Guidelines.pdf", type: "pdf", size: "8.1 MB", modified: "Jan 20, 2025", shared: true },
-  { id: 3, name: "Project Proposal.docx", type: "doc", size: "1.2 MB", modified: "Jan 18, 2025", shared: false },
-  { id: 4, name: "Event Photos.zip", type: "zip", size: "156 MB", modified: "Jan 15, 2025", shared: true },
-  { id: 5, name: "Meeting Notes.docx", type: "doc", size: "245 KB", modified: "Jan 12, 2025", shared: false },
-];
-
-const folders = [
-  { id: 1, name: "Contracts", files: 24, modified: "Jan 25, 2025" },
-  { id: 2, name: "Templates", files: 18, modified: "Jan 20, 2025" },
-  { id: 3, name: "Client Files", files: 156, modified: "Jan 18, 2025" },
-  { id: 4, name: "Marketing Assets", files: 89, modified: "Jan 15, 2025" },
-];
+import { CreateFolderModal } from "@/components/agency/modals/CreateFolderModal";
+import { FilesTable, FileRecord } from "@/components/agency/FilesTable";
+import { FileDetailsSidebar } from "@/components/agency/sidebars/FileDetailsSidebar";
 
 export default function DocumentsPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<FileRecord | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Track current folder for smarter upload modal
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderName, setCurrentFolderName] = useState<string | null>(null);
+
+  const handleFileSelect = useCallback((file: FileRecord) => {
+    setSelectedFile(file);
+    setSidebarOpen(true);
+  }, []);
+
+  const handleFolderChange = useCallback((folderId: string | null, folderName: string | null) => {
+    setCurrentFolderId(folderId);
+    setCurrentFolderName(folderName);
+  }, []);
+
+  const handleUploadComplete = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const handleFolderCreate = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const handleFileUpdate = useCallback((updatedFile: FileRecord) => {
+    setSelectedFile(updatedFile);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
 
   return (
     <>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Documents</h1>
-            <p className="text-gray-500 dark:text-gray-400">Manage all your files and folders</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+              Documents
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">
+              Manage all your files and folders
+            </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-              New Folder
+            <button
+              onClick={() => setIsFolderModalOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+            >
+              <span className="flex items-center gap-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  />
+                </svg>
+                New Folder
+              </span>
             </button>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => setIsUploadModalOpen(true)}
               className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Upload File
+              <span className="flex items-center gap-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  />
+                </svg>
+                Upload Files
+              </span>
             </button>
           </div>
         </div>
 
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Folders</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {folders.map((folder) => (
-              <div key={folder.id} className="rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md transition-shadow cursor-pointer dark:border-gray-800 dark:bg-white/[0.03]">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-100 dark:bg-warning-500/20">
-                    <FolderIcon className="w-5 h-5 text-warning-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-800 dark:text-white/90">{folder.name}</h4>
-                    <p className="text-xs text-gray-500">{folder.files} files</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-4">Recent Files</h3>
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {files.map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">
-                      <FileIcon className="w-5 h-5 text-gray-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-800 dark:text-white/90">{file.name}</h4>
-                      <p className="text-xs text-gray-500">{file.size} • Modified {file.modified}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {file.shared && (
-                      <span className="text-xs text-gray-400">Shared</span>
-                    )}
-                    <button className="text-brand-500 hover:text-brand-600 text-sm font-medium">Download</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Files Table */}
+        <FilesTable
+          key={refreshKey}
+          onFileSelect={handleFileSelect}
+          selectedFile={selectedFile}
+          onFolderChange={handleFolderChange}
+        />
       </div>
 
-      <UploadFileModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {/* Upload File Modal */}
+      <UploadFileModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadComplete={handleUploadComplete}
+        currentFolderId={currentFolderId}
+        currentFolderName={currentFolderName}
+      />
+
+      {/* Create Folder Modal */}
+      <CreateFolderModal
+        isOpen={isFolderModalOpen}
+        onClose={() => setIsFolderModalOpen(false)}
+        onSave={handleFolderCreate}
+        parentFolderId={currentFolderId}
+      />
+
+      {/* File Details Sidebar */}
+      <FileDetailsSidebar
+        file={selectedFile}
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        onUpdate={handleFileUpdate}
+      />
     </>
   );
 }

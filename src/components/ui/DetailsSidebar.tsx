@@ -4,12 +4,12 @@ import React from "react";
 interface DetailsSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: React.ReactNode;
   subtitle?: string;
   headerActions?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  width?: "sm" | "md" | "lg" | "xl";
+  width?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 const widthClasses = {
@@ -17,6 +17,7 @@ const widthClasses = {
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-xl",
+  "2xl": "max-w-2xl",
 };
 
 export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({

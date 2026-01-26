@@ -64,7 +64,7 @@ interface Event {
   location?: string;
   attendees?: number;
   description?: string;
-  requirements?: EventRequirements;
+  requirements?: Record<string, unknown>;
 }
 
 const eventsData: Event[] = [

@@ -1,40 +1,88 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
-import Select from "@/components/form/Select";
 import Label from "@/components/form/Label";
+
+interface Folder {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+}
 
 interface UploadFileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onUploadComplete?: (files: UploadedFile[]) => void;
+  currentFolderId?: string | null;
+  currentFolderName?: string | null;
 }
 
 export const UploadFileModal: React.FC<UploadFileModalProps> = ({
   isOpen,
   onClose,
+  onUploadComplete,
+  currentFolderId,
+  currentFolderName,
 }) => {
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: number]: number }>({});
+  const [error, setError] = useState("");
+
   const [formData, setFormData] = useState({
     files: [] as File[],
-    folder: "",
+    folder_id: currentFolderId || "root",
     tags: "",
-    shareWith: "",
+    description: "",
+    is_shared: false,
   });
   const [isDragging, setIsDragging] = useState(false);
 
-  const folderOptions = [
-    { value: "root", label: "Root (All Files)" },
-    { value: "contracts", label: "Contracts" },
-    { value: "templates", label: "Templates" },
-    { value: "client-files", label: "Client Files" },
-    { value: "marketing", label: "Marketing Assets" },
-  ];
+  // Fetch folders only if not already in a folder
+  useEffect(() => {
+    const fetchFolders = async () => {
+      if (currentFolderId) return; // Don't fetch if already in a folder
 
-  const shareOptions = [
-    { value: "private", label: "Private (Only me)" },
-    { value: "team", label: "Team" },
-    { value: "specific", label: "Specific People" },
-  ];
+      setLoadingFolders(true);
+      try {
+        const res = await fetch("/api/documents/folders");
+        const data = await res.json();
+        if (res.ok) {
+          setFolders(data.folders || []);
+        }
+      } catch {
+        // Ignore errors
+      } finally {
+        setLoadingFolders(false);
+      }
+    };
+    if (isOpen) fetchFolders();
+  }, [isOpen, currentFolderId]);
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        files: [],
+        folder_id: currentFolderId || "root",
+        tags: "",
+        description: "",
+        is_shared: false,
+      });
+      setError("");
+      setUploadProgress({});
+    }
+  }, [isOpen, currentFolderId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -45,17 +93,50 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
     setIsDragging(false);
   };
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+
+  const validateFiles = (files: File[]): { valid: File[]; rejected: string[] } => {
+    const valid: File[] = [];
+    const rejected: string[] = [];
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        rejected.push(`"${file.name}" exceeds 50MB limit (${formatFileSize(file.size)})`);
+      } else {
+        valid.push(file);
+      }
+    }
+
+    return { valid, rejected };
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
-    setFormData({ ...formData, files: [...formData.files, ...droppedFiles] });
+    const { valid, rejected } = validateFiles(droppedFiles);
+
+    if (rejected.length > 0) {
+      setError(`Files too large: ${rejected.join(", ")}`);
+    }
+
+    if (valid.length > 0) {
+      setFormData({ ...formData, files: [...formData.files, ...valid] });
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
-      setFormData({ ...formData, files: [...formData.files, ...selectedFiles] });
+      const { valid, rejected } = validateFiles(selectedFiles);
+
+      if (rejected.length > 0) {
+        setError(`Files too large: ${rejected.join(", ")}`);
+      }
+
+      if (valid.length > 0) {
+        setFormData({ ...formData, files: [...formData.files, ...valid] });
+      }
     }
   };
 
@@ -66,10 +147,97 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Upload data:", formData);
-    onClose();
+    setError("");
+    setUploading(true);
+
+    const uploadedFiles: UploadedFile[] = [];
+    const tags = formData.tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+
+    // Convert "root" to null for API
+    const folderId = formData.folder_id === "root" ? null : formData.folder_id;
+
+    try {
+      for (let i = 0; i < formData.files.length; i++) {
+        const file = formData.files[i];
+        setUploadProgress((prev) => ({ ...prev, [i]: 10 }));
+
+        // Convert file to base64
+        const base64 = await fileToBase64(file);
+        setUploadProgress((prev) => ({ ...prev, [i]: 30 }));
+
+        // Upload to API
+        const res = await fetch("/api/documents/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file: base64,
+            name: file.name,
+            folder_id: folderId,
+            description: formData.description || null,
+            tags: tags,
+            is_shared: formData.is_shared,
+          }),
+        });
+
+        setUploadProgress((prev) => ({ ...prev, [i]: 90 }));
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          // Check if this is a malware detection error
+          if (data.scanResult) {
+            throw new Error(
+              `⚠️ Security Alert: "${file.name}" was blocked. Detected as malicious by ${data.scanResult.malicious} security vendor(s).`
+            );
+          }
+          throw new Error(data.error || `Failed to upload ${file.name}`);
+        }
+
+        uploadedFiles.push(data.file);
+        setUploadProgress((prev) => ({ ...prev, [i]: 100 }));
+      }
+
+      if (onUploadComplete) {
+        onUploadComplete(uploadedFiles);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1024 / 1024).toFixed(2) + " MB";
+  };
+
+  // Determine the destination display
+  const getDestinationDisplay = () => {
+    if (currentFolderId && currentFolderName) {
+      return currentFolderName;
+    }
+    if (formData.folder_id === "root") {
+      return "Root (All Files)";
+    }
+    const folder = folders.find((f) => f.id === formData.folder_id);
+    return folder?.name || "Root (All Files)";
   };
 
   return (
@@ -83,7 +251,49 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Destination Info - Show current folder or allow selection */}
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+            </svg>
+            <span className="text-sm text-gray-600 dark:text-gray-400">Uploading to:</span>
+            <span className="text-sm font-medium text-gray-800 dark:text-white">
+              {getDestinationDisplay()}
+            </span>
+          </div>
+
+          {/* Only show folder selector if not already in a folder */}
+          {!currentFolderId && (
+            <div className="mt-3">
+              <select
+                value={formData.folder_id}
+                onChange={(e) => setFormData({ ...formData, folder_id: e.target.value })}
+                disabled={uploading || loadingFolders}
+                className="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white disabled:opacity-50"
+              >
+                <option value="root">Root (All Files)</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+              {loadingFolders && (
+                <p className="text-xs text-gray-400 mt-1">Loading folders...</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* File Drop Zone */}
         <div>
           <Label>Files</Label>
           <div
@@ -120,17 +330,19 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
                     className="hidden"
                     multiple
                     onChange={handleFileSelect}
+                    disabled={uploading}
                   />
-                </label>
-                {" "}or drag and drop
+                </label>{" "}
+                or drag and drop
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                PDF, DOC, XLS, PNG, JPG up to 50MB each
+                PDF, DOC, XLS, PNG, JPG, MP4, and more up to 50MB each
               </p>
             </div>
           </div>
         </div>
 
+        {/* Selected Files */}
         {formData.files.length > 0 && (
           <div>
             <Label>Selected Files ({formData.files.length})</Label>
@@ -140,77 +352,116 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
                   key={index}
                   className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-xs font-medium text-gray-600 dark:text-gray-400">
-                      {file.name.split(".").pop()?.toUpperCase()}
+                      {file.name.split(".").pop()?.toUpperCase().slice(0, 4)}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
                         {file.name}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                        {formatFileSize(file.size)}
                       </p>
                     </div>
+                    {uploadProgress[index] !== undefined && (
+                      <div className="w-16">
+                        <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-brand-500 transition-all duration-300"
+                            style={{ width: `${uploadProgress[index]}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(index)}
-                    className="text-gray-400 hover:text-error-500"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {!uploading && (
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="ml-2 text-gray-400 hover:text-error-500"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="folder">Destination Folder</Label>
-            <Select
-              options={folderOptions}
-              placeholder="Select folder"
-              onChange={(value) => setFormData({ ...formData, folder: value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="shareWith">Share With</Label>
-            <Select
-              options={shareOptions}
-              placeholder="Select visibility"
-              onChange={(value) => setFormData({ ...formData, shareWith: value })}
-            />
-          </div>
-        </div>
-
+        {/* Tags */}
         <div>
           <Label htmlFor="tags">Tags (Optional)</Label>
           <Input
             id="tags"
             type="text"
             placeholder="Add tags separated by commas"
+            value={formData.tags}
             onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+            disabled={uploading}
           />
         </div>
 
+        {/* Description */}
+        <div>
+          <Label htmlFor="description">Description (Optional)</Label>
+          <textarea
+            id="description"
+            rows={2}
+            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            placeholder="Add a description for these files..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            disabled={uploading}
+          />
+        </div>
+
+        {/* Share checkbox */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="is_shared"
+            checked={formData.is_shared}
+            onChange={(e) => setFormData({ ...formData, is_shared: e.target.checked })}
+            className="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+            disabled={uploading}
+          />
+          <label htmlFor="is_shared" className="text-sm text-gray-600 dark:text-gray-400">
+            Share with team
+          </label>
+        </div>
+
+        {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            disabled={uploading}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={formData.files.length === 0}
+            disabled={formData.files.length === 0 || uploading}
             className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Upload {formData.files.length > 0 && `(${formData.files.length})`}
+            {uploading
+              ? "Uploading..."
+              : `Upload ${formData.files.length > 0 ? `(${formData.files.length})` : ""}`}
           </button>
         </div>
       </form>

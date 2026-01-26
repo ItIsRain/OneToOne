@@ -79,7 +79,7 @@ interface EventData {
   location?: string;
   attendees?: number;
   description?: string;
-  requirements?: EventRequirements;
+  requirements?: Record<string, unknown>;
 }
 
 interface EditEventModalProps {
@@ -126,7 +126,7 @@ export function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModa
 
   if (!formData) return null;
 
-  const req = formData.requirements || {};
+  const req = (formData.requirements || {}) as EventRequirements;
   const updateReq = (updates: Partial<EventRequirements>) => {
     setFormData({
       ...formData,

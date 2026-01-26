@@ -67,7 +67,7 @@ interface EventData {
   location?: string;
   attendees?: number;
   description?: string;
-  requirements?: EventRequirements;
+  requirements?: Record<string, unknown>;
 }
 
 interface EventDetailsModalProps {
@@ -80,7 +80,7 @@ interface EventDetailsModalProps {
 export function EventDetailsModal({ isOpen, onClose, event, onEdit }: EventDetailsModalProps) {
   if (!event) return null;
 
-  const req = event.requirements || {};
+  const req = (event.requirements || {}) as EventRequirements;
 
   const statusColors = {
     "Upcoming": "from-blue-500 to-indigo-600",
