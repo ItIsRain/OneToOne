@@ -107,10 +107,10 @@ const eventTypes = [
 ];
 
 const stats = [
-  { value: 10000, suffix: "+", label: "Active Organizations" },
-  { value: 50, suffix: "M+", label: "Tasks Completed" },
-  { value: 99.9, suffix: "%", label: "Uptime Guarantee" },
-  { value: 24, suffix: "/7", label: "Support Available" },
+  { display: "10+", label: "Active Organizations" },
+  { display: "1K+", label: "Tasks Completed" },
+  { display: "100%", label: "Secure & Private" },
+  { display: "24/7", label: "Support Available" },
 ];
 
 const testimonials = [
@@ -233,15 +233,30 @@ const faqs = [
 
 // Animated Counter Component
 function AnimatedCounter({ value, suffix, duration = 2000 }: { value: number; suffix: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
+  const [count, setCount] = useState(value);
+  const [hasAnimated, setHasAnimated] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !isVisible) {
-          setIsVisible(true);
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          setCount(0);
+
+          let startTime: number;
+          const animate = (currentTime: number) => {
+            if (!startTime) startTime = currentTime;
+            const progress = Math.min((currentTime - startTime) / duration, 1);
+            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+            setCount(Math.floor(easeOutQuart * value));
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              setCount(value);
+            }
+          };
+          requestAnimationFrame(animate);
         }
       },
       { threshold: 0.1 }
@@ -252,25 +267,11 @@ function AnimatedCounter({ value, suffix, duration = 2000 }: { value: number; su
     }
 
     return () => observer.disconnect();
-  }, [isVisible]);
+  }, [hasAnimated, value, duration]);
 
-  useEffect(() => {
-    if (!isVisible) return;
+  const formattedCount = count >= 1000 ? count.toLocaleString() : count;
 
-    let startTime: number;
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      setCount(Math.floor(easeOutQuart * value));
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [isVisible, value, duration]);
-
-  return <span ref={ref}>{count}{suffix}</span>;
+  return <span ref={ref}>{formattedCount}{suffix}</span>;
 }
 
 // Marquee Component for Event Types and Testimonials
@@ -379,10 +380,9 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
         {/* Background gradient */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-50 via-white to-emerald-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950" />
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-lime-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         </div>
@@ -496,13 +496,13 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Section - Minimal & Elegant */}
-      <section className="py-20 border-y border-gray-100 dark:border-gray-800/50">
+      <section className="py-20 bg-gray-50 dark:bg-gray-900/50 border-y border-gray-100 dark:border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
             {stats.map((stat, idx) => (
               <div key={idx} className="text-center group">
                 <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white tracking-tight">
-                  <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+                  {stat.display}
                 </p>
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-lime-500" />
@@ -515,10 +515,9 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section - Premium Bento Grid */}
-      <section id="features" className="py-24 lg:py-32 relative overflow-hidden">
+      <section id="features" className="py-24 lg:py-32 relative overflow-hidden bg-gray-50 dark:bg-gray-900/50">
         {/* Subtle Background */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(132,204,22,0.1),transparent)]" />
         </div>
 
@@ -732,7 +731,7 @@ export default function LandingPage() {
       </section>
 
       {/* How It Works Section - Refined Timeline */}
-      <section id="how-it-works" className="py-24 lg:py-32 relative">
+      <section id="how-it-works" className="py-24 lg:py-32 relative bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="max-w-3xl mx-auto mb-20">
@@ -920,7 +919,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section - Premium Design */}
-      <section id="pricing" className="py-24 lg:py-32 relative">
+      <section id="pricing" className="py-24 lg:py-32 relative bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="max-w-3xl mx-auto mb-16">
