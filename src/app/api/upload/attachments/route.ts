@@ -3,17 +3,31 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 
-// Parse CLOUDINARY_URL
+// Configure Cloudinary - support both URL format and separate env vars
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
+let cloudinaryConfigured = false;
+
 if (cloudinaryUrl) {
-  const matches = cloudinaryUrl.match(/cloudinary:\/\/(\d+):([^@]+)@(.+)/);
+  // Try parsing CLOUDINARY_URL format: cloudinary://API_KEY:API_SECRET@CLOUD_NAME
+  const matches = cloudinaryUrl.match(/cloudinary:\/\/([^:]+):([^@]+)@(.+)/);
   if (matches) {
     cloudinary.config({
       cloud_name: matches[3],
       api_key: matches[1],
       api_secret: matches[2],
     });
+    cloudinaryConfigured = true;
   }
+}
+
+// Fallback to separate env vars if URL parsing failed
+if (!cloudinaryConfigured && process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  cloudinaryConfigured = true;
 }
 
 async function getSupabaseClient() {
@@ -69,8 +83,11 @@ export async function POST(request: Request) {
     }
 
     // Check if Cloudinary is configured
-    if (!process.env.CLOUDINARY_URL) {
-      return NextResponse.json({ error: "Cloudinary not configured" }, { status: 500 });
+    if (!cloudinaryConfigured) {
+      console.error("Cloudinary not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET");
+      return NextResponse.json({
+        error: "Cloudinary not configured. Please check your environment variables."
+      }, { status: 500 });
     }
 
     // Determine resource type based on file type
@@ -128,8 +145,11 @@ export async function PUT(request: Request) {
     }
 
     // Check if Cloudinary is configured
-    if (!process.env.CLOUDINARY_URL) {
-      return NextResponse.json({ error: "Cloudinary not configured" }, { status: 500 });
+    if (!cloudinaryConfigured) {
+      console.error("Cloudinary not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET");
+      return NextResponse.json({
+        error: "Cloudinary not configured. Please check your environment variables."
+      }, { status: 500 });
     }
 
     const uploadPromises = files.map(async ({ file, fileName, fileType }) => {
