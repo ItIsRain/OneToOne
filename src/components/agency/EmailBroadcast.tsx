@@ -58,11 +58,22 @@ interface Lead {
   status: string;
 }
 
+interface Contact {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+  email_opt_in: boolean;
+  do_not_contact: boolean;
+}
+
 interface Recipient {
   id: string;
   name: string;
   email: string;
-  type: "client" | "team" | "lead";
+  type: "client" | "team" | "lead" | "contact";
   selected: boolean;
 }
 
@@ -91,7 +102,7 @@ export const EmailBroadcast = () => {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [recipientFilter, setRecipientFilter] = useState<"all" | "clients" | "team" | "leads">("all");
+  const [recipientFilter, setRecipientFilter] = useState<"all" | "clients" | "contacts" | "team" | "leads">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectAll, setSelectAll] = useState(false);
 
@@ -131,10 +142,11 @@ export const EmailBroadcast = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [clientsRes, teamRes, leadsRes, eventsRes] = await Promise.all([
+      const [clientsRes, teamRes, leadsRes, contactsRes, eventsRes] = await Promise.all([
         fetch("/api/clients"),
         fetch("/api/team/members"),
         fetch("/api/leads"),
+        fetch("/api/contacts"),
         fetch("/api/events"),
       ]);
 
@@ -185,6 +197,24 @@ export const EmailBroadcast = () => {
               name: lead.name,
               email: lead.email,
               type: "lead",
+              selected: false,
+            });
+          }
+        });
+      }
+
+      // Process contacts
+      if (contactsRes.ok) {
+        const contactsData = await contactsRes.json();
+        const contacts: Contact[] = contactsData.contacts || [];
+        contacts.forEach((contact) => {
+          // Only include contacts with email, who opted in, and are not on do-not-contact list
+          if (contact.email && contact.email_opt_in && !contact.do_not_contact && contact.status === "active") {
+            recipientsList.push({
+              id: `contact-${contact.id}`,
+              name: `${contact.first_name} ${contact.last_name}`.trim(),
+              email: contact.email,
+              type: "contact",
               selected: false,
             });
           }
@@ -324,6 +354,8 @@ export const EmailBroadcast = () => {
         return "primary";
       case "lead":
         return "warning";
+      case "contact":
+        return "info";
       default:
         return "light";
     }
@@ -437,7 +469,7 @@ export const EmailBroadcast = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {["all", "clients", "team", "leads"].map((filter) => (
+              {["all", "clients", "contacts", "team", "leads"].map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setRecipientFilter(filter as typeof recipientFilter)}
@@ -551,7 +583,7 @@ export const EmailBroadcast = () => {
                     <TableCell className="py-3">
                       <Badge
                         size="sm"
-                        color={getTypeColor(recipient.type) as "success" | "warning" | "primary" | "light"}
+                        color={getTypeColor(recipient.type) as "success" | "warning" | "primary" | "light" | "info"}
                       >
                         {recipient.type.charAt(0).toUpperCase() + recipient.type.slice(1)}
                       </Badge>
