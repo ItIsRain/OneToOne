@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserPlanInfo, checkTeamMemberLimit } from "@/lib/plan-limits";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -126,6 +127,28 @@ export async function POST(request: Request) {
     // Check if user has permission to invite members
     if (!["owner", "admin"].includes(currentProfile.role)) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
+    // Check plan limits for team member creation
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const teamLimitCheck = await checkTeamMemberLimit(supabase, currentProfile.tenant_id, planInfo.planType);
+    if (!teamLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: teamLimitCheck.reason,
+          current: teamLimitCheck.current,
+          limit: teamLimitCheck.limit,
+          upgrade_required: teamLimitCheck.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

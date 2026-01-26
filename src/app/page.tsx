@@ -160,74 +160,97 @@ const testimonials = [
 
 const pricingPlans = [
   {
-    name: "Starter",
-    price: "29",
-    description: "Perfect for small teams getting started",
+    name: "Free",
+    type: "free",
+    price: { monthly: 0, yearly: 0 },
+    description: "Perfect for trying out the platform",
     features: [
-      "Up to 5 team members",
-      "Basic CRM & Contacts",
-      "Project Management",
-      "5GB Document Storage",
-      "Email Support",
+      "3 events total",
+      "2 team members",
+      "500 MB storage",
+      "Basic analytics",
+      "Community support",
+    ],
+    cta: "Get Started Free",
+    popular: false,
+    badge: null,
+  },
+  {
+    name: "Starter",
+    type: "starter",
+    price: { monthly: 29, yearly: 279 },
+    description: "For small agencies and freelancers",
+    features: [
+      "10 events/month",
+      "5 team members",
+      "5 GB storage",
+      "Basic CRM features",
+      "Email support",
+      "Logo branding",
     ],
     cta: "Start Free Trial",
     popular: false,
+    badge: null,
   },
   {
     name: "Professional",
-    price: "79",
-    description: "For growing organizations that need more",
+    type: "professional",
+    price: { monthly: 79, yearly: 758 },
+    description: "For growing agencies and organizers",
     features: [
-      "Up to 25 team members",
-      "Advanced CRM & Pipeline",
-      "Event Management",
-      "Finance & Invoicing",
-      "50GB Document Storage",
-      "Priority Support",
-      "Custom Reports",
+      "50 events/month",
+      "15 team members",
+      "25 GB storage",
+      "Full CRM & Invoicing",
+      "Judging system",
+      "Priority support",
+      "Custom branding",
     ],
     cta: "Start Free Trial",
     popular: true,
+    badge: "Most Popular",
   },
   {
-    name: "Enterprise",
-    price: "199",
-    description: "For large organizations with custom needs",
+    name: "Business",
+    type: "business",
+    price: { monthly: 199, yearly: 1910 },
+    description: "For large agencies and enterprises",
     features: [
+      "Unlimited events",
       "Unlimited team members",
-      "All Professional features",
-      "API Access",
-      "White-label Options",
-      "Unlimited Storage",
-      "Dedicated Account Manager",
-      "Custom Integrations",
-      "SLA Guarantee",
+      "100 GB storage",
+      "White-label branding",
+      "SSO/SAML integration",
+      "24/7 priority support",
+      "Dedicated account manager",
+      "99.9% SLA guarantee",
     ],
     cta: "Contact Sales",
     popular: false,
+    badge: "Enterprise",
   },
 ];
 
 const faqs = [
   {
-    question: "How long is the free trial?",
-    answer: "We offer a 14-day free trial on all plans. No credit card required to start. You'll have access to all features during the trial period.",
+    question: "Is there a free plan?",
+    answer: "Yes! We offer a free plan that includes 3 events, 2 team members, and 500MB storage. It's perfect for trying out the platform with no credit card required.",
   },
   {
     question: "Can I switch plans later?",
-    answer: "Absolutely! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing cycle, and we'll prorate any differences.",
+    answer: "Absolutely! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any differences.",
+  },
+  {
+    question: "Do you have any discount codes?",
+    answer: "Yes! Use the code LUNARLIMITED at checkout for 100% off any paid plan. This is a limited-time offer for early adopters.",
   },
   {
     question: "Is my data secure?",
     answer: "Security is our top priority. We use bank-level encryption, regular backups, and comply with GDPR and SOC 2 standards. Your data is always protected.",
   },
   {
-    question: "Do you offer custom integrations?",
-    answer: "Yes! Our Enterprise plan includes custom integrations. We can connect One To One with your existing tools and workflows. Contact our sales team to discuss your needs.",
-  },
-  {
     question: "What kind of support do you offer?",
-    answer: "All plans include email support. Professional plans get priority support with faster response times. Enterprise customers get a dedicated account manager and 24/7 phone support.",
+    answer: "Free plans get community support. Starter plans include email support. Professional plans get priority email support. Business customers get a dedicated account manager and 24/7 support.",
   },
 ];
 
@@ -305,6 +328,7 @@ function Marquee({ children, direction = "left", speed = 30 }: { children: React
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -922,7 +946,7 @@ export default function LandingPage() {
       <section id="pricing" className="py-24 lg:py-32 relative bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
-          <div className="max-w-3xl mx-auto mb-16">
+          <div className="max-w-3xl mx-auto mb-12">
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-700 to-transparent" />
               <span className="text-xs font-semibold tracking-widest text-gray-500 dark:text-gray-400 uppercase">Pricing</span>
@@ -932,30 +956,63 @@ export default function LandingPage() {
               Simple, transparent pricing
             </h2>
             <p className="mt-6 text-lg text-gray-600 dark:text-gray-400 text-center max-w-2xl mx-auto">
-              Choose the plan that fits your organization. All plans include a 14-day free trial.
+              Choose the plan that fits your organization. Start free and upgrade anytime.
             </p>
+
+            {/* Billing Toggle */}
+            <div className="mt-8 flex justify-center">
+              <div className="inline-flex items-center gap-4 p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                <button
+                  onClick={() => setBillingInterval("monthly")}
+                  className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    billingInterval === "monthly"
+                      ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingInterval("yearly")}
+                  className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    billingInterval === "yearly"
+                      ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  Yearly
+                  <span className="px-2 py-0.5 bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-400 text-xs font-semibold rounded-full">
+                    Save 20%
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto items-start">
+          <div className="grid lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-start">
             {pricingPlans.map((plan, idx) => (
               <div
                 key={idx}
                 className={`relative bg-white dark:bg-gray-900 rounded-2xl transition-all duration-300 ${
                   plan.popular
-                    ? "border-2 border-gray-900 dark:border-white lg:-mt-4 lg:mb-4 shadow-xl"
+                    ? "border-2 border-lime-500 lg:-mt-4 lg:mb-4 shadow-xl shadow-lime-500/10"
                     : "border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
                 }`}
               >
-                {/* Popular badge */}
-                {plan.popular && (
-                  <div className="absolute -top-3 left-6">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-semibold rounded-full">
-                      Most popular
+                {/* Badge */}
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full ${
+                      plan.badge === "Most Popular"
+                        ? "bg-lime-500 text-white"
+                        : "bg-gray-900 dark:bg-white text-white dark:text-gray-900"
+                    }`}>
+                      {plan.badge}
                     </span>
                   </div>
                 )}
 
-                <div className="p-8">
+                <div className="p-6 lg:p-8">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {plan.name}
                   </h3>
@@ -966,31 +1023,38 @@ export default function LandingPage() {
 
                   <div className="mt-6 flex items-baseline gap-1">
                     <span className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-                      ${plan.price}
+                      ${plan.price[billingInterval]}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      /month
+                      /{billingInterval === "yearly" ? "year" : "month"}
                     </span>
                   </div>
 
-                  <button
-                    className={`mt-6 w-full py-3 rounded-lg font-medium text-sm transition-all duration-200 ${
+                  {billingInterval === "yearly" && plan.price.monthly > 0 && (
+                    <p className="mt-1 text-sm text-lime-600 dark:text-lime-400">
+                      Save ${(plan.price.monthly * 12) - plan.price.yearly}/year
+                    </p>
+                  )}
+
+                  <Link
+                    href="/subscribe"
+                    className={`mt-6 w-full py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center ${
                       plan.popular
-                        ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100"
+                        ? "bg-lime-500 text-white hover:bg-lime-600"
                         : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
                     }`}
                   >
                     {plan.cta}
-                  </button>
+                  </Link>
 
-                  <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
+                  <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
                     <p className="text-xs font-medium uppercase tracking-wider mb-4 text-gray-400 dark:text-gray-500">
                       What's included
                     </p>
                     <ul className="space-y-3">
                       {plan.features.map((feature, fidx) => (
                         <li key={fidx} className="flex items-start gap-3">
-                          <svg className={`w-5 h-5 flex-shrink-0 ${plan.popular ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <svg className={`w-5 h-5 flex-shrink-0 ${plan.popular ? "text-lime-500" : "text-gray-400 dark:text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -1007,7 +1071,7 @@ export default function LandingPage() {
 
           {/* Trust note */}
           <p className="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
-            All plans include SSL security, daily backups, and 99.9% uptime SLA.
+            All plans include SSL security, daily backups, and 99.9% uptime SLA. Use code <span className="font-semibold text-lime-600 dark:text-lime-400">LUNARLIMITED</span> for 100% off!
           </p>
         </div>
       </section>

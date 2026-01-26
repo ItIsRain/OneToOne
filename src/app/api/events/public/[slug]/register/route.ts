@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { getTenantSubscription, checkAttendeeLimit } from "@/lib/plan-limits";
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +23,7 @@ export async function POST(
     // Get event by slug
     const { data: event, error: eventError } = await supabase
       .from("events")
-      .select("id, title, is_public, is_published, registration_required, max_attendees, attendees_count")
+      .select("id, title, is_public, is_published, registration_required, max_attendees, attendees_count, tenant_id")
       .eq("slug", slug)
       .single();
 
@@ -47,6 +48,18 @@ export async function POST(
         { error: "This event is full" },
         { status: 400 }
       );
+    }
+
+    // Check plan limits for attendees per event
+    const subscription = await getTenantSubscription(supabase, event.tenant_id);
+    if (subscription) {
+      const attendeeLimitCheck = await checkAttendeeLimit(supabase, event.id, subscription.plan_type);
+      if (!attendeeLimitCheck.allowed) {
+        return NextResponse.json(
+          { error: "This event has reached its registration limit" },
+          { status: 400 }
+        );
+      }
     }
 
     // Check for duplicate registration

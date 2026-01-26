@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -58,6 +59,26 @@ export async function GET(request: Request) {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan feature access for time tracking
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const timeTrackingAccess = checkFeatureAccess(planInfo.planType, "time_tracking");
+    if (!timeTrackingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: timeTrackingAccess.reason,
+          upgrade_required: timeTrackingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     // Build query
@@ -153,6 +174,26 @@ export async function POST(request: Request) {
 
     if (!currentProfile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan feature access for time tracking
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const timeTrackingAccess = checkFeatureAccess(planInfo.planType, "time_tracking");
+    if (!timeTrackingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: timeTrackingAccess.reason,
+          upgrade_required: timeTrackingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

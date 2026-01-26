@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserPlanInfo, checkAttendeeLimit } from "@/lib/plan-limits";
 
 // GET - List all attendees for an event (admin only)
 export async function GET(
@@ -166,6 +167,28 @@ export async function POST(
 
     if (!email || !name) {
       return NextResponse.json({ error: "Email and name are required" }, { status: 400 });
+    }
+
+    // Check plan limits for attendees per event
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const attendeeLimitCheck = await checkAttendeeLimit(supabase, eventId, planInfo.planType);
+    if (!attendeeLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: attendeeLimitCheck.reason,
+          current: attendeeLimitCheck.current,
+          limit: attendeeLimitCheck.limit,
+          upgrade_required: attendeeLimitCheck.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     // Check if attendee already exists

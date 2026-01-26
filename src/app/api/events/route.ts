@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { getUserPlanInfo, checkEventLimit } from "@/lib/plan-limits";
 
 export async function GET(request: NextRequest) {
   try {
@@ -134,6 +135,28 @@ export async function POST(request: NextRequest) {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan limits for event creation
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const eventLimitCheck = await checkEventLimit(supabase, profile.tenant_id, planInfo.planType);
+    if (!eventLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: eventLimitCheck.reason,
+          current: eventLimitCheck.current,
+          limit: eventLimitCheck.limit,
+          upgrade_required: eventLimitCheck.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

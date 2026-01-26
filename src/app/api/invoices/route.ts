@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -65,6 +66,26 @@ export async function GET() {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
+    // Check plan feature access for invoicing
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const invoicingAccess = checkFeatureAccess(planInfo.planType, "invoicing");
+    if (!invoicingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: invoicingAccess.reason,
+          upgrade_required: invoicingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
+    }
+
     // Fetch invoices with client and project info
     const { data: invoices, error } = await supabase
       .from("invoices")
@@ -111,6 +132,26 @@ export async function POST(request: Request) {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan feature access for invoicing
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const invoicingAccess = checkFeatureAccess(planInfo.planType, "invoicing");
+    if (!invoicingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: invoicingAccess.reason,
+          upgrade_required: invoicingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

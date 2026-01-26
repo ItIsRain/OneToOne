@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
+import { getUserPlanInfo, checkDocumentTemplateLimit } from "@/lib/plan-limits";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -178,6 +179,28 @@ export async function POST(request: Request) {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan limits for document templates
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const templateLimitCheck = await checkDocumentTemplateLimit(supabase, profile.tenant_id, planInfo.planType);
+    if (!templateLimitCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: templateLimitCheck.reason,
+          current: templateLimitCheck.current,
+          limit: templateLimitCheck.limit,
+          upgrade_required: templateLimitCheck.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();

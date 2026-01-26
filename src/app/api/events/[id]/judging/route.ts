@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 
 // Helper to get tenant and verify access
 async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, eventId: string) {
@@ -47,6 +48,26 @@ export async function GET(
     }
 
     const { event, profile, user } = access;
+
+    // Check plan feature access for judging system
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const judgingAccess = checkFeatureAccess(planInfo.planType, "judging_system");
+    if (!judgingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: judgingAccess.reason,
+          upgrade_required: judgingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
+    }
 
     // Get judges
     const { data: judges } = await supabase
@@ -150,7 +171,27 @@ export async function POST(
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event } = access;
+    const { event, user } = access;
+
+    // Check plan feature access for judging system
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const judgingAccess = checkFeatureAccess(planInfo.planType, "judging_system");
+    if (!judgingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: judgingAccess.reason,
+          upgrade_required: judgingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
+    }
 
     if (event.judging_status === "in_progress") {
       return NextResponse.json({ error: "Judging is already in progress" }, { status: 400 });
@@ -201,7 +242,27 @@ export async function PATCH(
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event } = access;
+    const { event, user } = access;
+
+    // Check plan feature access for judging system
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const judgingAccess = checkFeatureAccess(planInfo.planType, "judging_system");
+    if (!judgingAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: judgingAccess.reason,
+          upgrade_required: judgingAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
+    }
 
     if (event.judging_status !== "in_progress") {
       return NextResponse.json({ error: "Judging is not in progress" }, { status: 400 });

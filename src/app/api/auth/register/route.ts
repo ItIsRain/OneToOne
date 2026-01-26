@@ -122,6 +122,22 @@ export async function POST(request: Request) {
       // Continue anyway - profile can be created later
     }
 
+    // Create initial free subscription for the tenant
+    const periodDays = 30;
+    const { error: subscriptionError } = await supabase.from("tenant_subscriptions").insert({
+      tenant_id: tenant.id,
+      plan_type: "free",
+      status: "active",
+      billing_interval: "monthly",
+      current_period_start: new Date().toISOString(),
+      current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    if (subscriptionError) {
+      console.error("Subscription error:", subscriptionError);
+      // Continue anyway - subscription can be created later
+    }
+
     return NextResponse.json({
       success: true,
       message: "Account created successfully",

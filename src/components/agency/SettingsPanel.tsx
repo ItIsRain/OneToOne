@@ -1,11 +1,46 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTheme } from "@/context/ThemeContext";
+import Link from "next/link";
+
+interface BillingData {
+  plan_type: string;
+  price: number;
+  original_price?: number;
+  discount_percent?: number;
+  billing_interval: string;
+}
 
 export const SettingsPanel = () => {
   const { theme, toggleTheme } = useTheme();
   const [notifications, setNotifications] = useState(true);
   const [emailDigest, setEmailDigest] = useState(true);
+  const [billing, setBilling] = useState<BillingData | null>(null);
+
+  useEffect(() => {
+    const fetchBilling = async () => {
+      try {
+        const res = await fetch("/api/settings/billing");
+        if (res.ok) {
+          const data = await res.json();
+          setBilling(data.subscription);
+        }
+      } catch (err) {
+        console.error("Failed to fetch billing:", err);
+      }
+    };
+    fetchBilling();
+  }, []);
+
+  const getPlanDisplay = () => {
+    if (!billing) return "Loading...";
+    const planName = billing.plan_type.charAt(0).toUpperCase() + billing.plan_type.slice(1);
+    const interval = billing.billing_interval === "yearly" ? "year" : "month";
+    if (billing.discount_percent && billing.discount_percent > 0) {
+      return `${planName} - $${billing.price}/${interval} (${billing.discount_percent}% off)`;
+    }
+    return `${planName} - $${billing.price}/${interval}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -103,26 +138,26 @@ export const SettingsPanel = () => {
                 Current Plan
               </p>
               <p className="text-gray-500 text-theme-xs dark:text-gray-400">
-                Professional - $49/month
+                {getPlanDisplay()}
               </p>
             </div>
-            <button className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
-              Upgrade
-            </button>
+            <Link href="/dashboard/settings/billing" className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
+              Manage
+            </Link>
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-700">
             <div>
               <p className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                Payment Method
+                Payment Methods
               </p>
               <p className="text-gray-500 text-theme-xs dark:text-gray-400">
-                Visa ending in 4242
+                Manage payment methods
               </p>
             </div>
-            <button className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
+            <Link href="/dashboard/settings/billing" className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
               Update
-            </button>
+            </Link>
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-700">
@@ -134,9 +169,9 @@ export const SettingsPanel = () => {
                 View past invoices and receipts
               </p>
             </div>
-            <button className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
+            <Link href="/dashboard/settings/billing" className="text-brand-500 hover:text-brand-600 dark:text-brand-400 text-theme-sm font-medium">
               View
-            </button>
+            </Link>
           </div>
         </div>
       </div>

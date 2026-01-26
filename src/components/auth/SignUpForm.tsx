@@ -120,8 +120,8 @@ export default function SignUpForm() {
         // Still redirect - they can sign in manually
       }
 
-      // Redirect to dashboard
-      window.location.href = "/dashboard";
+      // Redirect to subscription page to select a plan
+      window.location.href = "/subscribe";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

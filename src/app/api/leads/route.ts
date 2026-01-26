@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -52,6 +53,26 @@ export async function GET() {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
+    // Check plan feature access for CRM
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const crmAccess = checkFeatureAccess(planInfo.planType, "crm");
+    if (!crmAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: crmAccess.reason,
+          upgrade_required: crmAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
+    }
+
     const { data: leads, error } = await supabase
       .from("leads")
       .select(`
@@ -95,6 +116,26 @@ export async function POST(request: Request) {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan feature access for CRM
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
+
+    const crmAccess = checkFeatureAccess(planInfo.planType, "crm");
+    if (!crmAccess.allowed) {
+      return NextResponse.json(
+        {
+          error: crmAccess.reason,
+          upgrade_required: crmAccess.upgrade_required,
+        },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
