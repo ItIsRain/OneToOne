@@ -5,7 +5,27 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        hostname: "**.findmyvenue.com",
+      },
+      {
+        protocol: "https",
+        hostname: "findmyvenue.com",
+      },
+      {
+        protocol: "https",
         hostname: "res.cloudinary.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.cloudinary.com",
+      },
+      {
+        protocol: "https",
+        hostname: "fmv-data.s3.ap-south-1.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.amazonaws.com",
       },
     ],
   },
@@ -16,7 +36,7 @@ const nextConfig: NextConfig = {
     });
     return config;
   },
-    
+
     turbopack: {
       rules: {
         '*.svg': {
@@ -25,7 +45,7 @@ const nextConfig: NextConfig = {
         },
       },
     },
-  
+
 };
 
 export default nextConfig;
