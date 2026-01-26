@@ -127,27 +127,23 @@ export const EmailBroadcast = () => {
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mock history - in production this would come from the database
-  const [history] = useState<BroadcastHistory[]>([
-    {
-      id: "1",
-      subject: "Annual Gala Event Invitation",
-      recipientCount: 156,
-      sentAt: "Jan 25, 2025 at 10:30 AM",
-      status: "sent",
-      openRate: 68,
-      template: "event",
-    },
-    {
-      id: "2",
-      subject: "Product Launch Announcement",
-      recipientCount: 89,
-      sentAt: "Jan 20, 2025 at 2:00 PM",
-      status: "sent",
-      openRate: 72,
-      template: "announcement",
-    },
-  ]);
+  const [history, setHistory] = useState<BroadcastHistory[]>([]);
+  const [broadcastStats, setBroadcastStats] = useState({ totalSent: 0, totalBroadcasts: 0 });
+  const [isSending, setIsSending] = useState(false);
+
+  // Fetch broadcast history
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/email/broadcast");
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.broadcasts || []);
+        setBroadcastStats(data.stats || { totalSent: 0, totalBroadcasts: 0 });
+      }
+    } catch (error) {
+      console.error("Error fetching broadcast history:", error);
+    }
+  }, []);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
@@ -160,6 +156,9 @@ export const EmailBroadcast = () => {
         fetch("/api/contacts"),
         fetch("/api/events"),
       ]);
+
+      // Also fetch broadcast history
+      fetchHistory();
 
       const recipientsList: Recipient[] = [];
 
@@ -244,14 +243,14 @@ export const EmailBroadcast = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchHistory]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const selectedCount = recipients.filter((r) => r.selected).length;
-  const totalSent = history.filter((h) => h.status === "sent").reduce((acc, h) => acc + h.recipientCount, 0);
+  const totalSent = broadcastStats.totalSent;
 
   const filteredRecipients = recipients.filter((r) => {
     const matchesFilter = recipientFilter === "all" || r.type === recipientFilter.slice(0, -1);
@@ -443,36 +442,67 @@ export const EmailBroadcast = () => {
       .replace(/\{\{type\}\}/gi, recipient.type);
   };
 
-  const handleSendBroadcast = () => {
+  const handleSendBroadcast = async () => {
     const selectedRecipients = recipients.filter((r) => r.selected);
 
-    // Prepare personalized emails for each recipient
-    const preparedEmails = selectedRecipients.map((recipient) => ({
-      to: recipient.email,
-      toName: recipient.name,
-      subject: personalizeContent(formData.subject, recipient),
-      preheader: personalizeContent(formData.preheader, recipient),
-      content: personalizeContent(formData.content, recipient),
-      ctaText: formData.ctaText,
-      ctaUrl: formData.ctaUrl,
-      attachments: attachments.map((a) => ({
-        url: a.url,
-        fileName: a.fileName,
-        fileType: a.fileType,
-        fileSize: a.fileSize,
-      })),
-    }));
+    if (selectedRecipients.length === 0) {
+      alert("Please select at least one recipient");
+      return;
+    }
 
-    console.log("Prepared emails for sending:", preparedEmails);
+    setIsSending(true);
 
-    // TODO: Send to email service API
-    // Example: await fetch('/api/email/broadcast', { method: 'POST', body: JSON.stringify({ emails: preparedEmails }) });
+    try {
+      // Prepare personalized emails for each recipient
+      const recipientsPayload = selectedRecipients.map((recipient) => ({
+        email: recipient.email,
+        name: recipient.name,
+        type: recipient.type,
+        id: recipient.id.replace(/^(client|team|lead|contact)-/, ""),
+        personalizedSubject: personalizeContent(formData.subject, recipient),
+        personalizedContent: personalizeContent(formData.content, recipient),
+      }));
 
-    setIsModalOpen(false);
-    // Reset selections
-    setRecipients(recipients.map((r) => ({ ...r, selected: false })));
-    setSelectAll(false);
-    setAttachments([]);
+      const response = await fetch("/api/email/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: formData.subject,
+          preheader: formData.preheader,
+          content: formData.content,
+          template: formData.template,
+          ctaText: formData.ctaText,
+          ctaUrl: formData.ctaUrl,
+          attachments: attachments.map((a) => ({
+            url: a.url,
+            fileName: a.fileName,
+            fileType: a.fileType,
+            fileSize: a.fileSize,
+          })),
+          recipients: recipientsPayload,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(`Broadcast sent successfully! ${data.sentCount} of ${data.totalRecipients} emails delivered.`);
+        setIsModalOpen(false);
+        // Reset selections
+        setRecipients(recipients.map((r) => ({ ...r, selected: false })));
+        setSelectAll(false);
+        setAttachments([]);
+        // Refresh history
+        fetchHistory();
+      } else {
+        alert(`Failed to send broadcast: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Send broadcast error:", error);
+      alert("Failed to send broadcast. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -512,8 +542,8 @@ export const EmailBroadcast = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <div className="animate-pulse flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl bg-gray-200 dark:bg-gray-700" />
@@ -539,7 +569,7 @@ export const EmailBroadcast = () => {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Stats Cards */}
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center gap-4">
@@ -551,6 +581,20 @@ export const EmailBroadcast = () => {
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Total Emails Sent</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalSent}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-500/20">
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Broadcasts Sent</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{broadcastStats.totalBroadcasts}</p>
             </div>
           </div>
         </div>
@@ -840,7 +884,7 @@ export const EmailBroadcast = () => {
       </div>
 
       {/* Compose Broadcast Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="max-w-3xl p-6 lg:p-8">
+      <Modal isOpen={isModalOpen} onClose={() => !isSending && setIsModalOpen(false)} className="max-w-3xl p-6 lg:p-8">
         <div className="mb-6">
           <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
             {currentStep === 1 ? "Choose a Template" : "Compose Broadcast"}
@@ -889,7 +933,7 @@ export const EmailBroadcast = () => {
             ))}
           </div>
         ) : (
-          <form onSubmit={(e) => { e.preventDefault(); handleSendBroadcast(); }} className="space-y-5 max-h-[50vh] overflow-y-auto pr-2">
+          <form onSubmit={async (e) => { e.preventDefault(); await handleSendBroadcast(); }} className="space-y-5 max-h-[50vh] overflow-y-auto pr-2">
             {formData.template === "event" && (
               <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 space-y-4">
                 <h4 className="font-medium text-gray-900 dark:text-white">Select Event</h4>
@@ -1096,16 +1140,27 @@ export const EmailBroadcast = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+                  disabled={isSending}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 disabled:opacity-50"
                 >
-                  Save Draft
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={uploadingFiles.length > 0 || !formData.subject || !formData.content || (formData.template === "event" && !formData.selectedEventId)}
-                  className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50"
+                  disabled={isSending || uploadingFiles.length > 0 || !formData.subject || !formData.content || (formData.template === "event" && !formData.selectedEventId)}
+                  className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 flex items-center gap-2"
                 >
-                  Send to {selectedCount} Recipients
+                  {isSending ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    `Send to ${selectedCount} Recipients`
+                  )}
                 </button>
               </div>
             </div>

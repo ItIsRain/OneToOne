@@ -34,6 +34,7 @@ export { MessagesChat } from "./MessagesChat";
 export { EmailsTable } from "./EmailsTable";
 export { NotificationsTable } from "./NotificationsTable";
 export { EmailBroadcast } from "./EmailBroadcast";
+export { default as EmailSettingsForm } from "./EmailSettingsForm";
 
 // Sidebars
 export * from "./sidebars";

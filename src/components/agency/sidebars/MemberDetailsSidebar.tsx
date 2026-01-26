@@ -4,6 +4,11 @@ import { DetailsSidebar, InfoRow, Section } from "@/components/ui/DetailsSidebar
 import Badge from "@/components/ui/badge/Badge";
 import type { TeamMember } from "../MembersTable";
 
+interface ExtendedTeamMember extends TeamMember {
+  is_invite?: boolean;
+  invite_status?: string;
+}
+
 interface RecentTask {
   id: string;
   title: string;
@@ -19,7 +24,7 @@ interface ManagedProject {
   project_code: string | null;
 }
 
-interface MemberWithActivity extends TeamMember {
+interface MemberWithActivity extends ExtendedTeamMember {
   recent_tasks?: RecentTask[];
   managed_projects?: ManagedProject[];
   invited_by_user?: {
@@ -45,6 +50,7 @@ interface MemberDetailsSidebarProps {
   onDelete?: (id: string) => void;
   onStatusChange?: (member: TeamMember, newStatus: string) => void;
   onRoleChange?: (member: TeamMember, newRoleId: string | null) => void;
+  onResendInvite?: (id: string) => Promise<void>;
   roles?: Role[];
 }
 
@@ -113,9 +119,12 @@ export const MemberDetailsSidebar: React.FC<MemberDetailsSidebarProps> = ({
   onDelete,
   onStatusChange,
   onRoleChange,
+  onResendInvite,
   roles = [],
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   if (!member) return null;
 
@@ -496,13 +505,70 @@ export const MemberDetailsSidebar: React.FC<MemberDetailsSidebarProps> = ({
         )}
 
         {/* Invitation Info */}
-        {member.status === "pending_invite" && member.invited_by_user && (
+        {member.status === "pending_invite" && (
           <Section title="Invitation Details">
+            {member.invited_by_user && (
+              <InfoRow
+                label="Invited By"
+                value={[member.invited_by_user.first_name, member.invited_by_user.last_name].filter(Boolean).join(" ")}
+              />
+            )}
+            <InfoRow label="Expires" value={formatDate(member.invite_expires_at || null)} />
             <InfoRow
-              label="Invited By"
-              value={[member.invited_by_user.first_name, member.invited_by_user.last_name].filter(Boolean).join(" ")}
+              label="Status"
+              value={
+                new Date(member.invite_expires_at || "") < new Date()
+                  ? <span className="text-error-500 font-medium">Expired</span>
+                  : <span className="text-warning-500 font-medium">Pending</span>
+              }
             />
-            <InfoRow label="Expires" value={formatDate(member.invite_expires_at)} />
+            {onResendInvite && (
+              <div className="mt-4">
+                {resendSuccess ? (
+                  <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-sm font-medium">Invitation resent successfully!</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      setIsResending(true);
+                      setResendSuccess(false);
+                      try {
+                        await onResendInvite(member.id);
+                        setResendSuccess(true);
+                        setTimeout(() => setResendSuccess(false), 5000);
+                      } catch (error) {
+                        console.error("Failed to resend invite:", error);
+                      } finally {
+                        setIsResending(false);
+                      }
+                    }}
+                    disabled={isResending}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isResending ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Resend Invitation
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
           </Section>
         )}
 

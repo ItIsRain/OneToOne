@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { sendTeamInviteEmail } from "@/lib/email";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -56,7 +57,7 @@ export async function GET(
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    // Fetch member with custom role
+    // First try to fetch from profiles
     const { data: member, error } = await supabase
       .from("profiles")
       .select(`
@@ -67,10 +68,85 @@ export async function GET(
       .eq("tenant_id", profile.tenant_id)
       .single();
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    // If not found in profiles, check team_invites
+    if (error && error.code === "PGRST116") {
+      const { data: invite, error: inviteError } = await supabase
+        .from("team_invites")
+        .select(`
+          *,
+          custom_role:roles(id, name, color, permissions, description)
+        `)
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (inviteError) {
+        if (inviteError.code === "PGRST116") {
+          return NextResponse.json({ error: "Member not found" }, { status: 404 });
+        }
+        return NextResponse.json({ error: inviteError.message }, { status: 500 });
       }
+
+      // Fetch invited_by user info
+      let invitedByData = null;
+      if (invite?.invited_by) {
+        const { data: invitedBy } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email")
+          .eq("id", invite.invited_by)
+          .single();
+        invitedByData = invitedBy;
+      }
+
+      // Fetch manager info
+      let managerData = null;
+      if (invite?.manager_id) {
+        const { data: manager } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, email, avatar_url, job_title")
+          .eq("id", invite.manager_id)
+          .single();
+        managerData = manager;
+      }
+
+      // Return invite as member
+      return NextResponse.json({
+        member: {
+          id: invite.id,
+          first_name: invite.first_name,
+          last_name: invite.last_name,
+          email: invite.email,
+          phone: invite.phone,
+          avatar_url: null,
+          job_title: invite.job_title,
+          department: invite.department,
+          employment_type: invite.employment_type,
+          start_date: invite.start_date,
+          role: invite.role,
+          custom_role: invite.custom_role,
+          custom_role_id: invite.custom_role_id,
+          manager_id: invite.manager_id,
+          hourly_rate: invite.hourly_rate,
+          skills: invite.skills,
+          timezone: invite.timezone,
+          notes: invite.notes,
+          linkedin_url: invite.linkedin_url,
+          tags: invite.tags,
+          status: "pending_invite",
+          created_at: invite.created_at,
+          manager: managerData,
+          invited_by_user: invitedByData,
+          is_invite: true,
+          invite_token: invite.invite_token,
+          invite_expires_at: invite.invite_expires_at,
+          invite_status: invite.status,
+          recent_tasks: [],
+          managed_projects: [],
+        },
+      });
+    }
+
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -287,7 +363,30 @@ export async function DELETE(
       );
     }
 
-    // Check if the member exists and is in the same tenant
+    // First check if it's an invite in team_invites table
+    const { data: inviteToDelete } = await supabase
+      .from("team_invites")
+      .select("id, status")
+      .eq("id", id)
+      .eq("tenant_id", currentProfile.tenant_id)
+      .single();
+
+    if (inviteToDelete) {
+      // Delete or cancel the invite
+      const { error } = await supabase
+        .from("team_invites")
+        .update({ status: "cancelled" })
+        .eq("id", id)
+        .eq("tenant_id", currentProfile.tenant_id);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Check if the member exists in profiles table
     const { data: memberToDelete } = await supabase
       .from("profiles")
       .select("id, role, status")
@@ -307,33 +406,136 @@ export async function DELETE(
       );
     }
 
-    // If status is pending_invite, hard delete (they never actually joined)
-    if (memberToDelete.status === "pending_invite") {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", id)
-        .eq("tenant_id", currentProfile.tenant_id);
+    // Soft delete by setting status to terminated
+    const { error } = await supabase
+      .from("profiles")
+      .update({ status: "terminated", updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("tenant_id", currentProfile.tenant_id);
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-    } else {
-      // Otherwise, soft delete by setting status to terminated
-      const { error } = await supabase
-        .from("profiles")
-        .update({ status: "terminated", updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("tenant_id", currentProfile.tenant_id);
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete member error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
+// POST - Resend invitation email
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
+    const body = await request.json();
+    const { action } = body;
+
+    if (action !== "resend_invite") {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's profile with tenant_id, role, and name
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("tenant_id, role, first_name, last_name")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentProfile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Only owners and admins can resend invites
+    if (!["owner", "admin"].includes(currentProfile.role)) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
+    // Fetch the invite
+    const { data: invite, error: inviteError } = await supabase
+      .from("team_invites")
+      .select("*")
+      .eq("id", id)
+      .eq("tenant_id", currentProfile.tenant_id)
+      .single();
+
+    if (inviteError || !invite) {
+      return NextResponse.json({ error: "Invitation not found" }, { status: 404 });
+    }
+
+    if (invite.status !== "pending") {
+      return NextResponse.json({ error: "This invitation is no longer pending" }, { status: 400 });
+    }
+
+    // Generate new token and extend expiry
+    const newInviteToken = crypto.randomUUID();
+    const newExpiry = new Date();
+    newExpiry.setDate(newExpiry.getDate() + 7);
+
+    // Update the invite with new token and expiry
+    const { error: updateError } = await supabase
+      .from("team_invites")
+      .update({
+        invite_token: newInviteToken,
+        invite_expires_at: newExpiry.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    // Get tenant name for email
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("name")
+      .eq("id", currentProfile.tenant_id)
+      .single();
+
+    // Send the invitation email
+    const inviterName = `${currentProfile.first_name} ${currentProfile.last_name || ""}`.trim();
+    const inviteeName = `${invite.first_name} ${invite.last_name || ""}`.trim();
+    const teamName = tenant?.name || "the team";
+
+    const emailSent = await sendTeamInviteEmail({
+      to: invite.email,
+      inviteeName,
+      inviterName,
+      teamName,
+      role: invite.role,
+      inviteToken: newInviteToken,
+    });
+
+    if (!emailSent) {
+      console.warn("Failed to resend invite email to:", invite.email);
+      return NextResponse.json({
+        success: true,
+        emailSent: false,
+        message: "Invitation updated but email failed to send"
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      emailSent: true,
+      message: "Invitation resent successfully"
+    });
+  } catch (error) {
+    console.error("Resend invite error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

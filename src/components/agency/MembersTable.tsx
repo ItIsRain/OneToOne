@@ -709,6 +709,17 @@ export const MembersTable = () => {
             });
           }
         }}
+        onResendInvite={async (id) => {
+          const response = await fetch(`/api/team/members/${id}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "resend_invite" }),
+          });
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || "Failed to resend invitation");
+          }
+        }}
         roles={roles}
       />
     </>
