@@ -75,15 +75,120 @@ const mockContacts: Contact[] = [
     lastMessage: "Let me know when you're free to discuss",
     lastMessageTime: "Jan 22",
   },
+  {
+    id: "7",
+    name: "Amanda White",
+    status: "online",
+    unreadCount: 3,
+    lastMessage: "The presentation is ready for tomorrow",
+    lastMessageTime: "11:15 AM",
+  },
+  {
+    id: "8",
+    name: "Robert Taylor",
+    status: "away",
+    lastSeen: "30 mins ago",
+    unreadCount: 0,
+    lastMessage: "I'll send the report by EOD",
+    lastMessageTime: "Yesterday",
+  },
+  {
+    id: "9",
+    name: "Jennifer Martinez",
+    status: "online",
+    unreadCount: 0,
+    lastMessage: "Can we reschedule the call?",
+    lastMessageTime: "Jan 24",
+  },
+  {
+    id: "10",
+    name: "Christopher Lee",
+    status: "offline",
+    lastSeen: "3 hours ago",
+    unreadCount: 0,
+    lastMessage: "The contract has been signed",
+    lastMessageTime: "Jan 24",
+  },
+  {
+    id: "11",
+    name: "Michelle Garcia",
+    status: "online",
+    unreadCount: 1,
+    lastMessage: "Budget approved for Q2",
+    lastMessageTime: "Jan 23",
+  },
+  {
+    id: "12",
+    name: "Daniel Anderson",
+    status: "away",
+    lastSeen: "1 hour ago",
+    unreadCount: 0,
+    lastMessage: "New team member starting Monday",
+    lastMessageTime: "Jan 23",
+  },
+  {
+    id: "13",
+    name: "Jessica Thomas",
+    status: "offline",
+    lastSeen: "2 days ago",
+    unreadCount: 0,
+    lastMessage: "Thanks for your help!",
+    lastMessageTime: "Jan 22",
+  },
+  {
+    id: "14",
+    name: "Kevin Jackson",
+    status: "online",
+    unreadCount: 0,
+    lastMessage: "Meeting notes attached",
+    lastMessageTime: "Jan 22",
+  },
+  {
+    id: "15",
+    name: "Rachel Moore",
+    status: "offline",
+    lastSeen: "4 hours ago",
+    unreadCount: 2,
+    lastMessage: "Please review the updated proposal",
+    lastMessageTime: "Jan 21",
+  },
+  {
+    id: "16",
+    name: "Brian Harris",
+    status: "online",
+    unreadCount: 0,
+    lastMessage: "All systems are operational",
+    lastMessageTime: "Jan 21",
+  },
 ];
 
 const mockChats: Record<string, ChatMessage[]> = {
   "1": [
-    { id: "1", senderId: "1", content: "Hi! How's the website redesign project going?", timestamp: "10:00 AM", status: "read", type: "text" },
-    { id: "2", senderId: "me", content: "Going great! We're making good progress on the homepage.", timestamp: "10:05 AM", status: "read", type: "text" },
-    { id: "3", senderId: "1", content: "That's awesome! Can you share some mockups?", timestamp: "10:15 AM", status: "read", type: "text" },
-    { id: "4", senderId: "me", content: "Sure, let me prepare them and send over.", timestamp: "10:20 AM", status: "read", type: "text" },
-    { id: "5", senderId: "1", content: "I've completed the initial mockups and ready for review. Let me know your thoughts when you get a chance!", timestamp: "10:30 AM", status: "delivered", type: "text" },
+    { id: "1", senderId: "1", content: "Hey! Good morning. How are you doing today?", timestamp: "9:00 AM", status: "read", type: "text" },
+    { id: "2", senderId: "me", content: "Morning Sarah! I'm doing great, thanks for asking. How about you?", timestamp: "9:02 AM", status: "read", type: "text" },
+    { id: "3", senderId: "1", content: "I'm good! Just finished my coffee and ready to tackle the day.", timestamp: "9:05 AM", status: "read", type: "text" },
+    { id: "4", senderId: "me", content: "Nice! So about the website redesign project...", timestamp: "9:08 AM", status: "read", type: "text" },
+    { id: "5", senderId: "1", content: "Yes! I was just about to bring that up. We need to finalize the homepage layout.", timestamp: "9:10 AM", status: "read", type: "text" },
+    { id: "6", senderId: "me", content: "Agreed. I've been working on a few variations. Want me to share them?", timestamp: "9:12 AM", status: "read", type: "text" },
+    { id: "7", senderId: "1", content: "That would be perfect! Send them over when you're ready.", timestamp: "9:15 AM", status: "read", type: "text" },
+    { id: "8", senderId: "me", content: "Will do. Also, did you get a chance to review the color palette I sent yesterday?", timestamp: "9:18 AM", status: "read", type: "text" },
+    { id: "9", senderId: "1", content: "Yes! I love the direction. The blue tones really match the brand identity.", timestamp: "9:20 AM", status: "read", type: "text" },
+    { id: "10", senderId: "me", content: "Great to hear! I was a bit worried it might be too bold.", timestamp: "9:22 AM", status: "read", type: "text" },
+    { id: "11", senderId: "1", content: "Not at all. The client will definitely appreciate it.", timestamp: "9:25 AM", status: "read", type: "text" },
+    { id: "12", senderId: "me", content: "Speaking of the client, when is our next meeting with them?", timestamp: "9:28 AM", status: "read", type: "text" },
+    { id: "13", senderId: "1", content: "It's scheduled for Thursday at 2 PM. I'll send you a calendar invite.", timestamp: "9:30 AM", status: "read", type: "text" },
+    { id: "14", senderId: "me", content: "Perfect, I'll block that time off. Should we prepare a presentation?", timestamp: "9:32 AM", status: "read", type: "text" },
+    { id: "15", senderId: "1", content: "Yes, definitely. Let's showcase the progress we've made so far.", timestamp: "9:35 AM", status: "read", type: "text" },
+    { id: "16", senderId: "me", content: "I can put together the slides. Want to split the talking points?", timestamp: "9:38 AM", status: "read", type: "text" },
+    { id: "17", senderId: "1", content: "Sounds like a plan. I'll handle the technical specs, you cover the design rationale?", timestamp: "9:40 AM", status: "read", type: "text" },
+    { id: "18", senderId: "me", content: "Deal! Let's sync up tomorrow to review everything.", timestamp: "9:42 AM", status: "read", type: "text" },
+    { id: "19", senderId: "1", content: "Works for me. Oh, one more thing - can you also prepare some mockups for mobile?", timestamp: "9:45 AM", status: "read", type: "text" },
+    { id: "20", senderId: "me", content: "Already on it! I should have those ready by end of day.", timestamp: "9:48 AM", status: "read", type: "text" },
+    { id: "21", senderId: "1", content: "You're the best! The team is lucky to have you.", timestamp: "9:50 AM", status: "read", type: "text" },
+    { id: "22", senderId: "me", content: "Thanks Sarah, that means a lot. We make a great team!", timestamp: "9:52 AM", status: "read", type: "text" },
+    { id: "23", senderId: "1", content: "We really do. Alright, I'll let you get back to work. Talk soon!", timestamp: "10:00 AM", status: "read", type: "text" },
+    { id: "24", senderId: "me", content: "Sounds good! Let me know if you need anything else.", timestamp: "10:05 AM", status: "read", type: "text" },
+    { id: "25", senderId: "1", content: "I've completed the initial mockups and ready for review. Let me know your thoughts when you get a chance!", timestamp: "10:30 AM", status: "delivered", type: "text" },
   ],
   "2": [
     { id: "1", senderId: "2", content: "Hey, I pushed the API documentation updates", timestamp: "9:30 AM", status: "read", type: "text" },
@@ -101,6 +206,18 @@ const mockChats: Record<string, ChatMessage[]> = {
   "5": [
     { id: "1", senderId: "5", content: "Great news! The client approved the designs", timestamp: "11:00 AM", status: "read", type: "text" },
     { id: "2", senderId: "me", content: "That's fantastic! Great job on the presentation.", timestamp: "11:15 AM", status: "read", type: "text" },
+  ],
+  "7": [
+    { id: "1", senderId: "7", content: "Hi! Just wanted to update you on the presentation.", timestamp: "10:00 AM", status: "read", type: "text" },
+    { id: "2", senderId: "7", content: "I've added the new slides you requested.", timestamp: "10:30 AM", status: "read", type: "text" },
+    { id: "3", senderId: "7", content: "The presentation is ready for tomorrow", timestamp: "11:15 AM", status: "delivered", type: "text" },
+  ],
+  "11": [
+    { id: "1", senderId: "11", content: "Budget approved for Q2", timestamp: "3:00 PM", status: "delivered", type: "text" },
+  ],
+  "15": [
+    { id: "1", senderId: "15", content: "Hi, I've made some changes to the proposal.", timestamp: "2:00 PM", status: "read", type: "text" },
+    { id: "2", senderId: "15", content: "Please review the updated proposal", timestamp: "2:30 PM", status: "delivered", type: "text" },
   ],
 };
 
@@ -191,6 +308,19 @@ export const MessagesChat = () => {
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+      "bg-purple-100 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400",
+      "bg-pink-100 text-pink-600 dark:bg-pink-500/20 dark:text-pink-400",
+      "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400",
+      "bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400",
+      "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400",
+    ];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] h-[calc(100vh-180px)] min-h-[600px]">
       <div className="flex h-full">
@@ -201,7 +331,7 @@ export const MessagesChat = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Messages</h2>
               {totalUnread > 0 && (
-                <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium text-white bg-brand-500 rounded-full">
+                <span className="flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-medium text-brand-600 bg-brand-50 dark:bg-brand-500/[0.12] dark:text-brand-400 rounded-full">
                   {totalUnread}
                 </span>
               )}
@@ -231,13 +361,13 @@ export const MessagesChat = () => {
                 <button
                   key={contact.id}
                   onClick={() => handleSelectContact(contact)}
-                  className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
-                    selectedContact?.id === contact.id ? "bg-brand-50 dark:bg-brand-500/10" : ""
+                  className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800 ${
+                    selectedContact?.id === contact.id ? "bg-brand-50 dark:bg-brand-500/[0.08]" : ""
                   }`}
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-semibold">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold ${getAvatarColor(contact.name)}`}>
                       {getInitials(contact.name)}
                     </div>
                     <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-gray-900 ${getStatusColor(contact.status)}`} />
@@ -258,7 +388,7 @@ export const MessagesChat = () => {
                         {contact.lastMessage}
                       </p>
                       {contact.unreadCount > 0 && (
-                        <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-medium text-white bg-brand-500 rounded-full flex-shrink-0 ml-2">
+                        <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-medium text-brand-600 bg-brand-50 dark:bg-brand-500/[0.12] dark:text-brand-400 rounded-full flex-shrink-0 ml-2">
                           {contact.unreadCount}
                         </span>
                       )}
@@ -285,7 +415,7 @@ export const MessagesChat = () => {
                   </svg>
                 </button>
                 <div className="relative">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-semibold text-sm">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm ${getAvatarColor(selectedContact.name)}`}>
                     {getInitials(selectedContact.name)}
                   </div>
                   <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${getStatusColor(selectedContact.status)}`} />
@@ -296,7 +426,7 @@ export const MessagesChat = () => {
                     {selectedContact.status === "online" ? "Online" : selectedContact.status === "away" ? "Away" : `Last seen ${selectedContact.lastSeen || "recently"}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -316,48 +446,53 @@ export const MessagesChat = () => {
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900/50">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.senderId === "me" ? "justify-end" : "justify-start"}`}
-                  >
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900/50">
+                {messages.map((message, index) => {
+                  const showTimestamp = index === 0 ||
+                    messages[index - 1].senderId !== message.senderId;
+
+                  return (
                     <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                        message.senderId === "me"
-                          ? "bg-brand-500 text-white rounded-br-md"
-                          : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md shadow-sm"
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.senderId === "me" ? "justify-end" : "justify-start"}`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <div className={`flex items-center justify-end gap-1 mt-1 ${message.senderId === "me" ? "text-white/70" : "text-gray-400"}`}>
-                        <span className="text-xs">{message.timestamp}</span>
-                        {message.senderId === "me" && (
-                          <span className="text-xs">
-                            {message.status === "read" ? (
-                              <svg className="w-4 h-4 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z" />
-                              </svg>
-                            ) : message.status === "delivered" ? (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                              </svg>
-                            )}
-                          </span>
-                        )}
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                          message.senderId === "me"
+                            ? "bg-brand-50 text-gray-900 dark:bg-brand-500/[0.15] dark:text-white rounded-br-md"
+                            : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md shadow-sm border border-gray-100 dark:border-gray-700"
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <div className={`flex items-center justify-end gap-1 mt-1 ${message.senderId === "me" ? "text-gray-500 dark:text-gray-400" : "text-gray-400"}`}>
+                          <span className="text-xs">{message.timestamp}</span>
+                          {message.senderId === "me" && (
+                            <span className="text-xs">
+                              {message.status === "read" ? (
+                                <svg className="w-4 h-4 text-brand-500" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z" />
+                                </svg>
+                              ) : message.status === "delivered" ? (
+                                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                </svg>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Typing Indicator */}
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100 dark:border-gray-700">
                       <div className="flex items-center gap-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
