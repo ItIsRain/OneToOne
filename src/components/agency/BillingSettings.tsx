@@ -4,6 +4,93 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DetailsSidebar } from "@/components/ui/DetailsSidebar";
 
+// Notification Modal Component
+interface NotificationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  type: "success" | "error" | "canceled";
+  title: string;
+  message: string;
+}
+
+const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, type, title, message }) => {
+  if (!isOpen) return null;
+
+  const config = {
+    success: {
+      bgGradient: "from-emerald-500 to-green-600",
+      iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
+      iconColor: "text-emerald-600 dark:text-emerald-400",
+      icon: (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    error: {
+      bgGradient: "from-red-500 to-rose-600",
+      iconBg: "bg-red-100 dark:bg-red-900/30",
+      iconColor: "text-red-600 dark:text-red-400",
+      icon: (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    canceled: {
+      bgGradient: "from-amber-500 to-orange-600",
+      iconBg: "bg-amber-100 dark:bg-amber-900/30",
+      iconColor: "text-amber-600 dark:text-amber-400",
+      icon: (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      ),
+    },
+  };
+
+  const { bgGradient, iconBg, iconColor, icon } = config[type];
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-md transform transition-all animate-in fade-in zoom-in duration-200">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-800">
+          {/* Header gradient */}
+          <div className={`bg-gradient-to-r ${bgGradient} px-6 py-8`}>
+            <div className="flex flex-col items-center text-center">
+              <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-white`}>
+                {icon}
+              </div>
+              <h3 className="text-xl font-bold text-white">{title}</h3>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-6 py-6">
+            <p className="text-center text-gray-600 dark:text-gray-300">
+              {message}
+            </p>
+
+            <button
+              onClick={onClose}
+              className={`mt-6 w-full rounded-xl bg-gradient-to-r ${bgGradient} px-4 py-3 font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg`}
+            >
+              {type === "success" ? "Great!" : type === "canceled" ? "Got it" : "Close"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface Subscription {
   id: string;
   plan_type: "free" | "starter" | "professional" | "business";
@@ -217,7 +304,12 @@ export const BillingSettings = () => {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
   const [showAddCard, setShowAddCard] = useState(false);
   const [addingCard, setAddingCard] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type: "success" | "error" | "canceled";
+    title: string;
+    message: string;
+  }>({ isOpen: false, type: "success", title: "", message: "" });
   const [cardForm, setCardForm] = useState({
     card_brand: "visa",
     card_last_four: "",
@@ -262,14 +354,24 @@ export const BillingSettings = () => {
 
     if (success === "true" && plan) {
       const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
-      setSuccessMessage(`Successfully upgraded to ${planName} plan! Your subscription is now active.`);
+      setNotification({
+        isOpen: true,
+        type: "success",
+        title: "Upgrade Successful!",
+        message: `You've successfully upgraded to the ${planName} plan. Your new features are now active and ready to use.`,
+      });
       // Clear query params from URL
       window.history.replaceState({}, "", "/dashboard/settings/billing");
       // Refresh billing data
       fetchBilling();
     }
     if (canceled === "true") {
-      setError("Checkout was canceled. Your plan has not been changed.");
+      setNotification({
+        isOpen: true,
+        type: "canceled",
+        title: "Checkout Canceled",
+        message: "No worries! Your checkout was canceled and your current plan remains unchanged. You can try again whenever you're ready.",
+      });
       window.history.replaceState({}, "", "/dashboard/settings/billing");
     }
   }, [searchParams, fetchBilling]);
@@ -295,10 +397,20 @@ export const BillingSettings = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        alert(data.message);
+        setNotification({
+          isOpen: true,
+          type: "success",
+          title: "Plan Changed",
+          message: "You've successfully switched to the Free plan.",
+        });
         fetchBilling();
       } catch (err) {
-        alert(err instanceof Error ? err.message : "Failed to change plan");
+        setNotification({
+          isOpen: true,
+          type: "error",
+          title: "Error",
+          message: err instanceof Error ? err.message : "Failed to change plan",
+        });
       } finally {
         setChangingPlan(false);
       }
@@ -306,20 +418,14 @@ export const BillingSettings = () => {
     }
 
     // Paid plan - use Stripe Checkout
-    if (!confirm(`You will be redirected to Stripe to complete your upgrade to the ${plan?.name} plan (${price > 0 ? `$${price}/${billingInterval === "yearly" ? "year" : "month"}` : "Free"}).`)) return;
-
     setChangingPlan(true);
     try {
-      // Prompt for discount code
-      const discountCode = prompt("Have a discount code? Enter it here (or leave empty):");
-
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planType,
           billingInterval,
-          discountCode: discountCode || undefined,
         }),
       });
 
@@ -328,7 +434,12 @@ export const BillingSettings = () => {
 
       // If it's a free upgrade (100% discount), no need to redirect
       if (data.freeUpgrade) {
-        alert(data.message);
+        setNotification({
+          isOpen: true,
+          type: "success",
+          title: "Upgrade Successful!",
+          message: data.message || "Your plan has been upgraded with the discount applied!",
+        });
         fetchBilling();
         return;
       }
@@ -338,7 +449,12 @@ export const BillingSettings = () => {
         window.location.href = data.checkoutUrl;
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to initiate checkout");
+      setNotification({
+        isOpen: true,
+        type: "error",
+        title: "Checkout Failed",
+        message: err instanceof Error ? err.message : "Failed to initiate checkout. Please try again.",
+      });
     } finally {
       setChangingPlan(false);
     }
@@ -460,31 +576,16 @@ export const BillingSettings = () => {
 
   return (
     <>
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification(prev => ({ ...prev, isOpen: false }))}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+      />
+
       <div className="space-y-6">
-        {/* Success Message Banner */}
-        {successMessage && (
-          <div className="rounded-2xl border border-success-200 bg-success-50 p-4 dark:border-success-800 dark:bg-success-900/20">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-100 dark:bg-success-900/40">
-                <svg className="h-5 w-5 text-success-600 dark:text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-success-800 dark:text-success-300">Upgrade Successful!</h3>
-                <p className="text-sm text-success-700 dark:text-success-400">{successMessage}</p>
-              </div>
-              <button
-                onClick={() => setSuccessMessage(null)}
-                className="text-success-500 hover:text-success-700 dark:hover:text-success-300"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Current Plan Card */}
         <div className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -517,7 +618,7 @@ export const BillingSettings = () => {
                   {currentPlanInfo.name} Plan
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {subscription?.discount_percent && subscription.discount_percent > 0 ? (
+                  {subscription?.discount_percent && subscription.discount_percent > 0 && subscription?.plan_type !== "free" && (subscription?.original_price || 0) > 0 ? (
                     <>
                       <span className="text-gray-400 line-through">
                         ${subscription?.original_price || 0}/{subscription?.billing_interval === "yearly" ? "year" : "month"}
@@ -531,7 +632,7 @@ export const BillingSettings = () => {
                     </>
                   ) : (
                     <span className="text-gray-500 dark:text-gray-400">
-                      ${subscription?.price || 0}/{subscription?.billing_interval === "yearly" ? "year" : "month"}
+                      {subscription?.plan_type === "free" ? "Free" : `$${subscription?.price || 0}/${subscription?.billing_interval === "yearly" ? "year" : "month"}`}
                     </span>
                   )}
                   {subscription?.cancel_at_period_end && (

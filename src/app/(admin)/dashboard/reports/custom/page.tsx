@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { CreateCustomReportModal } from "@/components/agency/modals";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 const savedReports = [
   { id: 1, name: "Monthly Client Revenue", lastRun: "Jan 25, 2025", schedule: "Monthly" },
@@ -12,6 +13,7 @@ export default function CustomReportsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
+    <FeatureGate feature="advanced_analytics">
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -95,5 +97,6 @@ export default function CustomReportsPage() {
 
       <CreateCustomReportModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
+    </FeatureGate>
   );
 }

@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { TemplatesTable, TemplateDetailsSidebar } from "@/components/agency";
 import { UploadTemplateModal } from "@/components/agency/modals";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 import type { TemplateRecord } from "@/components/agency/TemplatesTable";
 
 export default function TemplatesPage() {
@@ -76,6 +77,7 @@ export default function TemplatesPage() {
   };
 
   return (
+    <FeatureGate feature="document_templates">
     <>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -126,5 +128,6 @@ export default function TemplatesPage() {
         onUse={handleUseTemplate}
       />
     </>
+    </FeatureGate>
   );
 }

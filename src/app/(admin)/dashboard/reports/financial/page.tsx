@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 const financialData = {
   revenue: { current: 124500, previous: 108000 },
@@ -18,6 +19,7 @@ const expenseBreakdown = [
 
 export default function FinancialReportsPage() {
   return (
+    <FeatureGate feature="advanced_analytics">
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -89,5 +91,6 @@ export default function FinancialReportsPage() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

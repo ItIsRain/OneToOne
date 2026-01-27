@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
         discount_code: discountCode || "",
       },
       subscription_data: {
+        trial_period_days: 7,
         metadata: {
           tenant_id: profile.tenant_id,
           plan_type: planType,

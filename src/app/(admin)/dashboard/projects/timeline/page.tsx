@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { ProjectTimeline } from "@/components/agency/ProjectTimeline";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 interface Project {
   id: string;
@@ -29,6 +30,7 @@ export default function TimelinePage() {
   }, []);
 
   return (
+    <FeatureGate feature="timeline">
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -117,5 +119,6 @@ export default function TimelinePage() {
       {/* Timeline Component */}
       <ProjectTimeline projectId={selectedProject || undefined} />
     </div>
+    </FeatureGate>
   );
 }

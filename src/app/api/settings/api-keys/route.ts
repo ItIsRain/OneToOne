@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
         updated_at,
         created_by,
         profiles:created_by (
-          name,
+          first_name,
+          last_name,
           email
         )
       `)

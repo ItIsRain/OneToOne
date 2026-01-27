@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 interface FinanceStats {
   invoiceStats: {
@@ -122,45 +123,49 @@ export default function FinanceOverviewPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-            Finance Overview
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Loading financial data...
-          </p>
+      <FeatureGate feature="finance">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+              Finance Overview
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400">
+              Loading financial data...
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+                <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="animate-pulse rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
-              <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
-            </div>
-          ))}
-        </div>
-      </div>
+      </FeatureGate>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-            Finance Overview
-          </h1>
+      <FeatureGate feature="finance">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
+              Finance Overview
+            </h1>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+            <p className="text-error-500">{error}</p>
+            <button
+              onClick={fetchStats}
+              className="mt-2 text-brand-500 hover:text-brand-600"
+            >
+              Try again
+            </button>
+          </div>
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-error-500">{error}</p>
-          <button
-            onClick={fetchStats}
-            className="mt-2 text-brand-500 hover:text-brand-600"
-          >
-            Try again
-          </button>
-        </div>
-      </div>
+      </FeatureGate>
     );
   }
 
@@ -168,6 +173,7 @@ export default function FinanceOverviewPage() {
   const collectionGrowthPositive = (stats?.growth.collection || 0) >= 0;
 
   return (
+    <FeatureGate feature="finance">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -559,5 +565,6 @@ export default function FinanceOverviewPage() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

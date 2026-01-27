@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 const teamPerformance = [
   { name: "Alex Johnson", role: "Project Manager", tasks: 45, completed: 42, hours: 168, rating: 4.9 },
@@ -11,6 +12,7 @@ const teamPerformance = [
 
 export default function TeamReportsPage() {
   return (
+    <FeatureGate feature="advanced_analytics">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Team Reports</h1>
@@ -72,5 +74,6 @@ export default function TeamReportsPage() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }

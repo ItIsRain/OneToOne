@@ -126,10 +126,9 @@ const settingsItems: NavItem[] = [
     name: "Settings",
     subItems: [
       { name: "Company", path: "/dashboard/settings" },
-      { name: "Email Provider", path: "/dashboard/settings/email" },
-      { name: "Integrations", path: "/dashboard/settings/integrations" },
+      { name: "Email Provider", path: "/dashboard/settings/email", pro: true },
       { name: "Billing", path: "/dashboard/settings/billing" },
-      { name: "API Keys", path: "/dashboard/settings/api", pro: true },
+      { name: "API Keys", path: "/dashboard/settings/api" },
     ],
   },
 ];

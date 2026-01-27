@@ -212,9 +212,9 @@ const InfoItem: React.FC<{
     )}
     <div className="flex-1 min-w-0">
       <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
+      <div className="text-sm font-medium text-gray-800 dark:text-white/90 truncate">
         {value || "-"}
-      </p>
+      </div>
     </div>
   </div>
 );

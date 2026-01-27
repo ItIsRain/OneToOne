@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { KanbanBoard } from "@/components/agency/KanbanBoard";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 interface Project {
   id: string;
@@ -30,6 +31,7 @@ export default function KanbanPage() {
   }, []);
 
   return (
+    <FeatureGate feature="kanban">
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -127,5 +129,6 @@ export default function KanbanPage() {
       {/* Kanban Board */}
       <KanbanBoard projectId={selectedProject || undefined} />
     </div>
+    </FeatureGate>
   );
 }

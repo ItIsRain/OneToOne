@@ -2,6 +2,7 @@
 import React from "react";
 import { ArrowUpIcon, ArrowDownIcon } from "@/icons";
 import Badge from "@/components/ui/badge/Badge";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 
 const salesData = [
   { month: "Jan", revenue: 45000, deals: 12, conversion: 28 },
@@ -19,6 +20,7 @@ const topClients = [
 
 export default function SalesReportsPage() {
   return (
+    <FeatureGate feature="advanced_analytics">
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Sales Reports</h1>
@@ -98,5 +100,6 @@ export default function SalesReportsPage() {
         </div>
       </div>
     </div>
+    </FeatureGate>
   );
 }
