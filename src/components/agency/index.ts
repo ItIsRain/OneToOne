@@ -18,6 +18,7 @@ export { SettingsPanel } from "./SettingsPanel";
 export { CompanySettings } from "./CompanySettings";
 export { BillingSettings } from "./BillingSettings";
 export { ApiKeysSettings } from "./ApiKeysSettings";
+export { DomainSettings } from "./DomainSettings";
 export { ProjectsTable } from "./ProjectsTable";
 export { TasksTable } from "./TasksTable";
 export { KanbanBoard } from "./KanbanBoard";

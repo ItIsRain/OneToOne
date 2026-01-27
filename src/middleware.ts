@@ -1,11 +1,114 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+
+// Main domains that should use normal routing (not tenant subdomain routing)
+const MAIN_DOMAINS = ["1i1.ae", "www.1i1.ae", "app.1i1.ae", "localhost"];
+
+// Parse hostname and detect tenant context
+function parseHostname(hostname: string): {
+  isMainDomain: boolean;
+  subdomain: string | null;
+  isCustomDomain: boolean;
+} {
+  // Remove port for local development
+  const host = hostname.split(":")[0];
+
+  // Check if it's a main domain
+  if (MAIN_DOMAINS.includes(host)) {
+    return { isMainDomain: true, subdomain: null, isCustomDomain: false };
+  }
+
+  // Check if it's a subdomain of 1i1.ae
+  if (host.endsWith(".1i1.ae")) {
+    const subdomain = host.replace(".1i1.ae", "");
+    // Skip main subdomains
+    if (["www", "app", "api"].includes(subdomain)) {
+      return { isMainDomain: true, subdomain: null, isCustomDomain: false };
+    }
+    return { isMainDomain: false, subdomain, isCustomDomain: false };
+  }
+
+  // Check for localhost subdomains (development)
+  if (host.endsWith(".localhost")) {
+    const subdomain = host.replace(".localhost", "");
+    return { isMainDomain: false, subdomain, isCustomDomain: false };
+  }
+
+  // Otherwise, it's a custom domain
+  return { isMainDomain: false, subdomain: null, isCustomDomain: true };
+}
 
 export async function middleware(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
+  const hostname = request.headers.get("host") || "";
+  const { pathname } = request.nextUrl;
+
+  // Parse the hostname to detect tenant context
+  const { isMainDomain, subdomain, isCustomDomain } = parseHostname(hostname);
+
+  // Create a service client for tenant lookup (only when needed)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const isSupabaseConfigured = supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith("http");
+
+  // Handle subdomain or custom domain routing
+  if (!isMainDomain && isSupabaseConfigured) {
+    const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
+
+    let tenant = null;
+
+    if (subdomain) {
+      // Lookup tenant by subdomain
+      const { data } = await serviceClient
+        .from("tenants")
+        .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
+        .eq("subdomain", subdomain)
+        .single();
+      tenant = data;
+    } else if (isCustomDomain) {
+      // Lookup tenant by custom domain
+      const customDomain = hostname.split(":")[0]; // Remove port
+      const { data } = await serviceClient
+        .from("tenants")
+        .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
+        .eq("custom_domain", customDomain)
+        .single();
+      tenant = data;
+
+      // If domain exists but not verified, redirect to unverified page
+      if (tenant && !tenant.custom_domain_verified) {
+        return NextResponse.redirect(new URL("/unverified-domain", request.url));
+      }
+    }
+
+    // If no tenant found for subdomain, redirect to invalid subdomain page
+    if (!tenant) {
+      if (subdomain) {
+        return NextResponse.redirect(new URL("/invalid-subdomain", `https://1i1.ae`));
+      } else if (isCustomDomain) {
+        return NextResponse.redirect(new URL("/invalid-subdomain", `https://1i1.ae`));
+      }
+    }
+
+    // Inject tenant context headers for downstream use
+    if (tenant) {
+      requestHeaders.set("x-tenant-id", tenant.id);
+      requestHeaders.set("x-tenant-subdomain", tenant.subdomain);
+      requestHeaders.set("x-tenant-name", tenant.name);
+      if (tenant.logo_url) {
+        requestHeaders.set("x-tenant-logo", tenant.logo_url);
+      }
+      if (tenant.primary_color) {
+        requestHeaders.set("x-tenant-color", tenant.primary_color);
+      }
+    }
+  }
+
   let response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   });
 
@@ -18,11 +121,13 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           response = NextResponse.next({
-            request,
+            request: {
+              headers: requestHeaders,
+            },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -33,7 +138,6 @@ export async function middleware(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
   const publicRoutes = [
@@ -42,6 +146,8 @@ export async function middleware(request: NextRequest) {
     "/signup",
     "/subscribe",
     "/error-404",
+    "/invalid-subdomain",
+    "/unverified-domain",
     "/api/auth",
     "/api/stripe/webhook",
     "/event",

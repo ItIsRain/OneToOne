@@ -52,6 +52,20 @@ export async function POST(request: Request) {
       },
     });
 
+    // Check if subdomain is reserved
+    const { data: reservedSubdomain } = await supabase
+      .from("reserved_subdomains")
+      .select("subdomain, reason")
+      .eq("subdomain", subdomain.toLowerCase())
+      .single();
+
+    if (reservedSubdomain) {
+      return NextResponse.json(
+        { error: "This subdomain is reserved and cannot be used" },
+        { status: 400 }
+      );
+    }
+
     // Check if subdomain is already taken
     const { data: existingTenant } = await supabase
       .from("tenants")

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getTenantIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,12 +14,22 @@ export async function GET(
   try {
     const { slug } = await params;
 
-    // First, try to find the event by slug only to debug
-    const { data: eventCheck, error: checkError } = await supabase
+    // Check if request is coming from a tenant subdomain/custom domain
+    const tenantId = getTenantIdFromRequest(request);
+
+    // Build query for event lookup
+    let query = supabase
       .from("events")
-      .select("id, slug, is_public, is_published, title")
-      .eq("slug", slug)
-      .single();
+      .select("id, slug, is_public, is_published, title, tenant_id")
+      .eq("slug", slug);
+
+    // If accessed via subdomain, filter by tenant
+    if (tenantId) {
+      query = query.eq("tenant_id", tenantId);
+    }
+
+    // First, try to find the event by slug (and optionally tenant)
+    const { data: eventCheck, error: checkError } = await query.single();
 
     if (checkError) {
       console.log("Event lookup by slug failed:", checkError);
@@ -52,7 +63,8 @@ export async function GET(
       );
     }
 
-    // Now fetch the full event data
+    // Now fetch the full event data using the already found event ID
+    // This ensures we get the same event that passed the checks above
     const { data: event, error } = await supabase
       .from("events")
       .select(`
@@ -88,9 +100,10 @@ export async function GET(
         contact_email,
         contact_phone,
         status,
-        requirements
+        requirements,
+        tenant_id
       `)
-      .eq("slug", slug)
+      .eq("id", eventCheck.id)
       .single();
 
     if (error) {
