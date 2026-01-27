@@ -162,7 +162,7 @@ export const contactFields: FieldDefinition[] = [
     type: 'enum',
     required: false,
     aliases: ['contact type', 'type', 'category', 'contact_type'],
-    enumValues: ['personal', 'business', 'vendor', 'partner', 'other'],
+    enumValues: ['client_contact', 'lead_contact', 'vendor', 'partner', 'influencer', 'media', 'other'],
   },
   {
     name: 'tags',
