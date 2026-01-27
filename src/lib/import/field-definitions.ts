@@ -290,7 +290,7 @@ export const leadFields: FieldDefinition[] = [
     type: 'enum',
     required: false,
     aliases: ['priority', 'importance', 'urgency'],
-    enumValues: ['low', 'medium', 'high', 'critical'],
+    enumValues: ['low', 'medium', 'high', 'urgent'],
   },
   {
     name: 'score',
