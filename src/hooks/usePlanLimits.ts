@@ -178,6 +178,10 @@ export function usePlanLimits() {
 
   const hasFeature = useCallback(
     (feature: FeatureKey): boolean => {
+      // DEV MODE: Bypass all plan restrictions for testing
+      // TODO: Remove this bypass before deploying to production
+      return true;
+
       if (!planInfo) return false;
       return planInfo.limits.features[feature];
     },
