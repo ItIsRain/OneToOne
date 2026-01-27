@@ -107,6 +107,16 @@ export default function SubscribePage() {
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [tenantSubdomain, setTenantSubdomain] = useState<string | null>(null);
+
+  // Helper to get redirect URL for tenant subdomain
+  const getRedirectUrl = (path: string) => {
+    if (tenantSubdomain) {
+      const protocol = window.location.protocol;
+      return `${protocol}//${tenantSubdomain}.1i1.ae${path}`;
+    }
+    return path;
+  };
 
   // Check if user is authenticated
   useEffect(() => {
@@ -118,10 +128,22 @@ export default function SubscribePage() {
           return;
         }
         const data = await res.json();
+
+        // Store tenant subdomain for redirects
+        const subdomain = data.subdomain;
+        if (subdomain) {
+          setTenantSubdomain(subdomain);
+        }
+
         // If user already has an active paid subscription, redirect to dashboard
         // Free plan users can stay on this page to upgrade
         if (data.subscription?.status === "active" && data.subscription?.plan_type !== "free") {
-          router.push("/dashboard");
+          if (subdomain) {
+            const protocol = window.location.protocol;
+            window.location.href = `${protocol}//${subdomain}.1i1.ae/dashboard`;
+          } else {
+            window.location.href = "/dashboard";
+          }
           return;
         }
         // Pre-select current plan if user has free plan
@@ -203,8 +225,8 @@ export default function SubscribePage() {
         return;
       }
 
-      // Success - redirect to dashboard
-      router.push("/dashboard?subscribed=true");
+      // Success - redirect to dashboard on tenant subdomain
+      window.location.href = getRedirectUrl("/dashboard?subscribed=true");
     } catch (err) {
       setError("Failed to process subscription");
     } finally {
@@ -474,12 +496,12 @@ export default function SubscribePage() {
 
           {/* Continue with Free option */}
           <div className="mt-6 text-center">
-            <Link
-              href="/dashboard"
+            <button
+              onClick={() => window.location.href = getRedirectUrl("/dashboard")}
               className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
             >
               Continue with Free Plan →
-            </Link>
+            </button>
           </div>
         </div>
       </div>

@@ -120,8 +120,9 @@ export default function SignUpForm() {
         // Still redirect - they can sign in manually
       }
 
-      // Redirect to subscription page to select a plan
-      window.location.href = "/subscribe";
+      // Redirect to subscription page on the tenant's subdomain
+      const protocol = window.location.protocol;
+      window.location.href = `${protocol}//${formData.subdomain}.1i1.ae/subscribe`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

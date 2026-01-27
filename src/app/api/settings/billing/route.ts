@@ -170,6 +170,13 @@ export async function GET(request: NextRequest) {
 
     const tenantId = profile.tenant_id;
 
+    // Get tenant's subdomain for redirect purposes
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("subdomain")
+      .eq("id", tenantId)
+      .single();
+
     // Get or create subscription
     let { data: subscription } = await supabase
       .from("tenant_subscriptions")
@@ -277,6 +284,7 @@ export async function GET(request: NextRequest) {
       usage,
       plans: PLANS,
       hasUsedTrial,
+      subdomain: tenant?.subdomain || null,
     });
   } catch (error) {
     console.error("Error fetching billing:", error);

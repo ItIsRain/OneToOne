@@ -22,7 +22,7 @@ export default function SignInForm() {
 
     try {
       const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -31,7 +31,29 @@ export default function SignInForm() {
         throw new Error(signInError.message);
       }
 
-      // Redirect to dashboard
+      // Get user's tenant subdomain for redirect
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profile?.tenant_id) {
+        const { data: tenant } = await supabase
+          .from("tenants")
+          .select("subdomain")
+          .eq("id", profile.tenant_id)
+          .single();
+
+        if (tenant?.subdomain) {
+          // Redirect to tenant's subdomain
+          const protocol = window.location.protocol;
+          window.location.href = `${protocol}//${tenant.subdomain}.1i1.ae/dashboard`;
+          return;
+        }
+      }
+
+      // Fallback: redirect to dashboard on current domain
       window.location.href = "/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
