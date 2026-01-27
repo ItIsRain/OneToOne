@@ -23,8 +23,8 @@ function parseHostname(hostname: string): {
   // Check if it's a subdomain of 1i1.ae
   if (host.endsWith(".1i1.ae")) {
     const subdomain = host.replace(".1i1.ae", "");
-    // Skip main subdomains
-    if (["www", "app", "api"].includes(subdomain)) {
+    // Skip main subdomains (including portal which is the Cloudflare fallback origin)
+    if (["www", "app", "api", "portal"].includes(subdomain)) {
       return { isMainDomain: true, subdomain: null, isCustomDomain: false };
     }
     return { isMainDomain: false, subdomain, isCustomDomain: false };
