@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
     "/subscribe",
     "/error-404",
     "/api/auth",
+    "/api/stripe/webhook",
     "/event",
     "/judge",
     "/share",

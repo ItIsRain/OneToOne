@@ -52,10 +52,10 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
   const { bgGradient, iconBg, iconColor, icon } = config[type];
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         onClick={onClose}
       />
 
@@ -100,9 +100,6 @@ interface Subscription {
   current_period_end: string;
   cancel_at_period_end: boolean;
   price: number;
-  original_price?: number;
-  discount_code?: string;
-  discount_percent?: number;
 }
 
 interface PaymentMethod {
@@ -131,6 +128,7 @@ interface Usage {
 interface PlanFeature {
   text: string;
   included: boolean;
+  highlight?: boolean;
 }
 
 interface Plan {
@@ -140,6 +138,7 @@ interface Plan {
   price: { monthly: number; yearly: number };
   features: PlanFeature[];
   badge: string | null;
+  trial_days?: number;
 }
 
 interface BillingHistory {
@@ -200,14 +199,28 @@ const UsageBar: React.FC<{ percentage: number; color: string }> = ({ percentage,
 const PlanCard: React.FC<{
   plan: Plan;
   isCurrentPlan: boolean;
+  currentPlanType: string;
   billingInterval: "monthly" | "yearly";
   onSelect: () => void;
   loading?: boolean;
-}> = ({ plan, isCurrentPlan, billingInterval, onSelect, loading }) => {
+  hasUsedTrial?: boolean;
+}> = ({ plan, isCurrentPlan, currentPlanType, billingInterval, onSelect, loading, hasUsedTrial }) => {
   const price = plan.price[billingInterval];
   const monthlyEquivalent = billingInterval === "yearly" ? Math.round(price / 12) : price;
   const isProfessional = plan.type === "professional";
   const isBusiness = plan.type === "business";
+
+  // Determine if this is an upgrade or downgrade
+  const planOrder = ["free", "starter", "professional", "business"];
+  const currentPlanIndex = planOrder.indexOf(currentPlanType);
+  const thisPlanIndex = planOrder.indexOf(plan.type);
+  const isUpgrade = thisPlanIndex > currentPlanIndex;
+  const isDowngrade = thisPlanIndex < currentPlanIndex;
+
+  // Filter out trial feature if user has already used trial
+  const displayFeatures = hasUsedTrial
+    ? plan.features.filter(f => !f.text.toLowerCase().includes("free trial"))
+    : plan.features;
 
   const getBorderClass = () => {
     if (isCurrentPlan) return "border-brand-500 bg-brand-50 dark:bg-brand-500/10";
@@ -218,9 +231,20 @@ const PlanCard: React.FC<{
 
   const getButtonClass = () => {
     if (isCurrentPlan) return "bg-brand-500 text-white cursor-default";
+    if (isDowngrade) return "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400";
     if (isProfessional) return "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600";
     if (isBusiness) return "bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600";
     return "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700";
+  };
+
+  const getButtonText = () => {
+    if (isCurrentPlan) return "Current Plan";
+    if (loading) return "Processing...";
+    if (plan.price.monthly === 0) return "Downgrade to Free";
+    if (isDowngrade) return "Downgrade";
+    // Only show trial for users who haven't used it before
+    if (!hasUsedTrial && plan.trial_days) return `Start ${plan.trial_days}-Day Free Trial`;
+    return "Upgrade";
   };
 
   return (
@@ -257,10 +281,10 @@ const PlanCard: React.FC<{
       </div>
 
       <ul className="mb-6 space-y-3 flex-1">
-        {plan.features.slice(0, 8).map((feature, i) => (
-          <li key={i} className="flex items-start gap-2 text-sm">
+        {displayFeatures.slice(0, 8).map((feature, i) => (
+          <li key={i} className={`flex items-start gap-2 text-sm ${feature.highlight ? "bg-success-50 dark:bg-success-500/10 -mx-2 px-2 py-1.5 rounded-lg" : ""}`}>
             {feature.included ? (
-              <svg className="h-5 w-5 flex-shrink-0 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`h-5 w-5 flex-shrink-0 ${feature.highlight ? "text-success-600" : "text-success-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             ) : (
@@ -268,14 +292,14 @@ const PlanCard: React.FC<{
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             )}
-            <span className={feature.included ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"}>
+            <span className={feature.highlight ? "font-semibold text-success-700 dark:text-success-400" : feature.included ? "text-gray-600 dark:text-gray-300" : "text-gray-400 dark:text-gray-500"}>
               {feature.text}
             </span>
           </li>
         ))}
-        {plan.features.length > 8 && (
+        {displayFeatures.length > 8 && (
           <li className="text-sm text-brand-500 dark:text-brand-400">
-            +{plan.features.length - 8} more features
+            +{displayFeatures.length - 8} more features
           </li>
         )}
       </ul>
@@ -285,7 +309,7 @@ const PlanCard: React.FC<{
         disabled={isCurrentPlan || loading}
         className={`w-full rounded-xl py-3 text-sm font-semibold transition-all ${getButtonClass()} disabled:opacity-50`}
       >
-        {isCurrentPlan ? "Current Plan" : loading ? "Processing..." : plan.price.monthly === 0 ? "Get Started" : "Upgrade"}
+        {getButtonText()}
       </button>
     </div>
   );
@@ -316,6 +340,8 @@ export const BillingSettings = () => {
     card_exp_month: "",
     card_exp_year: "",
   });
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
+  const [hasUsedTrial, setHasUsedTrial] = useState(false);
 
   const fetchBilling = useCallback(async () => {
     try {
@@ -335,6 +361,7 @@ export const BillingSettings = () => {
       setPlans(billingData.plans || []);
       setBillingHistory(historyData.history || []);
       setBillingInterval(billingData.subscription?.billing_interval || "monthly");
+      setHasUsedTrial(billingData.hasUsedTrial || false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch billing");
     } finally {
@@ -457,6 +484,72 @@ export const BillingSettings = () => {
       });
     } finally {
       setChangingPlan(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!confirm("Are you sure you want to cancel your subscription? You'll continue to have access until the end of your billing period.")) {
+      return;
+    }
+
+    setCancelingSubscription(true);
+    try {
+      const res = await fetch("/api/settings/billing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel_at_period_end: true }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setNotification({
+        isOpen: true,
+        type: "success",
+        title: "Subscription Canceled",
+        message: "Your subscription has been canceled. You'll continue to have access until the end of your current billing period.",
+      });
+      fetchBilling();
+    } catch (err) {
+      setNotification({
+        isOpen: true,
+        type: "error",
+        title: "Error",
+        message: err instanceof Error ? err.message : "Failed to cancel subscription",
+      });
+    } finally {
+      setCancelingSubscription(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setCancelingSubscription(true);
+    try {
+      const res = await fetch("/api/settings/billing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancel_at_period_end: false }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setNotification({
+        isOpen: true,
+        type: "success",
+        title: "Subscription Reactivated",
+        message: "Your subscription has been reactivated and will continue as normal.",
+      });
+      fetchBilling();
+    } catch (err) {
+      setNotification({
+        isOpen: true,
+        type: "error",
+        title: "Error",
+        message: err instanceof Error ? err.message : "Failed to reactivate subscription",
+      });
+    } finally {
+      setCancelingSubscription(false);
     }
   };
 
@@ -618,23 +711,9 @@ export const BillingSettings = () => {
                   {currentPlanInfo.name} Plan
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {subscription?.discount_percent && subscription.discount_percent > 0 && subscription?.plan_type !== "free" && (subscription?.original_price || 0) > 0 ? (
-                    <>
-                      <span className="text-gray-400 line-through">
-                        ${subscription?.original_price || 0}/{subscription?.billing_interval === "yearly" ? "year" : "month"}
-                      </span>
-                      <span className="text-success-600 dark:text-success-400 font-semibold">
-                        ${subscription?.price || 0}/{subscription?.billing_interval === "yearly" ? "year" : "month"}
-                      </span>
-                      <span className="rounded-full bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-700 dark:bg-success-500/20 dark:text-success-400">
-                        {subscription.discount_percent}% OFF - {subscription.discount_code}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-gray-500 dark:text-gray-400">
-                      {subscription?.plan_type === "free" ? "Free" : `$${subscription?.price || 0}/${subscription?.billing_interval === "yearly" ? "year" : "month"}`}
-                    </span>
-                  )}
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {subscription?.plan_type === "free" ? "Free" : `$${subscription?.price || 0}/${subscription?.billing_interval === "yearly" ? "year" : "month"}`}
+                  </span>
                   {subscription?.cancel_at_period_end && (
                     <span className="text-warning-500">- Cancels at period end</span>
                   )}
@@ -703,6 +782,41 @@ export const BillingSettings = () => {
                 </div>
               </div>
             )}
+
+            {/* Manage Subscription - Only show for paid plans */}
+            {subscription?.plan_type !== "free" && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-800 dark:text-white">Manage Subscription</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {subscription?.cancel_at_period_end
+                        ? "Your subscription will end at the end of the billing period"
+                        : "Cancel or modify your subscription"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {subscription?.cancel_at_period_end ? (
+                      <button
+                        onClick={handleReactivateSubscription}
+                        disabled={cancelingSubscription}
+                        className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50"
+                      >
+                        {cancelingSubscription ? "Processing..." : "Reactivate Subscription"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCancelSubscription}
+                        disabled={cancelingSubscription}
+                        className="rounded-lg border border-error-300 bg-error-50 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-100 dark:border-error-700 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20 transition-colors disabled:opacity-50"
+                      >
+                        {cancelingSubscription ? "Processing..." : "Cancel Subscription"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -757,9 +871,11 @@ export const BillingSettings = () => {
                   key={plan.type}
                   plan={plan}
                   isCurrentPlan={subscription?.plan_type === plan.type}
+                  currentPlanType={subscription?.plan_type || "free"}
                   billingInterval={billingInterval}
                   onSelect={() => handleChangePlan(plan.type)}
                   loading={changingPlan}
+                  hasUsedTrial={hasUsedTrial}
                 />
               ))}
             </div>

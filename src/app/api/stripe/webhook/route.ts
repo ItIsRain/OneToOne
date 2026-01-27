@@ -95,13 +95,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionData = subscriptionResponse as any;
 
-  // Update tenant subscription in database
+  // Check if this is a trial subscription
+  const isTrialing = subscriptionData.status === "trialing";
+
+  // For trial subscriptions, use trial_end as the next billing date
+  // For regular subscriptions, use current_period_end
   const periodStart = subscriptionData.current_period_start
     ? new Date(subscriptionData.current_period_start * 1000).toISOString()
     : new Date().toISOString();
-  const periodEnd = subscriptionData.current_period_end
-    ? new Date(subscriptionData.current_period_end * 1000).toISOString()
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  let periodEnd: string;
+  if (isTrialing && subscriptionData.trial_end) {
+    // Trial subscription - next billing is when trial ends
+    periodEnd = new Date(subscriptionData.trial_end * 1000).toISOString();
+  } else if (subscriptionData.current_period_end) {
+    periodEnd = new Date(subscriptionData.current_period_end * 1000).toISOString();
+  } else {
+    // Fallback to 7 days for trial, 30 days for regular
+    const days = isTrialing ? 7 : 30;
+    periodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  }
 
   const { error } = await supabase
     .from("tenant_subscriptions")
@@ -121,7 +134,27 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.error("Error updating subscription:", error);
   }
 
-  console.log(`Subscription activated for tenant ${tenantId}: ${planType} (${billingInterval})`);
+  // Create billing history record for the subscription start (trial or regular)
+  const regularPrice = PLAN_PRICES[planType as keyof typeof PLAN_PRICES]?.[billingInterval] || 0;
+
+  const { error: historyError } = await supabase.from("billing_history").insert({
+    tenant_id: tenantId,
+    invoice_number: `INV-${Date.now()}`,
+    amount: isTrialing ? 0 : regularPrice,
+    original_amount: regularPrice,
+    currency: "USD",
+    status: "paid",
+    description: isTrialing
+      ? `${PLAN_NAMES[planType] || planType} Plan - 7-Day Free Trial Started`
+      : `${PLAN_NAMES[planType] || planType} Plan - ${billingInterval === "yearly" ? "Annual" : "Monthly"} Subscription`,
+    paid_at: new Date().toISOString(),
+  });
+
+  if (historyError) {
+    console.error("Error creating billing history:", historyError);
+  }
+
+  console.log(`Subscription activated for tenant ${tenantId}: ${planType} (${billingInterval})${isTrialing ? " - Trial" : ""}`);
 }
 
 async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription) {
