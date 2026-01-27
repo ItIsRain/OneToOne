@@ -65,12 +65,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    // Get tenant info
-    const { data: tenant } = await supabase
-      .from("tenants")
-      .select("name, stripe_customer_id")
-      .eq("id", profile.tenant_id)
-      .single();
+    // Get tenant info and check if user has used trial
+    const [tenantResult, subscriptionResult, billingHistoryResult] = await Promise.all([
+      supabase
+        .from("tenants")
+        .select("name, stripe_customer_id")
+        .eq("id", profile.tenant_id)
+        .single(),
+      supabase
+        .from("tenant_subscriptions")
+        .select("stripe_subscription_id")
+        .eq("tenant_id", profile.tenant_id)
+        .single(),
+      supabase
+        .from("billing_history")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", profile.tenant_id),
+    ]);
+
+    const tenant = tenantResult.data;
+    const hasUsedTrial = (billingHistoryResult.count || 0) > 0 || !!subscriptionResult.data?.stripe_subscription_id;
 
     // Get or create Stripe customer
     let stripeCustomerId = tenant?.stripe_customer_id;
@@ -178,7 +192,8 @@ export async function POST(request: NextRequest) {
         discount_code: discountCode || "",
       },
       subscription_data: {
-        trial_period_days: 7,
+        // Only offer trial if user hasn't used it before
+        ...(hasUsedTrial ? {} : { trial_period_days: 7 }),
         metadata: {
           tenant_id: profile.tenant_id,
           plan_type: planType,

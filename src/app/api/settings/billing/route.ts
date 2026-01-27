@@ -71,7 +71,9 @@ const PLANS = [
     description: "For small agencies and freelancers",
     price: PLAN_PRICES.starter,
     limits: PLAN_LIMITS.starter,
+    trial_days: 7,
     features: [
+      { text: "7-day free trial", included: true, highlight: true },
       { text: "10 events/month", included: true },
       { text: "5 team members", included: true },
       { text: "5 GB storage", included: true },
@@ -93,7 +95,9 @@ const PLANS = [
     description: "For growing agencies and regular organizers",
     price: PLAN_PRICES.professional,
     limits: PLAN_LIMITS.professional,
+    trial_days: 7,
     features: [
+      { text: "7-day free trial", included: true, highlight: true },
       { text: "50 events/month", included: true },
       { text: "15 team members", included: true },
       { text: "25 GB storage", included: true },
@@ -117,7 +121,9 @@ const PLANS = [
     description: "For large agencies and enterprise events",
     price: PLAN_PRICES.business,
     limits: PLAN_LIMITS.business,
+    trial_days: 7,
     features: [
+      { text: "7-day free trial", included: true, highlight: true },
       { text: "Unlimited events", included: true },
       { text: "Unlimited team members", included: true },
       { text: "100 GB storage", included: true },
@@ -201,8 +207,8 @@ export async function GET(request: NextRequest) {
       .order("is_default", { ascending: false })
       .order("created_at", { ascending: false });
 
-    // Get usage stats
-    const [eventsResult, membersResult, templatesResult] = await Promise.all([
+    // Get usage stats and check if user has used trial before
+    const [eventsResult, membersResult, templatesResult, billingHistoryResult] = await Promise.all([
       supabase
         .from("events")
         .select("id", { count: "exact", head: true })
@@ -215,16 +221,19 @@ export async function GET(request: NextRequest) {
         .from("document_templates")
         .select("id", { count: "exact", head: true })
         .eq("tenant_id", tenantId),
+      supabase
+        .from("billing_history")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId),
     ]);
+
+    // User has used trial if they have any billing history or have a stripe subscription
+    const hasUsedTrial = (billingHistoryResult.count || 0) > 0 || !!subscription?.stripe_subscription_id;
 
     const planType = (subscription?.plan_type || "free") as keyof typeof PLAN_LIMITS;
     const billingInterval = (subscription?.billing_interval || "monthly") as "monthly" | "yearly";
     const limits = PLAN_LIMITS[planType];
     const prices = PLAN_PRICES[planType];
-
-    // Check if discount code was applied (LUNARLIMITED = 100% off)
-    const discountCode = subscription?.discount_code;
-    const discountPercent = discountCode === "LUNARLIMITED" ? 100 : 0;
 
     const usage = {
       events: {
@@ -256,22 +265,18 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    const originalPrice = prices[billingInterval];
-    const discountAmount = (originalPrice * discountPercent) / 100;
-    const finalPrice = originalPrice - discountAmount;
+    const price = prices[billingInterval];
 
     return NextResponse.json({
       subscription: {
         ...subscription,
-        price: finalPrice,
-        original_price: originalPrice,
-        discount_code: discountCode,
-        discount_percent: discountPercent,
+        price,
         billing_interval: billingInterval,
       },
       paymentMethods: paymentMethods || [],
       usage,
       plans: PLANS,
+      hasUsedTrial,
     });
   } catch (error) {
     console.error("Error fetching billing:", error);
