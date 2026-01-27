@@ -162,10 +162,6 @@ export function checkFeatureAccess(
   planType: PlanType,
   feature: FeatureKey
 ): PlanCheckResult {
-  // DEV MODE: Bypass all plan restrictions for testing
-  // TODO: Remove this bypass before deploying to production
-  return { allowed: true };
-
   const limits = PLAN_LIMITS[planType];
   const hasAccess = limits.features[feature];
 
