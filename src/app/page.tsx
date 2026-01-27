@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 
 // Feature data with SVG icon names
@@ -337,12 +338,15 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-lime-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">1:1</span>
-              </div>
-              <span className="font-bold text-xl text-gray-900 dark:text-white">One To One</span>
-            </div>
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/Logo.svg"
+                alt="OneToOne"
+                width={160}
+                height={52}
+                className="h-13 w-auto"
+              />
+            </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
@@ -468,7 +472,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex-1 mx-4">
                   <div className="bg-white dark:bg-gray-700 rounded-lg px-4 py-1.5 text-sm text-gray-400 max-w-md mx-auto">
-                    app.onetoone.com/dashboard
+                    acme.1i1.ae/dashboard
                   </div>
                 </div>
               </div>
@@ -1207,11 +1211,14 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-8 pb-12 border-b border-gray-800">
             {/* Logo & Description */}
             <div className="col-span-2">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-lime-500 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-lime-500/20">
-                  <span className="text-white font-bold text-sm">1:1</span>
-                </div>
-                <span className="font-bold text-xl">One To One</span>
+              <div className="flex items-center mb-6">
+                <Image
+                  src="/Logo.svg"
+                  alt="OneToOne"
+                  width={180}
+                  height={60}
+                  className="h-14 w-auto brightness-0 invert"
+                />
               </div>
               <p className="text-gray-400 text-sm mb-6 leading-relaxed max-w-xs">
                 The all-in-one platform for managing your organization's clients, projects, events, and finances.

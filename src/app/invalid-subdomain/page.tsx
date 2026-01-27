@@ -2,8 +2,12 @@ import { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Portal Not Found | OneToOne",
+  title: "Portal Not Found",
   description: "This portal does not exist or has been removed.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function InvalidSubdomainPage() {

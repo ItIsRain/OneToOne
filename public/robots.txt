@@ -1,0 +1,17 @@
+# OneToOne Robots.txt
+# https://1i1.ae
+
+User-agent: *
+Allow: /
+Allow: /signin
+Allow: /signup
+Allow: /subscribe
+
+# Disallow admin/dashboard areas
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /invalid-subdomain
+Disallow: /unverified-domain
+
+# Sitemap
+Sitemap: https://1i1.ae/sitemap.xml

@@ -2,8 +2,12 @@ import { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Domain Pending Verification | OneToOne",
+  title: "Domain Pending Verification",
   description: "This custom domain is pending DNS verification.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function UnverifiedDomainPage() {

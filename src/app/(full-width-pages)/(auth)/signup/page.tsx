@@ -2,9 +2,12 @@ import SignUpForm from "@/components/auth/SignUpForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Next.js SignUp Page | One to One by Lunar Labs - Next.js Dashboard Template",
-  description: "This is Next.js SignUp Page One to One by Lunar Labs Dashboard Template",
-  // other metadata
+  title: "Create Your Account - Start Free Trial",
+  description: "Sign up for OneToOne and start managing your business in one platform. CRM, projects, events, invoicing, and more. No credit card required.",
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function SignUp() {
