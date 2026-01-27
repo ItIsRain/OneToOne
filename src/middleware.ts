@@ -103,6 +103,34 @@ export async function middleware(request: NextRequest) {
       if (tenant.primary_color) {
         requestHeaders.set("x-tenant-color", tenant.primary_color);
       }
+
+      // For tenant subdomains, redirect root path to signin or dashboard
+      if (pathname === "/") {
+        // Check if user is authenticated
+        const supabaseAuth = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            cookies: {
+              getAll() {
+                return request.cookies.getAll();
+              },
+              setAll() {
+                // No-op for this check
+              },
+            },
+          }
+        );
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+
+        if (user) {
+          // Authenticated - redirect to dashboard
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        } else {
+          // Not authenticated - redirect to signin
+          return NextResponse.redirect(new URL("/signin", request.url));
+        }
+      }
     }
   }
 
