@@ -40,3 +40,4 @@ export { AddBookmarkModal } from "./AddBookmarkModal";
 export { JudgingModal } from "./JudgingModal";
 export { MessageDetailsModal } from "./MessageDetailsModal";
 export { EmailDetailsModal } from "./EmailDetailsModal";
+export { ImportDataModal } from "./ImportDataModal";

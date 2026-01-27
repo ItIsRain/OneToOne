@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
-import { AddClientModal } from "./modals";
+import { AddClientModal, ImportDataModal } from "./modals";
 import { ClientDetailsSidebar } from "./sidebars";
 
 export interface Client {
@@ -48,6 +48,7 @@ export const ClientsTable = () => {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const fetchClients = useCallback(async () => {
     try {
@@ -187,6 +188,15 @@ export const ClientsTable = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-theme-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import
+            </button>
             <button
               onClick={handleAddClient}
               className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-theme-sm font-medium text-white shadow-theme-xs hover:bg-brand-600"
@@ -355,6 +365,13 @@ export const ClientsTable = () => {
           handleEditClient(client);
         }}
         onDelete={handleDeleteClient}
+      />
+
+      <ImportDataModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        entityType="clients"
+        onImportComplete={fetchClients}
       />
     </>
   );
