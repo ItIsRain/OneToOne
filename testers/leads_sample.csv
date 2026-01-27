@@ -1,0 +1,11 @@
+Name,Email,Phone,Company,Job Title,Website,Status,Estimated Value,Probability,Priority,Source,Industry,City,Country,Notes,Tags
+Alex Thompson,alex.t@bigcorp.com,+1-555-1101,BigCorp Industries,VP of Operations,https://bigcorp.com,qualified,50000,60,high,website,Manufacturing,Detroit,United States,Looking for event management solution,enterprise
+Maria Garcia,maria.g@retailplus.com,+1-555-1201,Retail Plus,Marketing Manager,https://retailplus.com,contacted,25000,40,medium,linkedin,Retail,Phoenix,United States,Interested in customer events,retail
+James Wilson,j.wilson@techstart.io,+1-555-1301,TechStart,Founder,https://techstart.io,new,15000,30,medium,referral,Technology,San Jose,United States,Early stage startup needs platform,startup
+Sophie Martin,sophie@luxurybrands.com,+1-555-1401,Luxury Brands Inc,Brand Director,https://luxurybrands.com,proposal,100000,75,high,conference,Luxury Goods,New York,United States,Ready to sign - needs final proposal,luxury
+Kevin Zhang,kevin.z@healthco.org,+1-555-1501,HealthCo,Events Coordinator,https://healthco.org,negotiation,35000,80,high,cold_outreach,Healthcare,Boston,United States,Negotiating contract terms,healthcare
+Rachel Green,r.green@edutech.edu,+1-555-1601,EduTech University,Dean of Events,https://edutech.edu,qualified,45000,55,medium,website,Education,Cambridge,United States,University event series opportunity,education
+Tom Baker,tom.b@foodchain.com,+1-555-1701,Food Chain Corp,Regional Manager,https://foodchain.com,contacted,20000,35,low,trade_show,Food & Beverage,Dallas,United States,Follow up after trade show meeting,food
+Nina Patel,nina.p@finserv.com,+1-555-1801,Financial Services Ltd,Client Relations,https://finserv.com,new,75000,25,medium,referral,Financial Services,Charlotte,United States,Referred by existing client,finance
+Carlos Rodriguez,carlos@mediagroup.tv,+1-555-1901,Media Group,Producer,https://mediagroup.tv,proposal,60000,70,high,linkedin,Media,Los Angeles,United States,Media event production partnership,media
+Emma White,emma.w@nonprofitorg.org,+1-555-2001,NonProfit Org,Executive Director,https://nonprofitorg.org,qualified,18000,50,medium,website,Non-Profit,Washington,United States,Annual fundraiser event planning,nonprofit

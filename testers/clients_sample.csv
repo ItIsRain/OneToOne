@@ -1,0 +1,11 @@
+Name,Email,Phone,Company,Website,Status,Industry,Address,City,Country,Source,Notes,Tags
+Acme Corporation,contact@acmecorp.com,+1-555-2101,Acme Corporation,https://acmecorp.com,active,Technology,100 Innovation Way,San Francisco,United States,referral,Long-term enterprise client since 2022,enterprise
+Global Events Ltd,info@globalevents.co.uk,+44-20-5552201,Global Events Ltd,https://globalevents.co.uk,active,Events,50 Westminster Bridge,London,United Kingdom,website,International events company,international
+Sunrise Healthcare,admin@sunrisehealth.com,+1-555-2301,Sunrise Healthcare Systems,https://sunrisehealth.com,active,Healthcare,200 Medical Center Dr,Houston,United States,conference,Healthcare conferences and training events,healthcare
+Digital Marketing Pro,hello@digitalmarketingpro.com,+1-555-2401,Digital Marketing Pro,https://digitalmarketingpro.com,active,Marketing,75 Brand Street,New York,United States,linkedin,Marketing agency - monthly webinar series,marketing
+EcoTech Solutions,support@ecotech.green,+1-555-2501,EcoTech Solutions,https://ecotech.green,active,Environmental,300 Green Valley Rd,Portland,United States,trade_show,Sustainability focused tech company,green
+Premier Education,registrar@premieredu.edu,+1-555-2601,Premier Education Institute,https://premieredu.edu,active,Education,1000 Campus Drive,Boston,United States,referral,University client - graduation events,education
+Fashion Forward Inc,events@fashionforward.style,+1-555-2701,Fashion Forward Inc,https://fashionforward.style,active,Fashion,888 Runway Ave,Miami,United States,cold_outreach,Fashion shows and product launches,fashion
+Sports United,bookings@sportsunited.com,+1-555-2801,Sports United LLC,https://sportsunited.com,active,Sports,500 Stadium Way,Denver,United States,website,Sports events and tournaments,sports
+Creative Studios,projects@creativestudios.art,+1-555-2901,Creative Studios,https://creativestudios.art,inactive,Arts,25 Gallery Lane,Chicago,United States,referral,Art exhibitions - currently on hold,arts
+TechConf Global,organizers@techconf.io,+1-555-3001,TechConf Global,https://techconf.io,active,Technology,1 Convention Center Blvd,Las Vegas,United States,conference,Major tech conference organizer,tech

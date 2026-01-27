@@ -60,8 +60,12 @@ function buildRecordData(
   const fields = getFieldDefinitions(entityType);
   const data: Record<string, unknown> = {
     tenant_id: tenantId,
-    created_by: userId,
   };
+
+  // Only contacts and leads have created_by column
+  if (entityType === "contacts" || entityType === "leads") {
+    data.created_by = userId;
+  }
 
   for (const field of fields) {
     if (row[field.name] !== undefined) {
