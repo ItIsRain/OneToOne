@@ -34,6 +34,7 @@ export const PLAN_LIMITS = {
       expenses: false, // expense tracking requires Starter+
       payments: false, // payment tracking requires Professional+
       budgets: false, // budget management requires Business
+      workflows: false, // workflow automation requires Professional+
     },
   },
   starter: {
@@ -62,6 +63,7 @@ export const PLAN_LIMITS = {
       expenses: true, // expense tracking enabled
       payments: false, // payment tracking requires Professional+
       budgets: false, // budget management requires Business
+      workflows: false, // workflow automation requires Professional+
     },
   },
   professional: {
@@ -91,6 +93,7 @@ export const PLAN_LIMITS = {
       expenses: true, // expense tracking enabled
       payments: true, // payment tracking enabled
       budgets: false, // budget management requires Business
+      workflows: true, // workflow automation enabled
     },
   },
   business: {
@@ -120,6 +123,7 @@ export const PLAN_LIMITS = {
       expenses: true, // expense tracking enabled
       payments: true, // payment tracking enabled
       budgets: true, // budget management (Business exclusive)
+      workflows: true, // workflow automation enabled
     },
   },
 } as const;

@@ -254,6 +254,9 @@ export const CompanySettings = () => {
     primary_color: "#465FFF",
   });
 
+  // Logo upload states
+  const [logoUploading, setLogoUploading] = useState(false);
+
   // Notification states
   const [notifications, setNotifications] = useState(true);
   const [emailDigest, setEmailDigest] = useState(true);
@@ -345,6 +348,70 @@ export const CompanySettings = () => {
 
   const handleInputChange = (field: keyof EditFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image must be under 2MB");
+      return;
+    }
+
+    setLogoUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await fetch("/api/upload/company-logo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64 }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Upload failed");
+        }
+
+        const data = await res.json();
+        setCompany(prev => prev ? { ...prev, logo_url: data.url } : prev);
+        localStorage.setItem("custom_logo_url", data.url);
+        window.dispatchEvent(new CustomEvent("logo-changed", { detail: data.url }));
+        setLogoUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Logo upload failed");
+      setLogoUploading(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    if (!confirm("Remove your custom logo? The default logo will be shown instead.")) return;
+
+    setLogoUploading(true);
+    try {
+      const res = await fetch("/api/upload/company-logo", { method: "DELETE" });
+      if (!res.ok) {
+        throw new Error("Failed to remove logo");
+      }
+      setCompany(prev => prev ? { ...prev, logo_url: null } : prev);
+      localStorage.removeItem("custom_logo_url");
+      window.dispatchEvent(new CustomEvent("logo-changed", { detail: null }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to remove logo");
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
   const renderEditForm = () => {
@@ -711,6 +778,60 @@ export const CompanySettings = () => {
           onEdit={() => handleEdit("profile")}
           gradient="from-brand-500 to-brand-600"
         >
+          {/* Logo Upload Section */}
+          <div className="mb-5 pb-5 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-start gap-4">
+              <div className="relative flex h-16 w-44 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                {company?.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={company.logo_url}
+                    alt="Company logo"
+                    className="h-full w-full object-contain p-2 dark:brightness-0 dark:invert"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-gray-400">
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                    </svg>
+                    <span className="text-xs">No logo</span>
+                  </div>
+                )}
+                {logoUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600 text-center">
+                  Upload Logo
+                  <input
+                    type="file"
+                    accept="image/svg+xml,image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={logoUploading}
+                  />
+                </label>
+                {company?.logo_url && (
+                  <button
+                    onClick={handleLogoRemove}
+                    disabled={logoUploading}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                  >
+                    Remove
+                  </button>
+                )}
+                <div className="space-y-1 text-xs text-gray-400 dark:text-gray-500">
+                  <p>Recommended: <span className="font-medium text-gray-500 dark:text-gray-400">400 x 80px</span></p>
+                  <p>Best format: <span className="font-medium text-gray-500 dark:text-gray-400">SVG</span> with transparent background</p>
+                  <p>SVG adapts to light &amp; dark themes automatically. Max 2MB.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InfoItem
               label="Company Name"

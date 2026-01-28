@@ -37,5 +37,9 @@ export { NotificationsTable } from "./NotificationsTable";
 export { EmailBroadcast } from "./EmailBroadcast";
 export { default as EmailSettingsForm } from "./EmailSettingsForm";
 
+// Automation
+export { WorkflowsTable } from "./WorkflowsTable";
+export { WorkflowTemplates } from "./WorkflowTemplates";
+
 // Sidebars
 export * from "./sidebars";

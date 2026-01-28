@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -7,135 +7,96 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
-import Badge from "../ui/badge/Badge";
 
 export interface Notification {
   id: string;
-  type: "task" | "payment" | "event" | "comment" | "client" | "document" | "system" | "reminder";
+  type: "task" | "payment" | "event" | "workflow" | "approval" | "system";
   title: string;
   message: string;
-  time: string;
-  date: string;
   read: boolean;
-  actionUrl?: string;
-  actionLabel?: string;
+  action_url?: string;
+  action_label?: string;
+  created_at: string;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "task",
-    title: "Task assigned to you",
-    message: "Alex assigned you to 'Review project proposal'",
-    time: "5 minutes ago",
-    date: "Today",
-    read: false,
-    actionUrl: "/dashboard/projects",
-    actionLabel: "View Task",
-  },
-  {
-    id: "2",
-    type: "payment",
-    title: "Payment received",
-    message: "Acme Corporation paid invoice #1024 ($4,500)",
-    time: "1 hour ago",
-    date: "Today",
-    read: false,
-    actionUrl: "/dashboard/finance/invoices",
-    actionLabel: "View Invoice",
-  },
-  {
-    id: "3",
-    type: "event",
-    title: "Event reminder",
-    message: "Product Launch event starts in 2 days",
-    time: "2 hours ago",
-    date: "Today",
-    read: false,
-    actionUrl: "/dashboard/events",
-    actionLabel: "View Event",
-  },
-  {
-    id: "4",
-    type: "comment",
-    title: "New comment",
-    message: "Sarah commented on 'Website Redesign' project",
-    time: "3 hours ago",
-    date: "Today",
-    read: true,
-    actionUrl: "/dashboard/projects",
-    actionLabel: "View Comment",
-  },
-  {
-    id: "5",
-    type: "client",
-    title: "New client added",
-    message: "Lisa added 'Innovate Co.' as a new client",
-    time: "5 hours ago",
-    date: "Today",
-    read: true,
-    actionUrl: "/dashboard/crm/clients",
-    actionLabel: "View Client",
-  },
-  {
-    id: "6",
-    type: "document",
-    title: "Document shared",
-    message: "Michael shared 'Q4 Report.pdf' with you",
-    time: "10:30 AM",
-    date: "Yesterday",
-    read: true,
-    actionUrl: "/dashboard/documents",
-    actionLabel: "View Document",
-  },
-  {
-    id: "7",
-    type: "system",
-    title: "System update",
-    message: "New features have been added to your dashboard",
-    time: "9:00 AM",
-    date: "Yesterday",
-    read: true,
-  },
-  {
-    id: "8",
-    type: "reminder",
-    title: "Meeting reminder",
-    message: "Team standup meeting in 30 minutes",
-    time: "8:30 AM",
-    date: "Yesterday",
-    read: true,
-  },
-];
-
 const typeConfig: Record<string, { icon: string; color: string; bgColor: string }> = {
-  task: { icon: "📋", color: "primary", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
-  payment: { icon: "💰", color: "success", bgColor: "bg-green-100 dark:bg-green-900/30" },
-  event: { icon: "📅", color: "warning", bgColor: "bg-yellow-100 dark:bg-yellow-900/30" },
-  comment: { icon: "💬", color: "primary", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
-  client: { icon: "👤", color: "success", bgColor: "bg-green-100 dark:bg-green-900/30" },
-  document: { icon: "📄", color: "light", bgColor: "bg-gray-100 dark:bg-gray-800" },
-  system: { icon: "⚙️", color: "light", bgColor: "bg-gray-100 dark:bg-gray-800" },
-  reminder: { icon: "🔔", color: "warning", bgColor: "bg-yellow-100 dark:bg-yellow-900/30" },
+  task: { icon: "\u{1F4CB}", color: "primary", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
+  payment: { icon: "\u{1F4B0}", color: "success", bgColor: "bg-green-100 dark:bg-green-900/30" },
+  event: { icon: "\u{1F4C5}", color: "warning", bgColor: "bg-yellow-100 dark:bg-yellow-900/30" },
+  workflow: { icon: "\u{26A1}", color: "primary", bgColor: "bg-purple-100 dark:bg-purple-900/30" },
+  approval: { icon: "\u{2705}", color: "success", bgColor: "bg-lime-100 dark:bg-lime-900/30" },
+  system: { icon: "\u{2699}\u{FE0F}", color: "light", bgColor: "bg-gray-100 dark:bg-gray-800" },
 };
 
+function timeAgo(dateStr: string): { time: string; date: string } {
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  let time: string;
+  if (diffMin < 1) time = "Just now";
+  else if (diffMin < 60) time = `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
+  else if (diffHr < 24) time = `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
+  else time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  let date: string;
+  if (diffDay === 0) date = "Today";
+  else if (diffDay === 1) date = "Yesterday";
+  else date = d.toLocaleDateString();
+
+  return { time, date };
+}
+
 export const NotificationsTable = () => {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const readParam = filter === "unread" ? "&read=false" : "";
+      const res = await fetch(`/api/notifications?limit=50${readParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const filteredNotifications = filter === "unread"
     ? notifications.filter((n) => !n.read)
     : notifications;
 
-  const handleMarkAsRead = (id: string) => {
+  const handleMarkAsRead = async (id: string) => {
     setNotifications(notifications.map((n) =>
       n.id === id ? { ...n, read: true } : n
     ));
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [id] }),
+    });
   };
 
-  const handleMarkAllAsRead = () => {
+  const handleMarkAllAsRead = async () => {
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
   };
 
   const handleDeleteNotification = (id: string) => {
@@ -149,6 +110,14 @@ export const NotificationsTable = () => {
     setNotifications([]);
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
       <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -157,7 +126,7 @@ export const NotificationsTable = () => {
             Notifications
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {notifications.length} notifications • {unreadCount} unread
+            {notifications.length} notifications {unreadCount > 0 && `\u2022 ${unreadCount} unread`}
           </p>
         </div>
 
@@ -260,6 +229,7 @@ export const NotificationsTable = () => {
             <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredNotifications.map((notification) => {
                 const config = typeConfig[notification.type] || typeConfig.system;
+                const { time, date } = timeAgo(notification.created_at);
                 return (
                   <TableRow key={notification.id} className={!notification.read ? "bg-brand-50/30 dark:bg-brand-500/5" : ""}>
                     <TableCell className="py-3">
@@ -284,8 +254,8 @@ export const NotificationsTable = () => {
                     </TableCell>
                     <TableCell className="py-3 text-gray-500 text-theme-sm dark:text-gray-400">
                       <div>
-                        <span className="block">{notification.time}</span>
-                        <span className="text-theme-xs">{notification.date}</span>
+                        <span className="block">{time}</span>
+                        <span className="text-theme-xs">{date}</span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3">
@@ -298,12 +268,12 @@ export const NotificationsTable = () => {
                             Mark read
                           </button>
                         )}
-                        {notification.actionUrl && (
+                        {notification.action_url && (
                           <a
-                            href={notification.actionUrl}
+                            href={notification.action_url}
                             className="text-brand-500 hover:text-brand-600"
                           >
-                            {notification.actionLabel || "View"}
+                            {notification.action_label || "View"}
                           </a>
                         )}
                         <button

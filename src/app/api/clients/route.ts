@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -171,6 +172,11 @@ export async function POST(request: Request) {
       console.error("Insert error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Trigger workflow automations for client_created
+    checkTriggers("client_created", { entity_id: client.id, entity_type: "client", client_name: client.name }, supabase, profile.tenant_id, user.id).catch((err) => {
+      console.error("Workflow trigger error (client_created):", err);
+    });
 
     return NextResponse.json({ client }, { status: 201 });
   } catch (error) {

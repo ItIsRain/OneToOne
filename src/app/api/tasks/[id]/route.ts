@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 export async function GET(
   request: NextRequest,
@@ -86,6 +87,9 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Fetch old task for status change trigger
+    const { data: oldTask } = await supabase.from("tasks").select("status, tenant_id").eq("id", id).single();
+
     // Auto-set timestamps based on status changes
     const updates = { ...body };
     if (body.status === "in_progress" && !body.started_at) {
@@ -131,6 +135,11 @@ export async function PATCH(
         .eq("id", task.created_by)
         .single();
       creator = data;
+    }
+
+    // Trigger workflow automations for task_status_changed
+    if (body.status && oldTask && body.status !== oldTask.status && oldTask.tenant_id) {
+      checkTriggers("task_status_changed", { entity_id: id, entity_type: "task", from_status: oldTask.status, to_status: body.status }, supabase, oldTask.tenant_id, user.id).catch(() => {});
     }
 
     return NextResponse.json({ ...task, assignee, creator });

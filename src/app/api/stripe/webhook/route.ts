@@ -186,12 +186,20 @@ async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription)
   }
 
   // Get period timestamps safely
+  const isTrialing = subscription.status === "trialing";
   const periodStart = subscription.current_period_start
     ? new Date(subscription.current_period_start * 1000).toISOString()
     : new Date().toISOString();
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
-    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // For trial subscriptions, use trial_end as next billing date
+  let periodEnd: string;
+  if (isTrialing && subscription.trial_end) {
+    periodEnd = new Date(subscription.trial_end * 1000).toISOString();
+  } else if (subscription.current_period_end) {
+    periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+  } else {
+    periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  }
 
   const { error } = await supabase
     .from("tenant_subscriptions")

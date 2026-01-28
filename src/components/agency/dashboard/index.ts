@@ -6,6 +6,10 @@ export { DashboardUpcoming } from "./DashboardUpcoming";
 export { DashboardBookmarks } from "./DashboardBookmarks";
 export { DashboardQuickActions } from "./DashboardQuickActions";
 
+export { WelcomeModal } from "./WelcomeModal";
+export { DashboardOnboarding } from "./DashboardOnboarding";
+export { DashboardGreeting } from "./DashboardGreeting";
+
 // Types
 export type { Announcement } from "./DashboardAnnouncements";
 export type { Goal } from "./DashboardGoals";

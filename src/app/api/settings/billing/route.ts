@@ -112,6 +112,7 @@ const PLANS = [
       { text: "Document templates (25)", included: true },
       { text: "Time tracking", included: true },
       { text: "Advanced permissions", included: true },
+      { text: "Workflow automation", included: true },
     ],
     badge: "Most Popular",
   },
@@ -142,6 +143,7 @@ const PLANS = [
       { text: "Audit logs", included: true },
       { text: "Dedicated account manager", included: true },
       { text: "99.9% SLA guarantee", included: true },
+      { text: "Workflow automation", included: true },
     ],
     badge: "Enterprise",
   },
@@ -274,11 +276,55 @@ export async function GET(request: NextRequest) {
 
     const price = prices[billingInterval];
 
+    // Fetch live data from Stripe subscription
+    let isTrialing = false;
+    let nextBillingDate: string | null = null;
+    let stripeCancelAtPeriodEnd = false;
+    if (subscription?.stripe_subscription_id) {
+      try {
+        const Stripe = (await import("stripe")).default;
+        const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+          apiVersion: "2025-12-15.clover",
+        });
+        const stripeSub = await stripeClient.subscriptions.retrieve(subscription.stripe_subscription_id);
+        isTrialing = stripeSub.status === "trialing";
+        stripeCancelAtPeriodEnd = stripeSub.cancel_at_period_end;
+
+        // Use trial_end for trialing subs, current_period_end otherwise
+        if (isTrialing && stripeSub.trial_end) {
+          nextBillingDate = new Date(stripeSub.trial_end * 1000).toISOString();
+        } else if (stripeSub.current_period_end) {
+          nextBillingDate = new Date(stripeSub.current_period_end * 1000).toISOString();
+        }
+
+        // Sync local DB with Stripe truth
+        const syncData: Record<string, unknown> = {};
+        if (nextBillingDate && subscription.current_period_end !== nextBillingDate) {
+          syncData.current_period_end = nextBillingDate;
+        }
+        if (subscription.cancel_at_period_end !== stripeCancelAtPeriodEnd) {
+          syncData.cancel_at_period_end = stripeCancelAtPeriodEnd;
+        }
+        if (Object.keys(syncData).length > 0) {
+          await supabase
+            .from("tenant_subscriptions")
+            .update(syncData)
+            .eq("id", subscription.id);
+          if (syncData.current_period_end) subscription.current_period_end = nextBillingDate!;
+          if (syncData.cancel_at_period_end !== undefined) subscription.cancel_at_period_end = stripeCancelAtPeriodEnd;
+        }
+      } catch (e) {
+        console.error("Error fetching Stripe subscription status:", e);
+      }
+    }
+
     return NextResponse.json({
       subscription: {
         ...subscription,
         price,
         billing_interval: billingInterval,
+        is_trialing: isTrialing,
+        next_billing_date: nextBillingDate || subscription?.current_period_end || null,
       },
       paymentMethods: paymentMethods || [],
       usage,

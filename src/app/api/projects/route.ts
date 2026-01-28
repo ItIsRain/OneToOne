@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 export async function GET() {
   try {
@@ -96,6 +97,9 @@ export async function POST(request: NextRequest) {
       console.error("Error creating project:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Trigger workflow automations for project_created
+    checkTriggers("project_created", { entity_id: project.id, entity_type: "project", project_name: project.name }, supabase, profile.tenant_id, user.id).catch(() => {});
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {

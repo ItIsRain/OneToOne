@@ -4,7 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
+import SidebarWidget from "./SidebarWidget";
 import {
+  BoltIcon,
   BoxCubeIcon,
   CalenderIcon,
   ChevronDownIcon,
@@ -93,6 +95,15 @@ const navItems: NavItem[] = [
       { name: "Shared", path: "/dashboard/documents/shared" },
     ],
   },
+  {
+    icon: <BoltIcon />,
+    name: "Automation",
+    subItems: [
+      { name: "Workflows", path: "/dashboard/automation/workflows" },
+      { name: "Approvals", path: "/dashboard/automation/approvals", new: true },
+      { name: "Run History", path: "/dashboard/automation/runs" },
+    ],
+  },
 ];
 
 // Secondary navigation - Communication & Insights
@@ -145,6 +156,40 @@ const AppSidebar: React.FC = () => {
   } | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // "pending" = not yet resolved (show nothing to avoid flash), null = no custom logo, string = custom logo URL
+  const [customLogoUrl, setCustomLogoUrl] = useState<string | null | "pending">("pending");
+
+  useEffect(() => {
+    // Read cached value immediately to avoid flash
+    const cached = localStorage.getItem("custom_logo_url");
+    setCustomLogoUrl(cached);
+
+    // Then validate against server
+    fetch("/api/tenant/info")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const url = data?.logo_url || null;
+        setCustomLogoUrl(url);
+        if (url) {
+          localStorage.setItem("custom_logo_url", url);
+        } else {
+          localStorage.removeItem("custom_logo_url");
+        }
+      })
+      .catch(() => {
+        // Keep cached value on error
+        if (!cached) setCustomLogoUrl(null);
+      });
+  }, []);
+
+  useEffect(() => {
+    const handleLogoChanged = (e: Event) => {
+      const url = (e as CustomEvent).detail as string | null;
+      setCustomLogoUrl(url);
+    };
+    window.addEventListener("logo-changed", handleLogoChanged);
+    return () => window.removeEventListener("logo-changed", handleLogoChanged);
+  }, []);
 
   const isActive = useCallback(
     (path: string, exactMatch: boolean = false) => {
@@ -354,27 +399,50 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex ${
-          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-        }`}
+        className="flex items-center justify-center py-8"
       >
-        <Link href="/dashboard">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <Image
-              src="/Logo.svg"
-              alt="Logo"
-              width={200}
-              height={40}
-              className="dark:brightness-0 dark:invert"
-            />
+        <Link href="/dashboard" className="flex items-center justify-center">
+          {customLogoUrl === "pending" ? (
+            // Invisible placeholder to reserve space and prevent flash
+            isExpanded || isHovered || isMobileOpen ? (
+              <div className="h-10 w-[200px]" />
+            ) : (
+              <div className="h-8 w-8" />
+            )
+          ) : isExpanded || isHovered || isMobileOpen ? (
+            customLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={customLogoUrl}
+                alt="Logo"
+                className="h-10 max-w-[200px] object-contain dark:brightness-0 dark:invert"
+              />
+            ) : (
+              <Image
+                src="/Logo.svg"
+                alt="Logo"
+                width={200}
+                height={40}
+                className="dark:brightness-0 dark:invert"
+              />
+            )
           ) : (
-            <Image
-              src="/LogoSmall.svg"
-              alt="Logo"
-              width={32}
-              height={32}
-              className="dark:brightness-0 dark:invert"
-            />
+            customLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={customLogoUrl}
+                alt="Logo"
+                className="h-8 w-8 object-contain dark:brightness-0 dark:invert"
+              />
+            ) : (
+              <Image
+                src="/LogoSmall.svg"
+                alt="Logo"
+                width={32}
+                height={32}
+                className="dark:brightness-0 dark:invert"
+              />
+            )
           )}
         </Link>
       </div>
@@ -428,6 +496,9 @@ const AppSidebar: React.FC = () => {
           </div>
         </nav>
       </div>
+
+      {/* Plan widget */}
+      <SidebarWidget />
     </aside>
   );
 };

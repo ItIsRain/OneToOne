@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, Suspense } from "react";
 import {
   DashboardMetrics,
   DashboardActivity,
@@ -9,6 +9,7 @@ import {
   DashboardBookmarks,
   DashboardQuickActions,
 } from "@/components/agency";
+import { WelcomeModal, DashboardOnboarding, DashboardGreeting } from "@/components/agency/dashboard";
 import type { Announcement, Goal } from "@/components/agency/dashboard";
 import {
   AddAnnouncementModal,
@@ -124,21 +125,17 @@ export default function Dashboard() {
   return (
     <>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
-            Dashboard
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Welcome back! Here&apos;s an overview of your agency.
-          </p>
-        </div>
+        {/* Personalized Greeting */}
+        <DashboardGreeting />
 
         {/* Metrics Row */}
         <DashboardMetrics key={`metrics-${refreshKey}`} />
 
         {/* Quick Actions */}
         <DashboardQuickActions />
+
+        {/* Onboarding Checklist */}
+        <DashboardOnboarding />
 
         {/* Main Grid */}
         <div className="grid grid-cols-12 gap-6">
@@ -215,6 +212,11 @@ export default function Dashboard() {
         onClose={() => setIsBookmarkModalOpen(false)}
         onSave={handleBookmarkSaved}
       />
+
+      {/* Welcome Modal (shows after signup with ?subscribed=true) */}
+      <Suspense fallback={null}>
+        <WelcomeModal />
+      </Suspense>
     </>
   );
 }

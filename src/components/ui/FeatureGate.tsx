@@ -101,6 +101,11 @@ const FEATURE_INFO: Record<FeatureKey, { title: string; description: string; ico
     description: "Create and manage budgets for projects and departments. Set spending limits, track actual vs. planned, and forecast future costs.",
     icon: "budget",
   },
+  workflows: {
+    title: "Workflow Automation",
+    description: "Automate repetitive agency tasks with triggers, approval gates, and multi-step pipelines.",
+    icon: "automation",
+  },
 };
 
 const PLAN_NAMES: Record<PlanType, string> = {
@@ -236,6 +241,12 @@ function FeatureIcon({ icon }: { icon: string }) {
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+        </svg>
+      );
+    case "automation":
+      return (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       );
     default:

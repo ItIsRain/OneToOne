@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserPlanInfo, checkEventLimit } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -248,6 +249,9 @@ export async function POST(request: NextRequest) {
         .single();
       creator = data;
     }
+
+    // Trigger workflow automations for event_created
+    checkTriggers("event_created", { entity_id: event.id, entity_type: "event", event_name: event.name || event.title }, supabase, profile.tenant_id, user.id).catch(() => {});
 
     return NextResponse.json({ ...event, assignee, creator }, { status: 201 });
   } catch (error) {

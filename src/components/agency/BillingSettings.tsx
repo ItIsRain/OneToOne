@@ -100,6 +100,8 @@ interface Subscription {
   current_period_end: string;
   cancel_at_period_end: boolean;
   price: number;
+  is_trialing?: boolean;
+  next_billing_date?: string | null;
 }
 
 interface PaymentMethod {
@@ -340,7 +342,7 @@ export const BillingSettings = () => {
     card_exp_month: "",
     card_exp_year: "",
   });
-  const [cancelingSubscription, setCancelingSubscription] = useState(false);
+  const [managingSubscription, setManagingSubscription] = useState(false);
   const [hasUsedTrial, setHasUsedTrial] = useState(false);
 
   const fetchBilling = useCallback(async () => {
@@ -487,69 +489,27 @@ export const BillingSettings = () => {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    if (!confirm("Are you sure you want to cancel your subscription? You'll continue to have access until the end of your billing period.")) {
-      return;
-    }
-
-    setCancelingSubscription(true);
+  const handleManageSubscription = async () => {
+    setManagingSubscription(true);
     try {
-      const res = await fetch("/api/settings/billing", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cancel_at_period_end: true }),
+      const res = await fetch("/api/stripe/portal", {
+        method: "POST",
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setNotification({
-        isOpen: true,
-        type: "success",
-        title: "Subscription Canceled",
-        message: "Your subscription has been canceled. You'll continue to have access until the end of your current billing period.",
-      });
-      fetchBilling();
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err) {
       setNotification({
         isOpen: true,
         type: "error",
         title: "Error",
-        message: err instanceof Error ? err.message : "Failed to cancel subscription",
+        message: err instanceof Error ? err.message : "Failed to open subscription management",
       });
-    } finally {
-      setCancelingSubscription(false);
-    }
-  };
-
-  const handleReactivateSubscription = async () => {
-    setCancelingSubscription(true);
-    try {
-      const res = await fetch("/api/settings/billing", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cancel_at_period_end: false }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      setNotification({
-        isOpen: true,
-        type: "success",
-        title: "Subscription Reactivated",
-        message: "Your subscription has been reactivated and will continue as normal.",
-      });
-      fetchBilling();
-    } catch (err) {
-      setNotification({
-        isOpen: true,
-        type: "error",
-        title: "Error",
-        message: err instanceof Error ? err.message : "Failed to reactivate subscription",
-      });
-    } finally {
-      setCancelingSubscription(false);
+      setManagingSubscription(false);
     }
   };
 
@@ -719,11 +679,13 @@ export const BillingSettings = () => {
                   )}
                 </div>
               </div>
-              {subscription?.current_period_end && (
+              {subscription?.plan_type !== "free" && (subscription.next_billing_date || subscription.current_period_end) && (
                 <div className="text-right">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Next billing date</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {subscription.is_trialing ? "Trial ends" : "Next billing date"}
+                  </p>
                   <p className="font-medium text-gray-800 dark:text-white">
-                    {formatDate(subscription.current_period_end)}
+                    {formatDate(subscription.next_billing_date || subscription.current_period_end)}
                   </p>
                 </div>
               )}
@@ -792,28 +754,28 @@ export const BillingSettings = () => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {subscription?.cancel_at_period_end
                         ? "Your subscription will end at the end of the billing period"
-                        : "Cancel or modify your subscription"}
+                        : "Update payment method, cancel, or modify your plan via Stripe"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {subscription?.cancel_at_period_end ? (
-                      <button
-                        onClick={handleReactivateSubscription}
-                        disabled={cancelingSubscription}
-                        className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50"
-                      >
-                        {cancelingSubscription ? "Processing..." : "Reactivate Subscription"}
-                      </button>
+                  <button
+                    onClick={handleManageSubscription}
+                    disabled={managingSubscription}
+                    className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    {managingSubscription ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                        Opening...
+                      </>
                     ) : (
-                      <button
-                        onClick={handleCancelSubscription}
-                        disabled={cancelingSubscription}
-                        className="rounded-lg border border-error-300 bg-error-50 px-4 py-2 text-sm font-medium text-error-600 hover:bg-error-100 dark:border-error-700 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20 transition-colors disabled:opacity-50"
-                      >
-                        {cancelingSubscription ? "Processing..." : "Cancel Subscription"}
-                      </button>
+                      <>
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                        Manage Subscription
+                      </>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
             )}
