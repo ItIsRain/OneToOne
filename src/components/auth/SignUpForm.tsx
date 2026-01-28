@@ -3,10 +3,12 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getTenantUrl, getSubdomainSuffix } from "@/lib/url";
 
-type Step = "details" | "otp" | "onboarding";
+type Step = "details" | "otp" | "onboarding" | "plan";
 
 const useCaseOptions = [
   { value: "events", label: "Event Management" },
@@ -16,7 +18,64 @@ const useCaseOptions = [
   { value: "other", label: "Other" },
 ];
 
+const planOptions = [
+  {
+    value: "free",
+    name: "Free",
+    price: "0",
+    description: "Try the platform with basic features",
+    features: [
+      "3 events total",
+      "2 team members",
+      "500 MB storage",
+      "Basic analytics",
+    ],
+  },
+  {
+    value: "starter",
+    name: "Starter",
+    price: "29",
+    description: "For small teams getting started",
+    features: [
+      "10 events/month",
+      "5 team members",
+      "5 GB storage",
+      "Email support",
+      "Basic CRM & invoicing",
+    ],
+  },
+  {
+    value: "professional",
+    name: "Professional",
+    price: "79",
+    description: "For growing organizations",
+    features: [
+      "50 events/month",
+      "15 team members",
+      "25 GB storage",
+      "Priority support",
+      "Full CRM & judging system",
+    ],
+    popular: true,
+  },
+  {
+    value: "business",
+    name: "Business",
+    price: "199",
+    description: "For large organizations",
+    features: [
+      "Unlimited events",
+      "Unlimited team members",
+      "100 GB storage",
+      "Dedicated account manager",
+      "White-label & SSO",
+    ],
+  },
+];
+
 export default function SignUpForm() {
+  const searchParams = useSearchParams();
+  const preselectedPlan = searchParams.get("plan") || "";
   const [step, setStep] = useState<Step>("details");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +90,7 @@ export default function SignUpForm() {
     otp: "",
     useCase: "",
     subdomain: "",
+    plan: "",
   });
 
   const updateFormData = (field: string, value: string) => {
@@ -92,14 +152,27 @@ export default function SignUpForm() {
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    // If a plan was preselected from URL, skip the plan selection step
+    const validPlans = planOptions.map((p) => p.value);
+    if (preselectedPlan && validPlans.includes(preselectedPlan)) {
+      handleSelectPlan(preselectedPlan);
+      return;
+    }
+    setStep("plan");
+  };
+
+  const handleSelectPlan = async (selectedPlan: string) => {
     setIsLoading(true);
     setError("");
+
+    const updatedFormData = { ...formData, plan: selectedPlan };
 
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(updatedFormData),
       });
 
       const data = await res.json();
@@ -120,9 +193,8 @@ export default function SignUpForm() {
         // Still redirect - they can sign in manually
       }
 
-      // Redirect to subscription page on the tenant's subdomain
-      const protocol = window.location.protocol;
-      window.location.href = `${protocol}//${formData.subdomain}.1i1.ae/subscribe`;
+      // Redirect to dashboard on the tenant's subdomain
+      window.location.href = getTenantUrl(formData.subdomain, "/dashboard?subscribed=true");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -130,25 +202,27 @@ export default function SignUpForm() {
     }
   };
 
+  const steps: Step[] = ["details", "otp", "onboarding", "plan"];
+
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center gap-2 mb-8">
-      {["details", "otp", "onboarding"].map((s, i) => (
+      {steps.map((s, i) => (
         <React.Fragment key={s}>
           <div
             className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors ${
               step === s
                 ? "bg-brand-500 text-white"
-                : ["details", "otp", "onboarding"].indexOf(step) > i
+                : steps.indexOf(step) > i
                 ? "bg-brand-100 text-brand-600"
                 : "bg-gray-100 text-gray-400"
             }`}
           >
             {i + 1}
           </div>
-          {i < 2 && (
+          {i < steps.length - 1 && (
             <div
-              className={`w-12 h-0.5 ${
-                ["details", "otp", "onboarding"].indexOf(step) > i
+              className={`w-8 h-0.5 ${
+                steps.indexOf(step) > i
                   ? "bg-brand-200"
                   : "bg-gray-100"
               }`}
@@ -358,7 +432,7 @@ export default function SignUpForm() {
               required
             />
             <span className="inline-flex items-center px-4 py-3 text-sm text-gray-500 bg-gray-100 border border-l-0 border-gray-200 rounded-r-lg">
-              .1i1.ae
+              {getSubdomainSuffix()}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-gray-500">
@@ -375,7 +449,7 @@ export default function SignUpForm() {
           disabled={isLoading || !formData.useCase || !formData.subdomain}
           className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? "Creating your portal..." : "Create My Portal"}
+          {isLoading ? "Creating your portal..." : "Continue"}
         </button>
 
         <button
@@ -389,6 +463,69 @@ export default function SignUpForm() {
     </form>
   );
 
+  const renderPlanStep = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3">
+        {planOptions.map((plan) => (
+          <div
+            key={plan.value}
+            onClick={() => !isLoading && handleSelectPlan(plan.value)}
+            className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              formData.plan === plan.value
+                ? "border-brand-500 bg-brand-50"
+                : "border-gray-200 hover:border-gray-300"
+            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {"popular" in plan && plan.popular && (
+              <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-brand-500 text-white text-xs font-semibold rounded-full">
+                Popular
+              </span>
+            )}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">{plan.name}</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{plan.description}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-gray-900">${plan.price}</span>
+                <span className="text-sm text-gray-500">/mo</span>
+              </div>
+            </div>
+            <ul className="mt-3 grid grid-cols-2 gap-1">
+              {plan.features.map((feature) => (
+                <li key={feature} className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <svg className="w-3.5 h-3.5 text-brand-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <p className="text-sm text-error-500">{error}</p>
+      )}
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-4">
+          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <span className="ml-2 text-sm text-gray-500">Creating your portal...</span>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setStep("onboarding")}
+        className="w-full text-sm text-gray-500 hover:text-gray-700"
+      >
+        &larr; Back
+      </button>
+    </div>
+  );
+
   const getStepTitle = () => {
     switch (step) {
       case "details":
@@ -397,6 +534,8 @@ export default function SignUpForm() {
         return { title: "Verify your email", subtitle: "We need to verify your email address" };
       case "onboarding":
         return { title: "Set up your portal", subtitle: "Tell us a bit about how you'll use 1i1" };
+      case "plan":
+        return { title: "Choose your plan", subtitle: "Select the plan that works best for you" };
     }
   };
 
@@ -429,6 +568,7 @@ export default function SignUpForm() {
           {step === "details" && renderDetailsStep()}
           {step === "otp" && renderOTPStep()}
           {step === "onboarding" && renderOnboardingStep()}
+          {step === "plan" && renderPlanStep()}
 
           {step === "details" && (
             <div className="mt-5">

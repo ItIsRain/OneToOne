@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getTenantUrl } from "@/lib/url";
 
 interface Plan {
   type: string;
@@ -112,8 +113,7 @@ export default function SubscribePage() {
   // Helper to get redirect URL for tenant subdomain
   const getRedirectUrl = (path: string) => {
     if (tenantSubdomain) {
-      const protocol = window.location.protocol;
-      return `${protocol}//${tenantSubdomain}.1i1.ae${path}`;
+      return getTenantUrl(tenantSubdomain, path);
     }
     return path;
   };
@@ -124,7 +124,15 @@ export default function SubscribePage() {
       try {
         const res = await fetch("/api/settings/billing");
         if (res.status === 401) {
-          router.push("/signin?redirect=/subscribe");
+          // Not authenticated — redirect to sign in and come back
+          const currentPath = window.location.pathname;
+          router.push(`/signin?redirect=${encodeURIComponent(currentPath)}`);
+          return;
+        }
+        if (!res.ok) {
+          // Non-auth error — let user continue, subscription call will provide specifics
+          console.error("Billing check returned status:", res.status);
+          setCheckingAuth(false);
           return;
         }
         const data = await res.json();
@@ -139,8 +147,7 @@ export default function SubscribePage() {
         // Free plan users can stay on this page to upgrade
         if (data.subscription?.status === "active" && data.subscription?.plan_type !== "free") {
           if (subdomain) {
-            const protocol = window.location.protocol;
-            window.location.href = `${protocol}//${subdomain}.1i1.ae/dashboard`;
+            window.location.href = getTenantUrl(subdomain, "/dashboard");
           } else {
             window.location.href = "/dashboard";
           }
@@ -212,6 +219,13 @@ export default function SubscribePage() {
           discount_code: discountCode || undefined,
         }),
       });
+
+      if (res.status === 401) {
+        // Session expired or cookie not available — redirect to sign in
+        const currentPath = window.location.pathname;
+        window.location.href = `/signin?redirect=${encodeURIComponent(currentPath)}`;
+        return;
+      }
 
       const data = await res.json();
 

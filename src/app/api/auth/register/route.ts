@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getSubdomainSuffix } from "@/lib/url";
 
 export async function POST(request: Request) {
   try {
-    const { firstName, lastName, email, password, useCase, subdomain } = await request.json();
+    const { firstName, lastName, email, password, useCase, subdomain, plan } = await request.json();
 
     // Validate required fields
     if (!firstName || !lastName || !email || !password || !useCase || !subdomain) {
@@ -36,12 +37,13 @@ export async function POST(request: Request) {
         lastName,
         email,
         useCase,
-        subdomain: `${subdomain}.1i1.ae`,
+        subdomain: `${subdomain}${getSubdomainSuffix()}`,
+        plan: plan || "free",
       });
       return NextResponse.json({
         success: true,
         message: "Account created (dev mode)",
-        subdomain: `${subdomain}.1i1.ae`,
+        subdomain: `${subdomain}${getSubdomainSuffix()}`,
       });
     }
 
@@ -136,11 +138,13 @@ export async function POST(request: Request) {
       // Continue anyway - profile can be created later
     }
 
-    // Create initial free subscription for the tenant
+    // Create subscription for the tenant with selected plan
+    const validPlans = ["free", "starter", "professional", "business"];
+    const selectedPlan = validPlans.includes(plan) ? plan : "free";
     const periodDays = 30;
     const { error: subscriptionError } = await supabase.from("tenant_subscriptions").insert({
       tenant_id: tenant.id,
-      plan_type: "free",
+      plan_type: selectedPlan,
       status: "active",
       billing_interval: "monthly",
       current_period_start: new Date().toISOString(),
@@ -155,7 +159,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: "Account created successfully",
-      subdomain: `${subdomain}.1i1.ae`,
+      subdomain: `${subdomain}${getSubdomainSuffix()}`,
       tenantId: tenant.id,
     });
   } catch (error) {

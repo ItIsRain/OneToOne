@@ -1041,7 +1041,7 @@ export default function LandingPage() {
                   )}
 
                   <Link
-                    href="/subscribe"
+                    href={`/signup?plan=${plan.type}`}
                     className={`mt-6 w-full py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center ${
                       plan.popular
                         ? "bg-lime-500 text-white hover:bg-lime-600"

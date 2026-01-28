@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { getTenantUrl, getBaseDomain } from "@/lib/url";
 import {
   createCustomHostname,
   deleteCustomHostname,
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       subdomain: tenant.subdomain,
-      subdomainUrl: `https://${tenant.subdomain}.1i1.ae`,
+      subdomainUrl: getTenantUrl(tenant.subdomain),
       customDomain: tenant.custom_domain,
       customDomainVerified: tenant.custom_domain_verified,
       customDomainSslStatus: sslStatus,
@@ -156,8 +157,9 @@ export async function PATCH(request: NextRequest) {
 
     // Check if domain contains reserved terms
     const lowerDomain = customDomain.toLowerCase();
-    if (lowerDomain.includes("1i1.ae") || lowerDomain.includes("1i1.com")) {
-      return NextResponse.json({ error: "Cannot use 1i1.ae or 1i1.com domains" }, { status: 400 });
+    const baseDomain = getBaseDomain();
+    if (lowerDomain.includes(baseDomain) || lowerDomain.includes("1i1.com")) {
+      return NextResponse.json({ error: `Cannot use ${baseDomain} or 1i1.com domains` }, { status: 400 });
     }
 
     // Check if domain is already used by another tenant

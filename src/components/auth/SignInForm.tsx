@@ -6,6 +6,7 @@ import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getTenantUrl } from "@/lib/url";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -47,8 +48,7 @@ export default function SignInForm() {
 
         if (tenant?.subdomain) {
           // Redirect to tenant's subdomain
-          const protocol = window.location.protocol;
-          window.location.href = `${protocol}//${tenant.subdomain}.1i1.ae/dashboard`;
+          window.location.href = getTenantUrl(tenant.subdomain, "/dashboard");
           return;
         }
       }

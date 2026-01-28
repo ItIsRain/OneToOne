@@ -1,8 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+
+function getCookieDomain(headerStore: Headers): string | undefined {
+  const host = (headerStore.get("host") || "").split(":")[0];
+  if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
+    return ".1i1.ae";
+  }
+  return undefined;
+}
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const headerStore = await headers();
+  const cookieDomain = getCookieDomain(headerStore);
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,7 +25,11 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                domain: cookieDomain ?? options?.domain,
+                path: "/",
+              })
             );
           } catch {
             // The `setAll` method was called from a Server Component.

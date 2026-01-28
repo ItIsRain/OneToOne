@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-
-// Main domains that should use normal routing (not tenant subdomain routing)
-const MAIN_DOMAINS = ["1i1.ae", "www.1i1.ae", "app.1i1.ae", "localhost"];
+import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl } from "@/lib/url";
 
 // Parse hostname and detect tenant context
 function parseHostname(hostname: string): {
@@ -12,31 +10,26 @@ function parseHostname(hostname: string): {
   subdomain: string | null;
   isCustomDomain: boolean;
 } {
-  // Remove port for local development
   const host = hostname.split(":")[0];
+  const mainDomains = getMainDomains();
 
   // Check if it's a main domain
-  if (MAIN_DOMAINS.includes(host)) {
+  if (mainDomains.includes(host)) {
     return { isMainDomain: true, subdomain: null, isCustomDomain: false };
   }
 
-  // Check if it's a subdomain of 1i1.ae
-  if (host.endsWith(".1i1.ae")) {
-    const subdomain = host.replace(".1i1.ae", "");
-    // Skip main subdomains (including portal which is the Cloudflare fallback origin)
-    if (["www", "app", "api", "portal"].includes(subdomain)) {
-      return { isMainDomain: true, subdomain: null, isCustomDomain: false };
-    }
+  // Check for subdomain (handles both production .1i1.ae and local .localhost)
+  const subdomain = extractSubdomain(hostname);
+  if (subdomain) {
     return { isMainDomain: false, subdomain, isCustomDomain: false };
   }
 
-  // Check for localhost subdomains (development)
-  if (host.endsWith(".localhost")) {
-    const subdomain = host.replace(".localhost", "");
-    return { isMainDomain: false, subdomain, isCustomDomain: false };
+  // If hostname wasn't recognized as main or subdomain, it's a custom domain
+  // (but skip localhost without subdomain)
+  if (host === "localhost" || host === "127.0.0.1") {
+    return { isMainDomain: true, subdomain: null, isCustomDomain: false };
   }
 
-  // Otherwise, it's a custom domain
   return { isMainDomain: false, subdomain: null, isCustomDomain: true };
 }
 
@@ -85,10 +78,8 @@ export async function middleware(request: NextRequest) {
 
     // If no tenant found for subdomain, redirect to invalid subdomain page
     if (!tenant) {
-      if (subdomain) {
-        return NextResponse.redirect(new URL("/invalid-subdomain", `https://1i1.ae`));
-      } else if (isCustomDomain) {
-        return NextResponse.redirect(new URL("/invalid-subdomain", `https://1i1.ae`));
+      if (subdomain || isCustomDomain) {
+        return NextResponse.redirect(new URL("/invalid-subdomain", getMainUrl()));
       }
     }
 
@@ -140,6 +131,9 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // Determine cookie domain for cross-subdomain auth
+  const cookieDomain = getCookieDomain(hostname);
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -158,7 +152,11 @@ export async function middleware(request: NextRequest) {
             },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, {
+              ...options,
+              domain: cookieDomain ?? options?.domain,
+              path: "/",
+            })
           );
         },
       },
