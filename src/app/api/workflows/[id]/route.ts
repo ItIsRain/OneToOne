@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function GET(
   request: NextRequest,
@@ -84,7 +85,77 @@ export async function PATCH(
     }
 
     if (steps && Array.isArray(steps)) {
-      const { error: deleteError } = await supabase
+      // Use service role client to bypass RLS for cascade deletion.
+      // The RLS policies don't include DELETE on step_executions/approvals/runs,
+      // so the user client silently fails to delete those records.
+      const adminClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      // Clean up all dependent records before deleting steps.
+      // FK chain: approvals → step_executions → steps, and step_executions → runs
+
+      const { data: runs } = await adminClient
+        .from("workflow_runs")
+        .select("id")
+        .eq("workflow_id", id);
+
+      if (runs && runs.length > 0) {
+        const runIds = runs.map((r: { id: string }) => r.id);
+
+        // Get all step execution IDs via run_id
+        const { data: allExecs } = await adminClient
+          .from("workflow_step_executions")
+          .select("id")
+          .in("run_id", runIds);
+
+        if (allExecs && allExecs.length > 0) {
+          const execIds = allExecs.map((e: { id: string }) => e.id);
+
+          // 1. Delete approvals referencing these executions
+          await adminClient
+            .from("workflow_approvals")
+            .delete()
+            .in("step_execution_id", execIds);
+
+          // 2. Delete step executions
+          await adminClient
+            .from("workflow_step_executions")
+            .delete()
+            .in("run_id", runIds);
+        }
+
+        // 3. Delete runs
+        await adminClient
+          .from("workflow_runs")
+          .delete()
+          .eq("workflow_id", id);
+      }
+
+      // 4. Also delete any orphaned step_executions by step_id (belt-and-suspenders)
+      const { data: existingSteps } = await adminClient
+        .from("workflow_steps")
+        .select("id")
+        .eq("workflow_id", id);
+
+      if (existingSteps && existingSteps.length > 0) {
+        const stepIds = existingSteps.map((s: { id: string }) => s.id);
+
+        const { data: orphanExecs } = await adminClient
+          .from("workflow_step_executions")
+          .select("id")
+          .in("step_id", stepIds);
+
+        if (orphanExecs && orphanExecs.length > 0) {
+          const orphanExecIds = orphanExecs.map((e: { id: string }) => e.id);
+          await adminClient.from("workflow_approvals").delete().in("step_execution_id", orphanExecIds);
+          await adminClient.from("workflow_step_executions").delete().in("step_id", stepIds);
+        }
+      }
+
+      // 5. Now safe to delete the steps
+      const { error: deleteError } = await adminClient
         .from("workflow_steps")
         .delete()
         .eq("workflow_id", id);
@@ -132,7 +203,74 @@ export async function DELETE(
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
-    const { error } = await supabase
+    // Verify ownership
+    const { data: existing } = await supabase
+      .from("workflows")
+      .select("id")
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+    }
+
+    // Use service role client to cascade-delete all dependent records
+    // FK chain: approvals → step_executions → steps, and step_executions → runs → workflow
+    const adminClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    // 1. Get all runs for this workflow
+    const { data: runs } = await adminClient
+      .from("workflow_runs")
+      .select("id")
+      .eq("workflow_id", id);
+
+    if (runs && runs.length > 0) {
+      const runIds = runs.map((r: { id: string }) => r.id);
+
+      // Get all step executions via run_id
+      const { data: allExecs } = await adminClient
+        .from("workflow_step_executions")
+        .select("id")
+        .in("run_id", runIds);
+
+      if (allExecs && allExecs.length > 0) {
+        const execIds = allExecs.map((e: { id: string }) => e.id);
+        await adminClient.from("workflow_approvals").delete().in("step_execution_id", execIds);
+        await adminClient.from("workflow_step_executions").delete().in("run_id", runIds);
+      }
+
+      await adminClient.from("workflow_runs").delete().eq("workflow_id", id);
+    }
+
+    // 2. Clean up steps (and any orphaned executions)
+    const { data: existingSteps } = await adminClient
+      .from("workflow_steps")
+      .select("id")
+      .eq("workflow_id", id);
+
+    if (existingSteps && existingSteps.length > 0) {
+      const stepIds = existingSteps.map((s: { id: string }) => s.id);
+
+      const { data: orphanExecs } = await adminClient
+        .from("workflow_step_executions")
+        .select("id")
+        .in("step_id", stepIds);
+
+      if (orphanExecs && orphanExecs.length > 0) {
+        const orphanExecIds = orphanExecs.map((e: { id: string }) => e.id);
+        await adminClient.from("workflow_approvals").delete().in("step_execution_id", orphanExecIds);
+        await adminClient.from("workflow_step_executions").delete().in("step_id", stepIds);
+      }
+
+      await adminClient.from("workflow_steps").delete().eq("workflow_id", id);
+    }
+
+    // 3. Now safe to delete the workflow itself
+    const { error } = await adminClient
       .from("workflows")
       .delete()
       .eq("id", id)

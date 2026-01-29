@@ -179,6 +179,271 @@ const TEMPLATES = [
       },
     ],
   },
+  {
+    name: "Lead Qualification Pipeline",
+    description: "Automatically assign, notify, and follow up when a new lead is captured.",
+    trigger_type: "lead_created",
+    category: "sales" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "send_notification",
+        config: {
+          title: "New Lead Captured",
+          message: "A new lead ({{lead_name}}) has been added from {{lead_source}}. Estimated value: {{lead_estimated_value}}.",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "create_task",
+        config: {
+          title: "Qualify Lead: {{lead_name}}",
+          description: "Review and qualify the new lead from {{lead_company}}. Check budget, timeline, and decision-making authority.",
+          priority: "high",
+          due_date_offset_days: 1,
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "send_email",
+        config: {
+          email_template: "custom",
+          recipient_type: "specific",
+          recipient_email: "{{lead_email}}",
+          subject: "Thanks for your interest!",
+          body: "Hi {{lead_name}}, thank you for reaching out. A member of our team will be in touch within 24 hours to discuss how we can help.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Payment Confirmation Flow",
+    description: "Send confirmation and update records when a payment is received.",
+    trigger_type: "payment_received",
+    category: "billing" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "send_notification",
+        config: {
+          title: "Payment Received",
+          message: "A payment of {{payment_amount}} has been received via {{payment_method}}.",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "send_email",
+        config: {
+          email_template: "invoice",
+          recipient_type: "entity_owner",
+          subject: "Payment Confirmation",
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "create_task",
+        config: {
+          title: "Send Payment Receipt",
+          description: "Generate and send official receipt for payment of {{payment_amount}}.",
+          priority: "medium",
+          due_date_offset_days: 1,
+        },
+      },
+    ],
+  },
+  {
+    name: "New Task Assignment",
+    description: "Notify the assignee and create follow-up reminders when a task is created.",
+    trigger_type: "task_created",
+    category: "productivity" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "send_notification",
+        config: {
+          title: "New Task Assigned",
+          message: "You have been assigned: {{task_title}} (Priority: {{task_priority}}).",
+          recipient_type: "entity_owner",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "send_email",
+        config: {
+          email_template: "custom",
+          recipient_type: "entity_owner",
+          subject: "New task: {{task_title}}",
+          body: "A new task has been assigned to you:\n\nTitle: {{task_title}}\nPriority: {{task_priority}}\n\nPlease review and start working on it.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Invoice Generation Workflow",
+    description: "Notify your team and email the client when a new invoice is created.",
+    trigger_type: "invoice_created",
+    category: "billing" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "send_notification",
+        config: {
+          title: "New Invoice Created",
+          message: "Invoice {{invoice_number}} for {{invoice_amount}} has been created.",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "approval",
+        config: {
+          instructions: "Review invoice {{invoice_number}} before sending to the client.",
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "send_email",
+        config: {
+          email_template: "invoice",
+          recipient_type: "entity_owner",
+          subject: "Invoice {{invoice_number}}",
+        },
+      },
+    ],
+  },
+  {
+    name: "Project Kickoff Automation",
+    description: "Create all kickoff tasks, assign team, and notify stakeholders when a project starts.",
+    trigger_type: "project_created",
+    category: "onboarding" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "create_task",
+        config: {
+          title: "Define Project Scope for {{project_name}}",
+          description: "Document project requirements, deliverables, and timeline.",
+          priority: "urgent",
+          due_date_offset_days: 2,
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "create_task",
+        config: {
+          title: "Create Project Plan",
+          description: "Break down {{project_name}} into phases and milestones.",
+          priority: "high",
+          due_date_offset_days: 5,
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "create_event",
+        config: {
+          title: "Kickoff Meeting: {{project_name}}",
+          description: "Kickoff meeting with the team and stakeholders.",
+          event_type: "meeting",
+          start_date_offset_days: 3,
+        },
+      },
+      {
+        step_order: 4,
+        step_type: "send_email",
+        config: {
+          email_template: "custom",
+          recipient_type: "trigger_user",
+          subject: "Project {{project_name}} has been created",
+          body: "Your new project {{project_name}} is set up and ready. A kickoff meeting has been scheduled and initial tasks have been created.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Event Registration Welcome",
+    description:
+      "Create a contact, notify your team, and welcome new attendees when someone registers for an event.",
+    trigger_type: "event_registration",
+    category: "registration" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "create_contact",
+        config: {
+          first_name: "{{attendee_name}}",
+          last_name: "",
+          email: "{{attendee_email}}",
+          phone: "{{attendee_phone}}",
+          company: "{{attendee_company}}",
+          job_title: "",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "send_notification",
+        config: {
+          title: "New Event Registration",
+          message:
+            "{{attendee_name}} ({{attendee_email}}) has registered for {{event_title}}.",
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "send_email",
+        config: {
+          email_template: "custom",
+          recipient_type: "specific",
+          recipient_email: "{{attendee_email}}",
+          subject: "Welcome to {{event_title}}!",
+          body: "Hi {{attendee_name}},\n\nThank you for registering for {{event_title}}! We're excited to have you join us.\n\nWe'll send you more details as the event approaches.",
+        },
+      },
+      {
+        step_order: 4,
+        step_type: "create_task",
+        config: {
+          title: "Follow up with {{attendee_name}}",
+          description:
+            "Send event details and preparation materials to {{attendee_email}} for {{event_title}}.",
+          priority: "medium",
+          due_date_offset_days: 1,
+        },
+      },
+    ],
+  },
+  {
+    name: "Task Completion Celebration",
+    description: "Notify the team and update records when a task is marked complete.",
+    trigger_type: "task_status_changed",
+    category: "productivity" as const,
+    steps: [
+      {
+        step_order: 1,
+        step_type: "condition",
+        config: {
+          condition_field: "to_status",
+          condition_operator: "equals",
+          condition_value: "completed",
+        },
+      },
+      {
+        step_order: 2,
+        step_type: "send_notification",
+        config: {
+          title: "Task Completed!",
+          message: "{{entity_name}} has been marked as completed. Great work!",
+          recipient_type: "trigger_user",
+        },
+      },
+      {
+        step_order: 3,
+        step_type: "add_tag",
+        config: {
+          entity_type: "task",
+          tag: "completed-automated",
+        },
+      },
+    ],
+  },
 ];
 
 const TRIGGER_BADGE_COLORS: Record<string, string> = {
@@ -190,6 +455,18 @@ const TRIGGER_BADGE_COLORS: Record<string, string> = {
     "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   invoice_overdue:
     "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  lead_created:
+    "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  payment_received:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  task_created:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  invoice_created:
+    "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  project_created:
+    "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
+  event_registration:
+    "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
 };
 
 const CATEGORY_BADGE_COLORS: Record<string, string> = {
@@ -201,6 +478,12 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
     "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   billing:
     "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  sales:
+    "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  productivity:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300",
+  registration:
+    "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
 };
 
 function formatTriggerType(trigger: string): string {

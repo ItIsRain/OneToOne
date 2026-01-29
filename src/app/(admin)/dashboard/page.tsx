@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback, Suspense } from "react";
+import React, { useState, useCallback, useEffect, Suspense } from "react";
 import {
   DashboardMetrics,
   DashboardActivity,
@@ -20,6 +20,9 @@ import {
   AnnouncementDetailsSidebar,
   GoalDetailsSidebar,
 } from "@/components/agency/sidebars";
+import { DashboardCustomizePanel, type DashboardSettings } from "@/components/agency/dashboard/DashboardCustomizePanel";
+import { widgetRegistry } from "@/lib/dashboard/widgetRegistry";
+import { DashboardBanner } from "@/components/agency/BannerDisplay";
 
 interface Bookmark {
   id: string;
@@ -33,7 +36,28 @@ interface Bookmark {
   notes: string | null;
 }
 
+const defaultSettings: DashboardSettings = {
+  show_greeting: true,
+  show_metrics: true,
+  show_quick_actions: true,
+  show_onboarding: true,
+  show_activity: true,
+  show_upcoming: true,
+  show_announcements: true,
+  show_goals: true,
+  show_bookmarks: true,
+  widget_order: ["greeting", "metrics", "quick_actions", "onboarding", "activity", "upcoming", "announcements", "goals", "bookmarks"],
+  accent_color: null,
+  banner_image_url: null,
+  banner_message: null,
+};
+
 export default function Dashboard() {
+  // Dashboard settings
+  const [dashSettings, setDashSettings] = useState<DashboardSettings>(defaultSettings);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
   // Announcement state
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
@@ -51,6 +75,38 @@ export default function Dashboard() {
 
   // Refresh key for components
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Fetch dashboard settings
+  useEffect(() => {
+    fetch("/api/settings/dashboard")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.settings) {
+          setDashSettings(data.settings);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveSettings = useCallback(async (newSettings: DashboardSettings) => {
+    setSavingSettings(true);
+    try {
+      const res = await fetch("/api/settings/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSettings),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDashSettings(data.settings);
+        setCustomizeOpen(false);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setSavingSettings(false);
+    }
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -122,48 +178,148 @@ export default function Dashboard() {
     handleRefresh();
   }, [handleRefresh]);
 
+  // Determine visibility
+  const isVisible = (key: string) => {
+    const visMap: Record<string, boolean> = {
+      greeting: dashSettings.show_greeting,
+      metrics: dashSettings.show_metrics,
+      quick_actions: dashSettings.show_quick_actions,
+      onboarding: dashSettings.show_onboarding,
+      activity: dashSettings.show_activity,
+      upcoming: dashSettings.show_upcoming,
+      announcements: dashSettings.show_announcements,
+      goals: dashSettings.show_goals,
+      bookmarks: dashSettings.show_bookmarks,
+    };
+    return visMap[key] !== false;
+  };
+
+  // Render a widget by key
+  const renderWidget = (key: string) => {
+    if (!isVisible(key)) return null;
+    switch (key) {
+      case "greeting":
+        return <DashboardGreeting key="greeting" />;
+      case "metrics":
+        return <DashboardMetrics key={`metrics-${refreshKey}`} />;
+      case "quick_actions":
+        return <DashboardQuickActions key="quick_actions" />;
+      case "onboarding":
+        return <DashboardOnboarding key="onboarding" />;
+      default:
+        return null;
+    }
+  };
+
+  // Separate widgets by column for grid rendering
+  const fullWidgets = dashSettings.widget_order.filter((k) => {
+    const w = widgetRegistry.find((r) => r.key === k);
+    return w?.column === "full" && isVisible(k);
+  });
+
+  const leftWidgets = dashSettings.widget_order.filter((k) => {
+    const w = widgetRegistry.find((r) => r.key === k);
+    return w?.column === "left" && isVisible(k);
+  });
+
+  const rightWidgets = dashSettings.widget_order.filter((k) => {
+    const w = widgetRegistry.find((r) => r.key === k);
+    return w?.column === "right" && isVisible(k);
+  });
+
+  const renderLeftWidget = (key: string) => {
+    switch (key) {
+      case "activity":
+        return <DashboardActivity key={`activity-${refreshKey}`} />;
+      case "upcoming":
+        return <DashboardUpcoming key={`upcoming-${refreshKey}`} />;
+      default:
+        return null;
+    }
+  };
+
+  const renderRightWidget = (key: string) => {
+    switch (key) {
+      case "announcements":
+        return (
+          <DashboardAnnouncements
+            key={`announcements-${refreshKey}`}
+            onAdd={handleAddAnnouncement}
+            onView={handleViewAnnouncement}
+          />
+        );
+      case "goals":
+        return (
+          <DashboardGoals
+            key={`goals-${refreshKey}`}
+            onAdd={handleAddGoal}
+            onView={handleViewGoal}
+          />
+        );
+      case "bookmarks":
+        return (
+          <DashboardBookmarks
+            key={`bookmarks-${refreshKey}`}
+            onAdd={handleAddBookmark}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
-        {/* Personalized Greeting */}
-        <DashboardGreeting />
+        {/* Customize Button */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => setCustomizeOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Customize
+          </button>
+        </div>
 
-        {/* Metrics Row */}
-        <DashboardMetrics key={`metrics-${refreshKey}`} />
+        {/* Banner */}
+        {dashSettings.banner_message && (
+          <DashboardBanner
+            message={dashSettings.banner_message}
+            imageUrl={dashSettings.banner_image_url}
+          />
+        )}
 
-        {/* Quick Actions */}
-        <DashboardQuickActions />
-
-        {/* Onboarding Checklist */}
-        <DashboardOnboarding />
+        {/* Full-width widgets */}
+        {fullWidgets.map((key) => renderWidget(key))}
 
         {/* Main Grid */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Column - Activity & Upcoming */}
-          <div className="col-span-12 xl:col-span-8 space-y-6">
-            <DashboardActivity key={`activity-${refreshKey}`} />
-            <DashboardUpcoming key={`upcoming-${refreshKey}`} />
-          </div>
+        {(leftWidgets.length > 0 || rightWidgets.length > 0) && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left Column */}
+            <div className="col-span-12 xl:col-span-8 space-y-6">
+              {leftWidgets.map((key) => renderLeftWidget(key))}
+            </div>
 
-          {/* Right Column - Announcements, Goals, Bookmarks */}
-          <div className="col-span-12 xl:col-span-4 space-y-6">
-            <DashboardAnnouncements
-              key={`announcements-${refreshKey}`}
-              onAdd={handleAddAnnouncement}
-              onView={handleViewAnnouncement}
-            />
-            <DashboardGoals
-              key={`goals-${refreshKey}`}
-              onAdd={handleAddGoal}
-              onView={handleViewGoal}
-            />
-            <DashboardBookmarks
-              key={`bookmarks-${refreshKey}`}
-              onAdd={handleAddBookmark}
-            />
+            {/* Right Column */}
+            <div className="col-span-12 xl:col-span-4 space-y-6">
+              {rightWidgets.map((key) => renderRightWidget(key))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+      {/* Customize Panel */}
+      <DashboardCustomizePanel
+        isOpen={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        settings={dashSettings}
+        onSave={handleSaveSettings}
+        saving={savingSettings}
+      />
 
       {/* Announcement Modal */}
       <AddAnnouncementModal

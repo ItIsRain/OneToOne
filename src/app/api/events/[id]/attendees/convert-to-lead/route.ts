@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 // POST - Convert attendee to CRM lead
 export async function POST(
@@ -81,6 +83,33 @@ export async function POST(
     if (leadError) {
       console.error("Error creating lead:", leadError);
       return NextResponse.json({ error: "Failed to create lead" }, { status: 500 });
+    }
+
+    // Fire lead_created workflow trigger
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers(
+          "lead_created",
+          {
+            entity_id: lead.id,
+            entity_type: "lead",
+            entity_name: lead.name,
+            lead_name: lead.name,
+            lead_email: lead.email || null,
+            lead_company: lead.company || null,
+            lead_source: lead.source || "event",
+            lead_estimated_value: lead.estimated_value || null,
+          },
+          serviceClient,
+          event?.tenant_id,
+          user.id
+        );
+      } catch (err) {
+        console.error("Workflow trigger error:", err);
+      }
     }
 
     return NextResponse.json({

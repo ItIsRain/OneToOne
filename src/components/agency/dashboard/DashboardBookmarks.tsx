@@ -82,11 +82,9 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
   const fetchBookmarks = useCallback(async () => {
     try {
       const res = await fetch("/api/bookmarks");
+      if (!res.ok) return;
       const data = await res.json();
-
-      if (res.ok) {
-        setBookmarks(data.bookmarks || []);
-      }
+      setBookmarks(data.bookmarks || []);
     } catch (err) {
       console.error("Failed to fetch bookmarks:", err);
     } finally {
@@ -122,7 +120,7 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-4">
           <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
           <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -139,7 +137,7 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           Quick Access

@@ -235,11 +235,44 @@ export default function SubscribePage() {
       }
 
       if (data.requires_payment) {
-        setError(data.message);
+        // Redirect to Stripe checkout for paid plans
+        try {
+          const checkoutRes = await fetch("/api/stripe/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              planType: selectedPlan,
+              billingInterval: billingInterval,
+              discountCode: discountCode || undefined,
+            }),
+          });
+
+          const checkoutData = await checkoutRes.json();
+
+          if (!checkoutRes.ok) {
+            setError(checkoutData.error || "Failed to start checkout");
+            return;
+          }
+
+          if (checkoutData.freeUpgrade) {
+            // 100% discount applied via Stripe route
+            window.location.href = getRedirectUrl("/dashboard?subscribed=true");
+            return;
+          }
+
+          if (checkoutData.checkoutUrl) {
+            window.location.href = checkoutData.checkoutUrl;
+            return;
+          }
+
+          setError("Failed to create checkout session");
+        } catch {
+          setError("Failed to start checkout process");
+        }
         return;
       }
 
-      // Success - redirect to dashboard on tenant subdomain
+      // Success (free plan or 100% discount) - redirect to dashboard
       window.location.href = getRedirectUrl("/dashboard?subscribed=true");
     } catch (err) {
       setError("Failed to process subscription");

@@ -100,7 +100,8 @@ const navItems: NavItem[] = [
     name: "Automation",
     subItems: [
       { name: "Workflows", path: "/dashboard/automation/workflows" },
-      { name: "Approvals", path: "/dashboard/automation/approvals", new: true },
+      { name: "Integrations", path: "/dashboard/automation/integrations", new: true },
+      { name: "Approvals", path: "/dashboard/automation/approvals" },
       { name: "Run History", path: "/dashboard/automation/runs" },
     ],
   },
@@ -140,6 +141,8 @@ const settingsItems: NavItem[] = [
       { name: "Domains", path: "/dashboard/settings/domains", new: true },
       { name: "Email Provider", path: "/dashboard/settings/email", pro: true },
       { name: "Billing", path: "/dashboard/settings/billing" },
+      { name: "Portal", path: "/dashboard/settings/portal", new: true },
+      { name: "Dashboard", path: "/dashboard/settings/dashboard" },
       { name: "API Keys", path: "/dashboard/settings/api" },
       { name: "API Docs", path: "/dashboard/settings/docs" },
     ],

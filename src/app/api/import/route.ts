@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 import {
   EntityType,
   ImportRequest,
@@ -243,9 +245,11 @@ export async function POST(request: Request) {
       }
 
       // Insert new record
-      const { error: insertError } = await supabase
+      const { data: insertedRecord, error: insertError } = await supabase
         .from(tableName)
-        .insert(recordData);
+        .insert(recordData)
+        .select()
+        .single();
 
       if (insertError) {
         result.failed++;
@@ -257,6 +261,41 @@ export async function POST(request: Request) {
         });
       } else {
         result.imported++;
+
+        // Fire workflow triggers for clients and leads
+        if (insertedRecord && (entityType === "clients" || entityType === "leads")) {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseServiceKey) {
+            const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+            try {
+              if (entityType === "clients") {
+                await checkTriggers("client_created", {
+                  entity_id: insertedRecord.id,
+                  entity_type: "client",
+                  entity_name: insertedRecord.name,
+                  client_name: insertedRecord.name,
+                  client_email: insertedRecord.email || null,
+                  client_phone: insertedRecord.phone || null,
+                  client_company: insertedRecord.company || null,
+                }, serviceClient, profile.tenant_id, user.id);
+              } else if (entityType === "leads") {
+                await checkTriggers("lead_created", {
+                  entity_id: insertedRecord.id,
+                  entity_type: "lead",
+                  entity_name: insertedRecord.name,
+                  lead_name: insertedRecord.name,
+                  lead_email: insertedRecord.email || null,
+                  lead_company: insertedRecord.company || null,
+                  lead_source: insertedRecord.source || null,
+                  lead_estimated_value: insertedRecord.estimated_value || null,
+                }, serviceClient, profile.tenant_id, user.id);
+              }
+            } catch (err) {
+              console.error(`Workflow trigger error (${entityType} import):`, err);
+            }
+          }
+        }
       }
     }
 

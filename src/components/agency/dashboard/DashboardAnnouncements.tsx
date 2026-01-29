@@ -52,12 +52,16 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
   const fetchAnnouncements = useCallback(async () => {
     try {
       const res = await fetch("/api/announcements?limit=5");
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch announcements");
+        if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
+          throw new Error("Session expired. Please refresh the page.");
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error || "Failed to fetch announcements");
       }
 
+      const data = await res.json();
       setAnnouncements(data.announcements || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load announcements");
@@ -83,7 +87,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-6">
           <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
           <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -101,7 +105,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           Announcements

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserPlanInfo, checkEventLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
@@ -251,7 +252,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Trigger workflow automations for event_created
-    checkTriggers("event_created", { entity_id: event.id, entity_type: "event", event_name: event.name || event.title }, supabase, profile.tenant_id, user.id).catch(() => {});
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers("event_created", {
+          entity_id: event.id,
+          entity_type: "event",
+          entity_name: event.title || event.name,
+          event_title: event.title,
+          event_date: event.start_date,
+          event_type: event.event_type,
+          event_client_id: event.client_id,
+        }, serviceClient, profile.tenant_id, user.id);
+      } catch (err) {
+        console.error("Workflow trigger error:", err);
+      }
+    }
 
     return NextResponse.json({ ...event, assignee, creator }, { status: 201 });
   } catch (error) {

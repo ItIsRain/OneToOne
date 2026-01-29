@@ -40,6 +40,7 @@ export { default as EmailSettingsForm } from "./EmailSettingsForm";
 // Automation
 export { WorkflowsTable } from "./WorkflowsTable";
 export { WorkflowTemplates } from "./WorkflowTemplates";
+export { IntegrationsSettings } from "./IntegrationsSettings";
 
 // Sidebars
 export * from "./sidebars";

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -200,6 +202,27 @@ export async function POST(request: Request) {
     if (error) {
       console.error("Insert error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Trigger workflow automations for lead_created
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers("lead_created", {
+          entity_id: lead.id,
+          entity_type: "lead",
+          entity_name: lead.name,
+          lead_name: lead.name,
+          lead_email: lead.email,
+          lead_company: lead.company,
+          lead_source: lead.source,
+          lead_estimated_value: lead.estimated_value,
+        }, serviceClient, profile.tenant_id, user.id);
+      } catch (err) {
+        console.error("Workflow trigger error (lead_created):", err);
+      }
     }
 
     return NextResponse.json({ lead }, { status: 201 });

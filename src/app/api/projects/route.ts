@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
 
@@ -99,7 +100,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Trigger workflow automations for project_created
-    checkTriggers("project_created", { entity_id: project.id, entity_type: "project", project_name: project.name }, supabase, profile.tenant_id, user.id).catch(() => {});
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers("project_created", {
+          entity_id: project.id,
+          entity_type: "project",
+          entity_name: project.name,
+          project_name: project.name,
+          project_status: project.status,
+          project_client_id: project.client_id,
+        }, serviceClient, profile.tenant_id, user.id);
+      } catch (err) {
+        console.error("Workflow trigger error:", err);
+      }
+    }
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {

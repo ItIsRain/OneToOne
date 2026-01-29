@@ -38,11 +38,16 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
   const fetchMetrics = useCallback(async () => {
     try {
       const res = await fetch("/api/dashboard/stats");
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch metrics");
+        if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
+          throw new Error("Session expired. Please refresh the page.");
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error || "Failed to fetch metrics");
       }
+
+      const data = await res.json();
 
       setMetrics(data.metrics);
       if (onDataLoaded) {
@@ -106,9 +111,9 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
       {/* Active Clients */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <GroupIcon className="text-gray-800 size-6 dark:text-white/90" />
+      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-brand-500 bg-white p-5 dark:border-gray-800 dark:border-l-brand-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600">
+          <GroupIcon className="text-white size-6" />
         </div>
         <div className="flex items-end justify-between mt-5">
           <div>
@@ -127,9 +132,9 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
       </div>
 
       {/* Upcoming Events */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <CalenderIcon className="text-gray-800 size-6 dark:text-white/90" />
+      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-warning-500 bg-white p-5 dark:border-gray-800 dark:border-l-warning-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-warning-400 to-warning-600">
+          <CalenderIcon className="text-white size-6" />
         </div>
         <div className="flex items-end justify-between mt-5">
           <div>
@@ -148,9 +153,9 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
       </div>
 
       {/* Monthly Revenue */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <DollarLineIcon className="text-gray-800 size-6 dark:text-white/90" />
+      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-success-500 bg-white p-5 dark:border-gray-800 dark:border-l-success-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-600">
+          <DollarLineIcon className="text-white size-6" />
         </div>
         <div className="flex items-end justify-between mt-5">
           <div>
@@ -169,9 +174,9 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
       </div>
 
       {/* Pending Tasks */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <TaskIcon className="text-gray-800 size-6 dark:text-white/90" />
+      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-blue-500 bg-white p-5 dark:border-gray-800 dark:border-l-blue-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600">
+          <TaskIcon className="text-white size-6" />
         </div>
         <div className="flex items-end justify-between mt-5">
           <div>

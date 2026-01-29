@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
 
@@ -139,7 +140,25 @@ export async function PATCH(
 
     // Trigger workflow automations for task_status_changed
     if (body.status && oldTask && body.status !== oldTask.status && oldTask.tenant_id) {
-      checkTriggers("task_status_changed", { entity_id: id, entity_type: "task", from_status: oldTask.status, to_status: body.status }, supabase, oldTask.tenant_id, user.id).catch(() => {});
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey) {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        try {
+          await checkTriggers("task_status_changed", {
+            entity_id: id,
+            entity_type: "task",
+            entity_name: task.title,
+            task_title: task.title,
+            from_status: oldTask.status,
+            to_status: body.status,
+            task_assignee_id: task.assigned_to,
+            task_project_id: task.project_id,
+          }, serviceClient, oldTask.tenant_id, user.id);
+        } catch (err) {
+          console.error("Workflow trigger error:", err);
+        }
+      }
     }
 
     return NextResponse.json({ ...task, assignee, creator });

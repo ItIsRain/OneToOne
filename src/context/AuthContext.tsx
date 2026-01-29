@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 
@@ -43,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data: profileData } = await supabase
@@ -54,7 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProfile(profileData);
     return profileData;
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Get initial session
@@ -89,7 +91,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, fetchProfile]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Handle session-only mode ("Keep me logged in" unchecked).
+  //
+  // sessionStorage is automatically cleared by the browser when the tab or
+  // window is closed. So instead of trying to detect close via unreliable
+  // browser events (beforeunload / pagehide / visibilitychange — all of which
+  // also fire during normal navigation and break the session), we simply check
+  // on page load: if the user previously opted out of persistence but
+  // sessionStorage is now empty (browser was closed & reopened), sign out.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // When session_only is set, it means the user is in a "don't persist" session.
+    // sessionStorage survives navigations within the same tab but is cleared on
+    // browser/tab close. So if we have a Supabase session but NO sessionStorage
+    // flag, AND localStorage says the last login was session-only, sign out.
+    const wasSessionOnly = localStorage.getItem("last_login_session_only");
+    const stillActive = sessionStorage.getItem("session_only");
+
+    if (wasSessionOnly === "true" && !stillActive) {
+      // Browser was closed and reopened — sign out
+      localStorage.removeItem("last_login_session_only");
+      supabase.auth.signOut().then(() => {
+        window.location.href = "/signin";
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();

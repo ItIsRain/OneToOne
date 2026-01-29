@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.ATTENDEE_JWT_SECRET || "attendee-portal-secret-key-change-in-production"
@@ -40,7 +42,7 @@ export async function POST(
     // Get event by slug
     const { data: event, error: eventError } = await supabase
       .from("events")
-      .select("id, title, is_public, is_published, requirements")
+      .select("id, title, is_public, is_published, requirements, tenant_id, event_type")
       .eq("slug", slug)
       .single();
 
@@ -110,6 +112,49 @@ export async function POST(
         }
       } catch {
         // Ignore errors - this is a non-critical operation
+      }
+
+      // Trigger event_registration workflows
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey && event.tenant_id) {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+
+        // Look up a tenant admin for userId (public registrations have no auth user)
+        let workflowUserId = attendee.id;
+        const { data: tenantAdmin } = await serviceClient
+          .from("profiles")
+          .select("id")
+          .eq("tenant_id", event.tenant_id)
+          .limit(1)
+          .single();
+        if (tenantAdmin) {
+          workflowUserId = tenantAdmin.id;
+        }
+
+        try {
+          await checkTriggers(
+            "event_registration",
+            {
+              entity_id: attendee.id,
+              entity_type: "event_attendee",
+              entity_name: attendee.name,
+              attendee_id: attendee.id,
+              attendee_name: attendee.name,
+              attendee_email: attendee.email,
+              attendee_phone: phone || null,
+              attendee_company: company || null,
+              event_id: event.id,
+              event_title: event.title,
+              event_type: event.event_type || null,
+            },
+            serviceClient,
+            event.tenant_id,
+            workflowUserId
+          );
+        } catch (err) {
+          console.error("Workflow trigger error:", err);
+        }
       }
 
       // Create token

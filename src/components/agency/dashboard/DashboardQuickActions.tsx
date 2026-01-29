@@ -49,7 +49,7 @@ const quickActions: QuickAction[] = [
 
 export const DashboardQuickActions: React.FC = () => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
       <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
         Quick Actions
       </h3>
@@ -59,7 +59,7 @@ export const DashboardQuickActions: React.FC = () => {
           <Link
             key={action.title}
             href={action.href}
-            className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+            className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 transition-all hover:scale-[1.02] hover:bg-gray-100 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
           >
             <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${action.bgColor}`}>
               <span className={action.color}>{action.icon}</span>

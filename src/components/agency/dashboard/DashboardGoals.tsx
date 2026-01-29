@@ -40,12 +40,16 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
   const fetchGoals = useCallback(async () => {
     try {
       const res = await fetch("/api/goals?status=active");
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch goals");
+        if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
+          throw new Error("Session expired. Please refresh the page.");
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error || "Failed to fetch goals");
       }
 
+      const data = await res.json();
       setGoals(data.goals || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load goals");
@@ -90,7 +94,7 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-6">
           <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
           <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
@@ -108,7 +112,7 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           Goals & KPIs

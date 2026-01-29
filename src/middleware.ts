@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl } from "@/lib/url";
+import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl, isLocalDev } from "@/lib/url";
 
 // Parse hostname and detect tenant context
 function parseHostname(hostname: string): {
@@ -95,33 +95,7 @@ export async function middleware(request: NextRequest) {
         requestHeaders.set("x-tenant-color", tenant.primary_color);
       }
 
-      // For tenant subdomains, redirect root path to signin or dashboard
-      if (pathname === "/") {
-        // Check if user is authenticated
-        const supabaseAuth = createServerClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          {
-            cookies: {
-              getAll() {
-                return request.cookies.getAll();
-              },
-              setAll() {
-                // No-op for this check
-              },
-            },
-          }
-        );
-        const { data: { user } } = await supabaseAuth.auth.getUser();
-
-        if (user) {
-          // Authenticated - redirect to dashboard
-          return NextResponse.redirect(new URL("/dashboard", request.url));
-        } else {
-          // Not authenticated - redirect to signin
-          return NextResponse.redirect(new URL("/signin", request.url));
-        }
-      }
+      // Portal pages (/, /events) are public on tenant subdomains — no redirect
     }
   }
 
@@ -165,20 +139,63 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Local dev: auto-detect tenant from authenticated user so localhost:3000/ shows the portal
+  if (isMainDomain && isLocalDev() && user && !requestHeaders.has("x-tenant-id") && isSupabaseConfigured) {
+    try {
+      const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
+      const { data: profile } = await serviceClient
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.tenant_id) {
+        const { data: tenant } = await serviceClient
+          .from("tenants")
+          .select("id, subdomain, name, logo_url, primary_color")
+          .eq("id", profile.tenant_id)
+          .single();
+
+        if (tenant) {
+          requestHeaders.set("x-tenant-id", tenant.id);
+          requestHeaders.set("x-tenant-subdomain", tenant.subdomain || "");
+          requestHeaders.set("x-tenant-name", tenant.name || "");
+          if (tenant.logo_url) requestHeaders.set("x-tenant-logo", tenant.logo_url);
+          if (tenant.primary_color) requestHeaders.set("x-tenant-color", tenant.primary_color);
+
+          // Preserve existing cookies (including refreshed auth tokens) before
+          // replacing the response object with one that has updated headers.
+          const existingCookies = response.cookies.getAll();
+          response = NextResponse.next({
+            request: { headers: requestHeaders },
+          });
+          existingCookies.forEach((c) => response.cookies.set(c.name, c.value));
+        }
+      }
+    } catch (e) {
+      console.error("Local dev tenant auto-detect error:", e);
+    }
+  }
+
   // Public routes that don't require authentication
   const publicRoutes = [
     "/",
     "/signin",
     "/signup",
     "/subscribe",
+    "/reset-password",
+    "/update-password",
     "/error-404",
     "/invalid-subdomain",
     "/unverified-domain",
     "/api/auth",
     "/api/stripe/webhook",
+    "/api/cron",
+    "/events",
     "/event",
     "/judge",
     "/share",
+    "/api/portal",
   ];
 
   // Check if current path is public
@@ -203,6 +220,13 @@ export async function middleware(request: NextRequest) {
 
   // Redirect to signin if not authenticated
   if (!user) {
+    // For API routes, return JSON instead of HTML redirect
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "Unauthorized", redirect: "/signin" },
+        { status: 401 }
+      );
+    }
     const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(signinUrl);

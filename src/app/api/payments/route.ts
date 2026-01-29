@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -155,6 +157,26 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", body.invoice_id);
+      }
+    }
+
+    // Trigger workflow automations for payment_received
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers("payment_received", {
+          entity_id: payment.id,
+          entity_type: "payment",
+          entity_name: `Payment ${payment.amount} ${payment.currency}`,
+          payment_amount: payment.amount,
+          payment_method: payment.payment_method,
+          payment_invoice_id: payment.invoice_id,
+          payment_client_id: payment.client_id,
+        }, serviceClient, profile.tenant_id, user.id);
+      } catch (err) {
+        console.error("Workflow trigger error (payment_received):", err);
       }
     }
 

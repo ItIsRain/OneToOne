@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
@@ -174,9 +175,24 @@ export async function POST(request: Request) {
     }
 
     // Trigger workflow automations for client_created
-    checkTriggers("client_created", { entity_id: client.id, entity_type: "client", client_name: client.name }, supabase, profile.tenant_id, user.id).catch((err) => {
-      console.error("Workflow trigger error (client_created):", err);
-    });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+      try {
+        await checkTriggers("client_created", {
+          entity_id: client.id,
+          entity_type: "client",
+          entity_name: client.name,
+          client_name: client.name,
+          client_email: client.email,
+          client_phone: client.phone,
+          client_company: client.company,
+        }, serviceClient, profile.tenant_id, user.id);
+      } catch (err) {
+        console.error("Workflow trigger error (client_created):", err);
+      }
+    }
 
     return NextResponse.json({ client }, { status: 201 });
   } catch (error) {

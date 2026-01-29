@@ -4,11 +4,14 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getTenantUrl } from "@/lib/url";
 
 export default function SignInForm() {
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect");
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [email, setEmail] = useState("");
@@ -32,12 +35,30 @@ export default function SignInForm() {
         throw new Error(signInError.message);
       }
 
+      // Store session persistence preference
+      if (!isChecked) {
+        // User does NOT want to stay logged in — mark for session-only.
+        // sessionStorage is cleared when the browser/tab closes. On next
+        // open, AuthContext detects the missing flag and signs out.
+        sessionStorage.setItem("session_only", "true");
+        localStorage.setItem("last_login_session_only", "true");
+      } else {
+        sessionStorage.removeItem("session_only");
+        localStorage.removeItem("last_login_session_only");
+      }
+
       // Get user's tenant subdomain for redirect
       const { data: profile } = await supabase
         .from("profiles")
         .select("tenant_id")
         .eq("id", authData.user.id)
         .single();
+
+      // Determine where to redirect
+      // Only allow relative paths to prevent open redirect attacks
+      const safeRedirect = redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")
+        ? redirectPath
+        : "/dashboard";
 
       if (profile?.tenant_id) {
         const { data: tenant } = await supabase
@@ -47,14 +68,13 @@ export default function SignInForm() {
           .single();
 
         if (tenant?.subdomain) {
-          // Redirect to tenant's subdomain
-          window.location.href = getTenantUrl(tenant.subdomain, "/dashboard");
+          window.location.href = getTenantUrl(tenant.subdomain, safeRedirect);
           return;
         }
       }
 
-      // Fallback: redirect to dashboard on current domain
-      window.location.href = "/dashboard";
+      // Fallback: redirect on current domain
+      window.location.href = safeRedirect;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

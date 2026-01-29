@@ -43,12 +43,16 @@ export const DashboardActivity: React.FC = () => {
   const fetchActivities = useCallback(async () => {
     try {
       const res = await fetch("/api/dashboard/activity?limit=10");
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch activities");
+        if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
+          throw new Error("Session expired. Please refresh the page.");
+        }
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as Record<string, string>).error || "Failed to fetch activities");
       }
 
+      const data = await res.json();
       setActivities(data.activities || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load activities");
@@ -127,7 +131,7 @@ export const DashboardActivity: React.FC = () => {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
           Recent Activity

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getUserPlanInfo, checkAttendeeLimit } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 // GET - List all attendees for an event (admin only)
 export async function GET(
@@ -228,6 +230,44 @@ export async function POST(
 
     // Update event attendee count
     await supabase.rpc("increment_attendee_count", { event_id: eventId });
+
+    // Fetch event details for workflow trigger
+    const { data: eventData } = await supabase
+      .from("events")
+      .select("id, title, event_type, tenant_id")
+      .eq("id", eventId)
+      .single();
+
+    if (eventData) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey) {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        try {
+          await checkTriggers(
+            "event_registration",
+            {
+              entity_id: attendee.id,
+              entity_type: "event_attendee",
+              entity_name: attendee.name,
+              attendee_id: attendee.id,
+              attendee_name: attendee.name,
+              attendee_email: attendee.email,
+              attendee_phone: phone || null,
+              attendee_company: company || null,
+              event_id: eventData.id,
+              event_title: eventData.title,
+              event_type: eventData.event_type || null,
+            },
+            serviceClient,
+            eventData.tenant_id,
+            user.id
+          );
+        } catch (err) {
+          console.error("Workflow trigger error:", err);
+        }
+      }
+    }
 
     return NextResponse.json({ attendee }, { status: 201 });
   } catch (error) {

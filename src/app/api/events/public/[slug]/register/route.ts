@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantSubscription, checkAttendeeLimit } from "@/lib/plan-limits";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 export async function POST(
   request: NextRequest,
@@ -23,7 +25,7 @@ export async function POST(
     // Get event by slug
     const { data: event, error: eventError } = await supabase
       .from("events")
-      .select("id, title, is_public, is_published, registration_required, max_attendees, attendees_count, tenant_id")
+      .select("id, title, is_public, is_published, registration_required, max_attendees, attendees_count, tenant_id, event_type")
       .eq("slug", slug)
       .single();
 
@@ -106,6 +108,52 @@ export async function POST(
       .from("events")
       .update({ attendees_count: (event.attendees_count || 0) + 1 })
       .eq("id", event.id);
+
+    // Trigger event_registration workflows using a standalone service client
+    // so the workflow execution survives after the response is sent
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && supabaseServiceKey) {
+      const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+
+      // Look up a tenant admin/owner to use as userId for the workflow run
+      // (public registrations have no authenticated user)
+      let workflowUserId = registration.id;
+      const { data: tenantAdmin } = await serviceClient
+        .from("profiles")
+        .select("id")
+        .eq("tenant_id", event.tenant_id)
+        .limit(1)
+        .single();
+      if (tenantAdmin) {
+        workflowUserId = tenantAdmin.id;
+      }
+
+      // MUST await — fire-and-forget will be killed when Next.js ends the request
+      try {
+        await checkTriggers(
+          "event_registration",
+          {
+            entity_id: registration.id,
+            entity_type: "event_attendee",
+            entity_name: registration.name,
+            attendee_id: registration.id,
+            attendee_name: registration.name,
+            attendee_email: registration.email,
+            attendee_phone: phone?.trim() || null,
+            attendee_company: company?.trim() || null,
+            event_id: event.id,
+            event_title: event.title,
+            event_type: event.event_type || null,
+          },
+          serviceClient,
+          event.tenant_id,
+          workflowUserId
+        );
+      } catch (err) {
+        console.error("Workflow trigger error:", err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
