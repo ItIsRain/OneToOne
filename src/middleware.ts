@@ -4,6 +4,59 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl, isLocalDev } from "@/lib/url";
 
+// Public routes that NEVER require authentication.
+// Checked early so we skip all auth work for these paths.
+const PUBLIC_PREFIXES = [
+  "/signin",
+  "/signup",
+  "/subscribe",
+  "/reset-password",
+  "/update-password",
+  "/error-404",
+  "/invalid-subdomain",
+  "/unverified-domain",
+  "/api/auth",
+  "/api/stripe/webhook",
+  "/api/cron",
+  "/events",
+  "/event",
+  "/judge",
+  "/share",
+  "/api/portal",
+  "/api/events/public",
+  "/api/forms/public",
+  "/api/proposals/public",
+  "/api/contracts/public",
+  "/form",
+  "/proposal",
+  "/contract",
+  "/book",
+  "/api/book",
+  "/invoice",
+];
+
+function isPublicRoute(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return PUBLIC_PREFIXES.some(
+    (route) => pathname === route || pathname.startsWith(route + "/")
+  );
+}
+
+// API routes that bypass subscription check
+const BYPASS_SUBSCRIPTION_PREFIXES = [
+  "/api/settings/billing",
+  "/api/subscription",
+  "/api/discount-codes",
+  "/api/events/public",
+  "/api/stripe",
+  "/api/profile",
+  "/api/tenant/info",
+];
+
+function isBypassSubscription(pathname: string): boolean {
+  return BYPASS_SUBSCRIPTION_PREFIXES.some((route) => pathname.startsWith(route));
+}
+
 // Parse hostname and detect tenant context
 function parseHostname(hostname: string): {
   isMainDomain: boolean;
@@ -13,19 +66,15 @@ function parseHostname(hostname: string): {
   const host = hostname.split(":")[0];
   const mainDomains = getMainDomains();
 
-  // Check if it's a main domain
   if (mainDomains.includes(host)) {
     return { isMainDomain: true, subdomain: null, isCustomDomain: false };
   }
 
-  // Check for subdomain (handles both production .1i1.ae and local .localhost)
   const subdomain = extractSubdomain(hostname);
   if (subdomain) {
     return { isMainDomain: false, subdomain, isCustomDomain: false };
   }
 
-  // If hostname wasn't recognized as main or subdomain, it's a custom domain
-  // (but skip localhost without subdomain)
   if (host === "localhost" || host === "127.0.0.1") {
     return { isMainDomain: true, subdomain: null, isCustomDomain: false };
   }
@@ -38,22 +87,19 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") || "";
   const { pathname } = request.nextUrl;
 
-  // Parse the hostname to detect tenant context
   const { isMainDomain, subdomain, isCustomDomain } = parseHostname(hostname);
 
-  // Create a service client for tenant lookup (only when needed)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const isSupabaseConfigured = supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith("http");
 
-  // Handle subdomain or custom domain routing
+  // ── Step 1: Tenant header injection (subdomain / custom domain) ──
   if (!isMainDomain && isSupabaseConfigured) {
     const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
 
     let tenant = null;
 
     if (subdomain) {
-      // Lookup tenant by subdomain
       const { data } = await serviceClient
         .from("tenants")
         .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
@@ -61,8 +107,7 @@ export async function middleware(request: NextRequest) {
         .single();
       tenant = data;
     } else if (isCustomDomain) {
-      // Lookup tenant by custom domain
-      const customDomain = hostname.split(":")[0]; // Remove port
+      const customDomain = hostname.split(":")[0];
       const { data } = await serviceClient
         .from("tenants")
         .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
@@ -70,43 +115,35 @@ export async function middleware(request: NextRequest) {
         .single();
       tenant = data;
 
-      // If domain exists but not verified, redirect to unverified page
       if (tenant && !tenant.custom_domain_verified) {
         return NextResponse.redirect(new URL("/unverified-domain", request.url));
       }
     }
 
-    // If no tenant found for subdomain, redirect to invalid subdomain page
-    if (!tenant) {
-      if (subdomain || isCustomDomain) {
-        return NextResponse.redirect(new URL("/invalid-subdomain", getMainUrl()));
-      }
+    if (!tenant && (subdomain || isCustomDomain)) {
+      return NextResponse.redirect(new URL("/invalid-subdomain", getMainUrl()));
     }
 
-    // Inject tenant context headers for downstream use
     if (tenant) {
       requestHeaders.set("x-tenant-id", tenant.id);
       requestHeaders.set("x-tenant-subdomain", tenant.subdomain);
       requestHeaders.set("x-tenant-name", tenant.name);
-      if (tenant.logo_url) {
-        requestHeaders.set("x-tenant-logo", tenant.logo_url);
-      }
-      if (tenant.primary_color) {
-        requestHeaders.set("x-tenant-color", tenant.primary_color);
-      }
-
-      // Portal pages (/, /events) are public on tenant subdomains — no redirect
+      if (tenant.logo_url) requestHeaders.set("x-tenant-logo", tenant.logo_url);
+      if (tenant.primary_color) requestHeaders.set("x-tenant-color", tenant.primary_color);
     }
   }
 
-  let response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  // ── Step 2: Public routes — return immediately, NO auth work ──
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
 
-  // Determine cookie domain for cross-subdomain auth
+  // ── Step 3: Protected routes — create Supabase auth client ──
   const cookieDomain = getCookieDomain(hostname);
+
+  let response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -121,9 +158,7 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value)
           );
           response = NextResponse.next({
-            request: {
-              headers: requestHeaders,
-            },
+            request: { headers: requestHeaders },
           });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, {
@@ -137,9 +172,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // getSession() reads JWT from cookies locally. Only makes a network call
+  // when the access token is expired and needs refreshing (~once/hour).
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user ?? null;
 
-  // Local dev: auto-detect tenant from authenticated user so localhost:3000/ shows the portal
+  // ── Local dev: auto-detect tenant from authenticated user ──
   if (isMainDomain && isLocalDev() && user && !requestHeaders.has("x-tenant-id") && isSupabaseConfigured) {
     try {
       const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
@@ -163,8 +201,6 @@ export async function middleware(request: NextRequest) {
           if (tenant.logo_url) requestHeaders.set("x-tenant-logo", tenant.logo_url);
           if (tenant.primary_color) requestHeaders.set("x-tenant-color", tenant.primary_color);
 
-          // Preserve existing cookies (including refreshed auth tokens) before
-          // replacing the response object with one that has updated headers.
           const existingCookies = response.cookies.getAll();
           response = NextResponse.next({
             request: { headers: requestHeaders },
@@ -177,59 +213,13 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    "/",
-    "/signin",
-    "/signup",
-    "/subscribe",
-    "/reset-password",
-    "/update-password",
-    "/error-404",
-    "/invalid-subdomain",
-    "/unverified-domain",
-    "/api/auth",
-    "/api/stripe/webhook",
-    "/api/cron",
-    "/events",
-    "/event",
-    "/judge",
-    "/share",
-    "/api/portal",
-    "/api/events/public",
-    "/api/forms/public",
-    "/form",
-  ];
-
-  // Check if current path is public
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(route + "/") || pathname.startsWith("/api/auth")
-  );
-
-  // API routes that should bypass subscription check
-  const bypassApiRoutes = [
-    "/api/settings/billing",
-    "/api/subscription",
-    "/api/discount-codes",
-    "/api/events/public",
-  ];
-
-  const isBypassApiRoute = bypassApiRoutes.some((route) => pathname.startsWith(route));
-
-  // Allow public routes
-  if (isPublicRoute) {
-    return response;
-  }
-
-  // Redirect to signin if not authenticated
+  // ── Step 4: Redirect to signin if not authenticated ──
   if (!user) {
-    // For API routes, return JSON instead of HTML redirect
     if (pathname.startsWith("/api/")) {
       const apiResponse = NextResponse.json(
         { error: "Unauthorized", redirect: "/signin" },
         { status: 401 }
       );
-      // Carry over any cookie-clearing headers from failed token refresh
       response.cookies.getAll().forEach((c) =>
         apiResponse.cookies.set(c.name, c.value, {
           domain: cookieDomain ?? undefined,
@@ -241,7 +231,6 @@ export async function middleware(request: NextRequest) {
     const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("redirect", pathname);
     const redirectResponse = NextResponse.redirect(signinUrl);
-    // Carry over any cookie-clearing headers from failed token refresh
     response.cookies.getAll().forEach((c) =>
       redirectResponse.cookies.set(c.name, c.value, {
         domain: cookieDomain ?? undefined,
@@ -251,15 +240,9 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   }
 
-  // Allow bypass API routes (used for subscription management)
-  if (isBypassApiRoute) {
-    return response;
-  }
-
-  // Check subscription for protected routes (dashboard, etc.)
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/api/")) {
+  // ── Step 5: Subscription check (only for dashboard pages, not every API call) ──
+  if (pathname.startsWith("/dashboard") && !isBypassSubscription(pathname)) {
     try {
-      // Get user's profile to find tenant_id
       const { data: profile } = await supabase
         .from("profiles")
         .select("tenant_id")
@@ -267,39 +250,20 @@ export async function middleware(request: NextRequest) {
         .single();
 
       if (profile?.tenant_id) {
-        // Check subscription status
         const { data: subscription } = await supabase
           .from("tenant_subscriptions")
           .select("plan_type, status")
           .eq("tenant_id", profile.tenant_id)
           .single();
 
-        // If no subscription or inactive, redirect to subscribe page
-        // Note: "free" plan is allowed - only require subscription selection for new users
         if (!subscription || subscription.status !== "active") {
-          // For API routes, return 403
-          if (pathname.startsWith("/api/")) {
-            return NextResponse.json(
-              { error: "Subscription required", redirect: "/subscribe" },
-              { status: 403 }
-            );
-          }
-          // For pages, redirect to subscribe
           return NextResponse.redirect(new URL("/subscribe", request.url));
         }
       } else {
-        // No profile/tenant - redirect to subscribe
-        if (pathname.startsWith("/api/")) {
-          return NextResponse.json(
-            { error: "Account setup required", redirect: "/subscribe" },
-            { status: 403 }
-          );
-        }
         return NextResponse.redirect(new URL("/subscribe", request.url));
       }
     } catch (error) {
       console.error("Middleware subscription check error:", error);
-      // On error, allow access but log it
     }
   }
 
