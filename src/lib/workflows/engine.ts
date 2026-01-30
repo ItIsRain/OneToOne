@@ -1,4 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient, createClient as createServiceClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email";
 import {
   welcomeEmail,
@@ -666,13 +666,13 @@ async function executeStep(
       return { created_client_id: client?.id };
     }
 
-    /* ---- Show Banner (in-app banner notification) ---- */
+    /* ---- Show Modal (in-app modal notification, shown once) ---- */
     case "send_banner": {
       const recipientType = resolved.recipient_type as string || "trigger_user";
       const bannerType = resolved.banner_type as string || "info";
       const title = resolved.title as string || "Workflow Notification";
       const message = resolved.message as string || "";
-      const dismissAfter = resolved.dismiss_after ? Number(resolved.dismiss_after) : 0;
+      const buttonText = resolved.button_text as string || "Got it";
 
       // Determine recipients
       let recipientIds: string[] = [];
@@ -688,21 +688,21 @@ async function executeStep(
         recipientIds = [userId];
       }
 
-      // Create banner notifications for each recipient
-      const bannerRows = recipientIds.map((uid) => ({
+      // Create modal notifications for each recipient (shown once, center screen)
+      const modalRows = recipientIds.map((uid) => ({
         user_id: uid,
-        type: "banner",
+        type: "modal",
         title: title,
         message: message,
         tenant_id: tenantId,
         action_url: null,
         read: false,
-        metadata: { banner_type: bannerType, dismiss_after: dismissAfter },
+        metadata: { banner_type: bannerType, show_once: true, button_text: buttonText },
       }));
 
-      const { error } = await supabase.from("notifications").insert(bannerRows);
-      if (error) throw new Error(`Failed to send banner: ${error.message}`);
-      return { banner_sent: true, recipient_count: recipientIds.length };
+      const { error } = await supabase.from("notifications").insert(modalRows);
+      if (error) throw new Error(`Failed to send modal: ${error.message}`);
+      return { modal_sent: true, recipient_count: recipientIds.length };
     }
 
     /* ---- Send to Slack ---- */
@@ -968,13 +968,94 @@ async function executeStep(
           }
         );
 
+        const responseBody = await response.json().catch(() => ({}));
+
+        if (!response.ok || responseBody.error_code) {
+          const errMsg = responseBody.message || responseBody.error_message || `Twilio API error ${response.status}`;
+          throw new Error(`SMS failed: ${errMsg} (code: ${responseBody.error_code || response.status})`);
+        }
+
         return {
-          sms_sent: response.ok,
-          sms_status: response.status,
+          sms_sent: true,
+          sms_sid: responseBody.sid,
+          sms_message_status: responseBody.status,
           phone_number: phoneNumber,
         };
       } catch (err) {
         throw new Error(`SMS failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* ---- Send WhatsApp ---- */
+    case "send_whatsapp": {
+      const phoneNumber = resolved.phone_number as string;
+      const message = (resolved.message as string) || "Workflow notification";
+
+      if (!phoneNumber) throw new Error("Missing recipient phone number for send_whatsapp");
+
+      // Get WhatsApp integration credentials
+      const { data: waConfig } = await supabase
+        .from("tenant_integrations")
+        .select("config")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "whatsapp")
+        .eq("is_active", true)
+        .single();
+
+      if (!waConfig?.config) {
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "workflow",
+          title: "WhatsApp not sent (not configured)",
+          message: `Would have sent to ${phoneNumber}: ${message}`,
+          tenant_id: tenantId,
+        });
+        return { whatsapp_sent: false, reason: "whatsapp_not_configured", phone_number: phoneNumber };
+      }
+
+      const cfg = waConfig.config as Record<string, string>;
+      const apiToken = cfg.api_token;
+      const phoneNumberId = cfg.phone_number_id;
+
+      if (!apiToken || !phoneNumberId) {
+        throw new Error("WhatsApp integration missing api_token or phone_number_id");
+      }
+
+      try {
+        const templateName = resolved.template_name as string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payload: Record<string, any> = {
+          messaging_product: "whatsapp",
+          to: phoneNumber,
+        };
+
+        if (templateName) {
+          payload.type = "template";
+          payload.template = { name: templateName, language: { code: "en" } };
+        } else {
+          payload.type = "text";
+          payload.text = { body: message };
+        }
+
+        const response = await fetch(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        return {
+          whatsapp_sent: response.ok,
+          whatsapp_status: response.status,
+          phone_number: phoneNumber,
+        };
+      } catch (err) {
+        throw new Error(`WhatsApp send failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -1028,6 +1109,549 @@ async function executeStep(
       return { __paused: true, resume_at: resumeAt.toISOString() };
     }
 
+    /* ---- ElevenLabs Text-to-Speech → Twilio Voice Call ---- */
+    case "elevenlabs_tts": {
+      const text = (resolved.text as string);
+      if (!text) throw new Error("Missing text for ElevenLabs TTS");
+
+      const phoneNumber = (resolved.phone_number as string);
+      const deliveryMethod = (resolved.delivery_method as string) || "call";
+
+      const { data: elConfig } = await supabase
+        .from("tenant_integrations")
+        .select("config")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "elevenlabs")
+        .eq("is_active", true)
+        .single();
+
+      if (!elConfig?.config) {
+        throw new Error("ElevenLabs integration not configured. Go to Settings → Integrations to set it up.");
+      }
+
+      const cfg = elConfig.config as Record<string, string>;
+      const apiKey = cfg.api_key;
+      const voiceId = (resolved.voice_id as string) || cfg.voice_id || "21m00Tcm4TlvDq8ikWAM";
+      const modelId = (resolved.model_id as string) || cfg.model_id || "eleven_multilingual_v2";
+
+      if (!apiKey) throw new Error("ElevenLabs API key not configured");
+
+      // Default built-in voices allowed on all plans (no library restriction)
+      const FALLBACK_VOICE = "21m00Tcm4TlvDq8ikWAM"; // Rachel
+
+      async function callTTS(vid: string) {
+        return fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${vid}`,
+          {
+            method: "POST",
+            headers: {
+              "xi-api-key": apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text,
+              model_id: modelId,
+            }),
+          }
+        );
+      }
+
+      try {
+        let response = await callTTS(voiceId);
+        let usedVoice = voiceId;
+
+        // If the voice is restricted (402), retry with a default built-in voice
+        if (response.status === 402 && voiceId !== FALLBACK_VOICE) {
+          response = await callTTS(FALLBACK_VOICE);
+          usedVoice = FALLBACK_VOICE;
+        }
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => "");
+          throw new Error(`ElevenLabs API error ${response.status}: ${errBody}`);
+        }
+
+        // Get audio bytes from the response
+        const audioBuffer = await response.arrayBuffer();
+
+        // If no phone number is provided, just generate and store the audio metadata
+        if (!phoneNumber || deliveryMethod === "generate_only") {
+          return {
+            tts_generated: true,
+            tts_voice_id: usedVoice,
+            tts_model_id: modelId,
+            tts_text_length: text.length,
+            tts_voice_fallback: usedVoice !== voiceId,
+            tts_delivery: "none",
+          };
+        }
+
+        // Upload audio to Supabase Storage so Twilio can access it
+        const fileName = `tts-${runId}-${stepId}-${Date.now()}.mp3`;
+
+        // Use service role client for storage upload to bypass RLS
+        const storageClient = createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data: uploadData, error: uploadError } = await storageClient.storage
+          .from("tts-audio")
+          .upload(fileName, Buffer.from(audioBuffer), {
+            contentType: "audio/mpeg",
+            upsert: true,
+          });
+
+        if (uploadError) {
+          throw new Error(`Failed to upload TTS audio: ${uploadError.message}`);
+        }
+
+        // Get public URL for the audio file
+        const { data: urlData } = storageClient.storage
+          .from("tts-audio")
+          .getPublicUrl(uploadData.path);
+
+        const audioUrl = urlData.publicUrl;
+
+        // Make a Twilio voice call that plays the audio
+        let twilioSid: string | undefined;
+        let twilioToken: string | undefined;
+        let twilioFrom: string | undefined;
+
+        const { data: twilioConfig } = await supabase
+          .from("tenant_integrations")
+          .select("config")
+          .eq("tenant_id", tenantId)
+          .eq("provider", "twilio")
+          .eq("is_active", true)
+          .single();
+
+        if (twilioConfig?.config) {
+          const tcfg = twilioConfig.config as Record<string, string>;
+          twilioSid = tcfg.account_sid;
+          twilioToken = tcfg.auth_token;
+          twilioFrom = tcfg.phone_number;
+        }
+
+        if (!twilioSid) twilioSid = process.env.TWILIO_SID;
+        if (!twilioToken) twilioToken = process.env.TWILIO_TOKEN;
+        if (!twilioFrom) twilioFrom = process.env.TWILIO_FROM;
+
+        if (!twilioSid || !twilioToken || !twilioFrom) {
+          throw new Error("Twilio not configured. Both ElevenLabs and Twilio integrations are required to make TTS phone calls.");
+        }
+
+        // Build TwiML to play the audio
+        const twiml = `<Response><Play>${audioUrl}</Play></Response>`;
+
+        const authString = Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64");
+        const callResponse = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Calls.json`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${authString}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              To: phoneNumber,
+              From: twilioFrom,
+              Twiml: twiml,
+            }).toString(),
+          }
+        );
+
+        const callBody = await callResponse.json().catch(() => ({}));
+
+        if (!callResponse.ok || callBody.error_code) {
+          const errMsg = callBody.message || `Twilio call failed: ${callResponse.status}`;
+          throw new Error(`TTS call failed: ${errMsg} (code: ${callBody.error_code || callResponse.status})`);
+        }
+
+        return {
+          tts_generated: true,
+          tts_voice_id: usedVoice,
+          tts_model_id: modelId,
+          tts_text_length: text.length,
+          tts_voice_fallback: usedVoice !== voiceId,
+          tts_delivery: "call",
+          tts_call_sid: callBody.sid,
+          tts_call_status: callBody.status,
+          tts_audio_url: audioUrl,
+          tts_phone_number: phoneNumber,
+        };
+      } catch (err) {
+        throw new Error(`ElevenLabs TTS failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* ---- OpenAI Generate ---- */
+    case "openai_generate": {
+      const prompt = (resolved.prompt as string);
+      if (!prompt) throw new Error("Missing prompt for OpenAI generate");
+
+      const { data: oaiConfig } = await supabase
+        .from("tenant_integrations")
+        .select("config")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "openai")
+        .eq("is_active", true)
+        .single();
+
+      if (!oaiConfig?.config) {
+        throw new Error("OpenAI integration not configured. Go to Settings → Integrations to set it up.");
+      }
+
+      const cfg = oaiConfig.config as Record<string, string>;
+      const apiKey = cfg.api_key;
+      const model = (resolved.model as string) || cfg.model || "gpt-4o-mini";
+      const orgId = cfg.organization_id;
+
+      if (!apiKey) throw new Error("OpenAI API key not configured");
+
+      const systemPrompt = (resolved.system_prompt as string) || "You are a helpful business assistant.";
+      const maxTokens = Number(resolved.max_tokens) || 500;
+
+      try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        };
+        if (orgId) headers["OpenAI-Organization"] = orgId;
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: prompt },
+            ],
+            max_tokens: maxTokens,
+          }),
+        });
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => "");
+          throw new Error(`OpenAI API error ${response.status}: ${errBody}`);
+        }
+
+        const data = await response.json();
+        const aiResponse = data.choices?.[0]?.message?.content || "";
+
+        return {
+          ai_response: aiResponse,
+          ai_model: model,
+          ai_tokens_used: data.usage?.total_tokens || 0,
+        };
+      } catch (err) {
+        throw new Error(`OpenAI generate failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* ---- Stripe Payment Link ---- */
+    case "stripe_payment_link": {
+      const productName = (resolved.product_name as string) || "Payment";
+      const amount = Number(resolved.amount);
+      const currency = (resolved.currency as string) || "usd";
+      const sendTo = (resolved.send_to as string) || "";
+
+      if (!amount || amount <= 0) throw new Error("Missing or invalid amount for Stripe payment link");
+
+      const { data: stripeConfig } = await supabase
+        .from("tenant_integrations")
+        .select("config")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "stripe")
+        .eq("is_active", true)
+        .single();
+
+      if (!stripeConfig?.config) {
+        // Show modal to the user explaining Stripe setup is required
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "modal",
+          title: "Stripe Setup Required",
+          message: "Your workflow tried to create a payment link, but Stripe is not configured yet.\n\nGo to Settings → Integrations → Stripe and add your Secret Key to enable payment links.",
+          tenant_id: tenantId,
+          read: false,
+          metadata: { banner_type: "error", show_once: true, button_text: "Go to Settings" },
+        });
+        throw new Error("Stripe integration not configured. A setup prompt has been sent to the user.");
+      }
+
+      const cfg = stripeConfig.config as Record<string, string>;
+      const secretKey = cfg.secret_key;
+      if (!secretKey) {
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "modal",
+          title: "Stripe Secret Key Missing",
+          message: "Your Stripe integration is connected but the Secret Key is missing.\n\nGo to Settings → Integrations → Stripe and enter your sk_live_... or sk_test_... key.",
+          tenant_id: tenantId,
+          read: false,
+          metadata: { banner_type: "error", show_once: true, button_text: "Go to Settings" },
+        });
+        throw new Error("Stripe secret key not configured. A setup prompt has been sent to the user.");
+      }
+
+      const authString = Buffer.from(`${secretKey}:`).toString("base64");
+
+      try {
+        // 1. Create a product
+        const productRes = await fetch("https://api.stripe.com/v1/products", {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${authString}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({ name: productName }).toString(),
+        });
+        if (!productRes.ok) {
+          const errBody = await productRes.json().catch(() => ({}));
+          const errMsg = (errBody as { error?: { message?: string } })?.error?.message || `HTTP ${productRes.status}`;
+          await supabase.from("notifications").insert({
+            user_id: userId,
+            type: "modal",
+            title: "Stripe Payment Failed",
+            message: `Could not create the Stripe product.\n\nError: ${errMsg}\n\nPlease check your Stripe Secret Key in Settings → Integrations → Stripe. Make sure you're using a valid key (sk_live_... or sk_test_...).`,
+            tenant_id: tenantId,
+            read: false,
+            metadata: { banner_type: "error", show_once: true, button_text: "Got it" },
+          });
+          throw new Error(`Stripe product creation failed: ${errMsg}`);
+        }
+        const product = await productRes.json();
+
+        // 2. Create a price
+        const priceRes = await fetch("https://api.stripe.com/v1/prices", {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${authString}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            product: product.id,
+            unit_amount: String(amount),
+            currency,
+          }).toString(),
+        });
+        if (!priceRes.ok) throw new Error(`Stripe price creation failed: ${priceRes.status}`);
+        const price = await priceRes.json();
+
+        // 3. Create a payment link
+        const linkParams: Record<string, string> = {
+          "line_items[0][price]": price.id,
+          "line_items[0][quantity]": "1",
+        };
+        const customerEmail = resolved.customer_email as string;
+        if (customerEmail) {
+          linkParams["after_completion[type]"] = "redirect";
+          linkParams["after_completion[redirect][url]"] = "https://example.com/thank-you";
+        }
+
+        const linkRes = await fetch("https://api.stripe.com/v1/payment_links", {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${authString}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams(linkParams).toString(),
+        });
+        if (!linkRes.ok) throw new Error(`Stripe payment link creation failed: ${linkRes.status}`);
+        const paymentLink = await linkRes.json();
+
+        // 4. Send the payment link via email if send_to is provided
+        if (sendTo) {
+          const currencySymbol: Record<string, string> = { usd: "$", eur: "€", gbp: "£", aed: "AED ", aud: "A$", cad: "C$" };
+          const sym = currencySymbol[currency] || currency.toUpperCase() + " ";
+          const displayAmount = (amount / 100).toFixed(2);
+          try {
+            await sendEmail({
+              to: sendTo,
+              subject: `Payment Request: ${productName} — ${sym}${displayAmount}`,
+              html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+  <h2 style="margin:0 0 8px">Payment Request</h2>
+  <p style="color:#666;margin:0 0 24px">You have a payment of <strong>${sym}${displayAmount}</strong> for <strong>${productName}</strong>.</p>
+  <a href="${paymentLink.url}" style="display:inline-block;background:#635BFF;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600">Pay Now</a>
+  <p style="color:#999;font-size:12px;margin:24px 0 0">If the button doesn't work, copy this link:<br/><a href="${paymentLink.url}" style="color:#635BFF">${paymentLink.url}</a></p>
+</div>`,
+              tenantId,
+            });
+          } catch (emailErr) {
+            console.error("Failed to send payment link email:", emailErr);
+          }
+        }
+
+        return {
+          payment_link_url: paymentLink.url,
+          payment_link_id: paymentLink.id,
+          stripe_product_id: product.id,
+          stripe_price_id: price.id,
+          payment_amount: amount,
+          payment_currency: currency,
+        };
+      } catch (err) {
+        throw new Error(`Stripe payment link failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* ---- Google Calendar Event ---- */
+    case "google_calendar_event": {
+      const summary = (resolved.summary as string) || "Workflow Event";
+
+      const { data: gcalConfig } = await supabase
+        .from("tenant_integrations")
+        .select("config")
+        .eq("tenant_id", tenantId)
+        .eq("provider", "google_calendar")
+        .eq("is_active", true)
+        .single();
+
+      if (!gcalConfig?.config) {
+        throw new Error("Google Calendar integration not configured. Go to Settings → Integrations to set it up.");
+      }
+
+      const cfg = gcalConfig.config as Record<string, string>;
+      const clientId = cfg.client_id;
+      const clientSecret = cfg.client_secret;
+      const refreshToken = cfg.refresh_token;
+
+      if (!clientId || !clientSecret || !refreshToken) {
+        throw new Error("Google Calendar credentials incomplete");
+      }
+
+      try {
+        // Exchange refresh token for access token
+        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+          }).toString(),
+        });
+
+        if (!tokenRes.ok) throw new Error(`Google OAuth token refresh failed: ${tokenRes.status}`);
+        const tokenData = await tokenRes.json();
+        const accessToken = tokenData.access_token;
+
+        // Build event start/end times
+        const offsetDays = Number(resolved.start_offset_days) || 1;
+        const startTime = (resolved.start_time as string) || "09:00";
+        const durationMinutes = Number(resolved.duration_minutes) || 30;
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() + offsetDays);
+        const [hours, minutes] = startTime.split(":").map(Number);
+        startDate.setHours(hours, minutes, 0, 0);
+
+        const endDate = new Date(startDate.getTime() + durationMinutes * 60 * 1000);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const eventBody: Record<string, any> = {
+          summary,
+          description: (resolved.description as string) || "",
+          start: { dateTime: startDate.toISOString() },
+          end: { dateTime: endDate.toISOString() },
+        };
+
+        const attendeeEmail = resolved.attendee_email as string;
+        if (attendeeEmail) {
+          eventBody.attendees = [{ email: attendeeEmail }];
+        }
+
+        const eventRes = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(eventBody),
+          }
+        );
+
+        if (!eventRes.ok) {
+          const errBody = await eventRes.text().catch(() => "");
+          throw new Error(`Google Calendar API error ${eventRes.status}: ${errBody}`);
+        }
+
+        const createdEvent = await eventRes.json();
+        return {
+          calendar_event_id: createdEvent.id,
+          calendar_event_link: createdEvent.htmlLink,
+          calendar_event_start: startDate.toISOString(),
+          calendar_event_end: endDate.toISOString(),
+        };
+      } catch (err) {
+        throw new Error(`Google Calendar event failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    /* ---- Zapier Trigger (Webhook) ---- */
+    case "zapier_trigger": {
+      let webhookUrl = resolved.webhook_url as string;
+
+      if (!webhookUrl) {
+        const { data: zapierConfig } = await supabase
+          .from("tenant_integrations")
+          .select("config")
+          .eq("tenant_id", tenantId)
+          .eq("provider", "zapier")
+          .eq("is_active", true)
+          .single();
+
+        if (!zapierConfig?.config) {
+          throw new Error("Zapier integration not configured. Go to Settings → Integrations to set it up.");
+        }
+
+        const cfg = zapierConfig.config as Record<string, string>;
+        webhookUrl = cfg.webhook_url;
+      }
+
+      if (!webhookUrl) throw new Error("Missing Zapier webhook URL");
+
+      // Build payload: use custom JSON if provided, otherwise send trigger context
+      let payload: Record<string, unknown>;
+      if (resolved.payload_json) {
+        try {
+          payload = JSON.parse(resolved.payload_json as string);
+        } catch {
+          payload = { raw: resolved.payload_json };
+        }
+      } else {
+        payload = {
+          workflow_id: context.workflow_id,
+          run_id: runId,
+          entity_id: context.entity_id,
+          entity_type: context.entity_type,
+          entity_name: context.entity_name,
+          trigger_data: context,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      try {
+        const response = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        return {
+          zapier_sent: response.ok,
+          zapier_status: response.status,
+        };
+      } catch (err) {
+        throw new Error(`Zapier webhook failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     default:
       throw new Error(`Unknown step type: ${stepType}`);
   }
@@ -1068,7 +1692,7 @@ async function resolveRecipientId(
             .select(ownerField)
             .eq("id", entityId)
             .single();
-          if (data && data[ownerField]) return data[ownerField] as string;
+          if (data && (data as Record<string, unknown>)[ownerField]) return (data as Record<string, unknown>)[ownerField] as string;
         }
       }
       return userId; // fallback
@@ -1128,11 +1752,11 @@ async function resolveRecipientEmail(
             .select(ownerField)
             .eq("id", entityId)
             .single();
-          if (entity && entity[ownerField]) {
+          if (entity && (entity as Record<string, unknown>)[ownerField]) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("email, first_name, last_name")
-              .eq("id", entity[ownerField])
+              .eq("id", (entity as Record<string, unknown>)[ownerField] as string)
               .single();
             if (profile?.email) {
               return {

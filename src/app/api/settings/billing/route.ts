@@ -280,10 +280,10 @@ export async function GET(request: NextRequest) {
     let isTrialing = false;
     let nextBillingDate: string | null = null;
     let stripeCancelAtPeriodEnd = false;
-    if (subscription?.stripe_subscription_id) {
+    if (subscription?.stripe_subscription_id && process.env.STRIPE_SECRET_KEY) {
       try {
         const Stripe = (await import("stripe")).default;
-        const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+        const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
           apiVersion: "2025-12-15.clover",
         });
         const stripeSub = await stripeClient.subscriptions.retrieve(subscription.stripe_subscription_id);
@@ -293,8 +293,8 @@ export async function GET(request: NextRequest) {
         // Use trial_end for trialing subs, current_period_end otherwise
         if (isTrialing && stripeSub.trial_end) {
           nextBillingDate = new Date(stripeSub.trial_end * 1000).toISOString();
-        } else if (stripeSub.current_period_end) {
-          nextBillingDate = new Date(stripeSub.current_period_end * 1000).toISOString();
+        } else if ((stripeSub as unknown as Record<string, unknown>).current_period_end) {
+          nextBillingDate = new Date(((stripeSub as unknown as Record<string, unknown>).current_period_end as number) * 1000).toISOString();
         }
 
         // Sync local DB with Stripe truth

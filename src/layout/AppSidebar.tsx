@@ -18,6 +18,7 @@ import {
   GroupIcon,
   HorizontaLDots,
   MailIcon,
+  PageIcon,
   PieChartIcon,
   PlugInIcon,
   TaskIcon,
@@ -96,6 +97,22 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <PageIcon />,
+    name: "Forms",
+    subItems: [
+      { name: "All Forms", path: "/dashboard/forms", new: true },
+      { name: "Templates", path: "/dashboard/forms/templates" },
+    ],
+  },
+  {
+    icon: <DocsIcon />,
+    name: "Proposals",
+    subItems: [
+      { name: "All Proposals", path: "/dashboard/proposals", new: true },
+      { name: "Templates", path: "/dashboard/proposals/templates" },
+    ],
+  },
+  {
     icon: <BoltIcon />,
     name: "Automation",
     subItems: [
@@ -142,6 +159,8 @@ const settingsItems: NavItem[] = [
       { name: "Email Provider", path: "/dashboard/settings/email", pro: true },
       { name: "Billing", path: "/dashboard/settings/billing" },
       { name: "Portal", path: "/dashboard/settings/portal", new: true },
+      { name: "Portal Clients", path: "/dashboard/portal/clients", new: true },
+      { name: "Portal Approvals", path: "/dashboard/portal/approvals", new: true },
       { name: "Dashboard", path: "/dashboard/settings/dashboard" },
       { name: "API Keys", path: "/dashboard/settings/api" },
       { name: "API Docs", path: "/dashboard/settings/docs" },

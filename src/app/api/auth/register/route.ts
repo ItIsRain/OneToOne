@@ -4,7 +4,7 @@ import { getSubdomainSuffix } from "@/lib/url";
 
 export async function POST(request: Request) {
   try {
-    const { firstName, lastName, email, password, useCase, subdomain, plan } = await request.json();
+    const { firstName, lastName, email, password, phone, useCase, subdomain, plan } = await request.json();
 
     // Validate required fields
     if (!firstName || !lastName || !email || !password || !useCase || !subdomain) {
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         firstName,
         lastName,
         email,
+        phone: phone || null,
         useCase,
         subdomain: `${subdomain}${getSubdomainSuffix()}`,
         plan: plan || "free",
@@ -90,7 +91,9 @@ export async function POST(request: Request) {
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
+        phone: phone || null,
       },
+      phone: phone || undefined,
     });
 
     if (authError) {
@@ -130,6 +133,7 @@ export async function POST(request: Request) {
       first_name: firstName,
       last_name: lastName,
       email,
+      phone: phone || null,
       role: "owner",
     });
 

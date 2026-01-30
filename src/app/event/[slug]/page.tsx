@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { getEventTypeConfig, getPublicFields } from "@/config/eventTypeSchema";
 import type { FormField } from "@/config/eventTypeSchema";
@@ -2066,6 +2066,16 @@ function EventPageContent() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Registration wizard state
+  const [regStep, setRegStep] = useState<"details" | "otp" | "phone">("details");
+  const [regOtp, setRegOtp] = useState(["", "", "", "", "", ""]);
+  const [regPhone, setRegPhone] = useState("");
+  const [regCountryCode, setRegCountryCode] = useState("+971");
+  const [regPhoneError, setRegPhoneError] = useState<string | null>(null);
+  const [regPhoneTouched, setRegPhoneTouched] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   // Portal state
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [publicActiveTab, setPublicActiveTab] = useState<"overview" | "schedule" | "challenges" | "prizes" | "info">("overview");
@@ -2170,30 +2180,61 @@ function EventPageContent() {
     }
   }, [isAuthenticated, event]);
 
-  // Handle auth
-  const handleAuth = async (e: React.FormEvent) => {
+  // OTP cooldown timer
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const t = setTimeout(() => setOtpCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpCooldown]);
+
+  // Phone validation
+  const REG_PHONE_MIN: Record<string, number> = {
+    "+971": 9, "+1": 10, "+44": 10, "+91": 10, "+966": 9,
+    "+974": 8, "+973": 8, "+968": 8, "+965": 8, "+962": 9,
+    "+961": 7, "+20": 10, "+49": 10, "+33": 9, "+61": 9,
+  };
+  const REG_COUNTRY_CODES = [
+    { code: "+971", flag: "🇦🇪", name: "UAE" },
+    { code: "+1", flag: "🇺🇸", name: "US" },
+    { code: "+44", flag: "🇬🇧", name: "UK" },
+    { code: "+91", flag: "🇮🇳", name: "India" },
+    { code: "+966", flag: "🇸🇦", name: "Saudi" },
+    { code: "+974", flag: "🇶🇦", name: "Qatar" },
+    { code: "+973", flag: "🇧🇭", name: "Bahrain" },
+    { code: "+968", flag: "🇴🇲", name: "Oman" },
+    { code: "+965", flag: "🇰🇼", name: "Kuwait" },
+    { code: "+962", flag: "🇯🇴", name: "Jordan" },
+    { code: "+961", flag: "🇱🇧", name: "Lebanon" },
+    { code: "+20", flag: "🇪🇬", name: "Egypt" },
+    { code: "+49", flag: "🇩🇪", name: "Germany" },
+    { code: "+33", flag: "🇫🇷", name: "France" },
+    { code: "+61", flag: "🇦🇺", name: "Australia" },
+  ];
+
+  useEffect(() => {
+    if (!regPhoneTouched) return;
+    const digits = regPhone.replace(/\D/g, "");
+    const min = REG_PHONE_MIN[regCountryCode] ?? 7;
+    if (!digits) setRegPhoneError("Phone number is required");
+    else if (digits.length < min) setRegPhoneError(`Enter at least ${min} digits`);
+    else if (digits.length > 15) setRegPhoneError("Phone number is too long");
+    else setRegPhoneError(null);
+  }, [regPhone, regCountryCode, regPhoneTouched]);
+
+  // Handle login (unchanged path)
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthSubmitting(true);
     setAuthError(null);
 
     try {
-      const body = authMode === "login"
-        ? { action: "login", email: authEmail, password: authPassword }
-        : { action: "register", email: authEmail, password: authPassword, name: authName };
-
       const res = await fetch(`/api/events/public/${slug}/auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ action: "login", email: authEmail, password: authPassword }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Authentication failed");
-      }
-
-      // Store token and refresh
+      if (!res.ok) throw new Error(data.error || "Authentication failed");
       if (data.token) {
         localStorage.setItem(`attendee_token_${slug}`, data.token);
         refreshSession();
@@ -2202,6 +2243,140 @@ function EventPageContent() {
       setAuthError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setAuthSubmitting(false);
+    }
+  };
+
+  // Registration wizard — Step 1: send OTP
+  const handleRegSendOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authName.trim() || !authEmail.trim() || authPassword.length < 6) return;
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send code");
+      setRegStep("otp");
+      setOtpCooldown(60);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  // Registration wizard — Step 2: verify OTP
+  const handleRegVerifyOTP = useCallback(async (code?: string) => {
+    const otp = code ?? regOtp.join("");
+    if (otp.length !== 6) return;
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail, otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Invalid code");
+      setRegStep("phone");
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Something went wrong");
+      setRegOtp(["", "", "", "", "", ""]);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }, [authEmail, regOtp]);
+
+  const handleRegOtpChange = (i: number, val: string) => {
+    const d = val.replace(/\D/g, "").slice(-1);
+    const next = [...regOtp];
+    next[i] = d;
+    setRegOtp(next);
+    if (d && i < 5) otpRefs.current[i + 1]?.focus();
+    if (d && i === 5 && next.join("").length === 6) handleRegVerifyOTP(next.join(""));
+  };
+
+  const handleRegOtpKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !regOtp[i] && i > 0) otpRefs.current[i - 1]?.focus();
+  };
+
+  const handleRegOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = ["", "", "", "", "", ""];
+    for (let j = 0; j < pasted.length; j++) next[j] = pasted[j];
+    setRegOtp(next);
+    otpRefs.current[Math.min(pasted.length, 5)]?.focus();
+    if (pasted.length === 6) handleRegVerifyOTP(pasted);
+  };
+
+  const handleRegResendOTP = async () => {
+    if (otpCooldown > 0) return;
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: authEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to resend code");
+      setOtpCooldown(60);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  // Registration wizard — Step 3: submit with phone
+  const handleRegComplete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegPhoneTouched(true);
+    const digits = regPhone.replace(/\D/g, "");
+    const min = REG_PHONE_MIN[regCountryCode] ?? 7;
+    if (!digits || digits.length < min) {
+      setRegPhoneError(digits ? `Enter at least ${min} digits` : "Phone number is required");
+      return;
+    }
+    setAuthSubmitting(true);
+    setAuthError(null);
+    try {
+      const phone = `${regCountryCode}${digits}`;
+      const res = await fetch(`/api/events/public/${slug}/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "register", email: authEmail, password: authPassword, name: authName, phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Registration failed");
+      if (data.token) {
+        localStorage.setItem(`attendee_token_${slug}`, data.token);
+        refreshSession();
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  // Legacy handler for login mode only
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authMode === "login") {
+      handleLogin(e);
+    } else {
+      handleRegSendOTP(e);
     }
   };
 
@@ -3277,7 +3452,7 @@ function EventPageContent() {
                         {/* Auth Tabs */}
                         <div className="flex mb-6 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
                           <button
-                            onClick={() => setAuthMode("register")}
+                            onClick={() => { setAuthMode("register"); setRegStep("details"); setAuthError(null); }}
                             className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                               authMode === "register"
                                 ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
@@ -3287,7 +3462,7 @@ function EventPageContent() {
                             Register
                           </button>
                           <button
-                            onClick={() => setAuthMode("login")}
+                            onClick={() => { setAuthMode("login"); setAuthError(null); }}
                             className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                               authMode === "login"
                                 ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
@@ -3298,85 +3473,307 @@ function EventPageContent() {
                           </button>
                         </div>
 
-                        {/* Auth Form */}
-                        <form onSubmit={handleAuth} className="space-y-4">
-                          {authMode === "register" && (
+                        {authMode === "login" ? (
+                          /* ── Login Form ── */
+                          <form onSubmit={handleLogin} className="space-y-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                                Full Name
-                              </label>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
                               <input
-                                type="text"
-                                value={authName}
-                                onChange={(e) => setAuthName(e.target.value)}
-                                required={authMode === "register"}
+                                type="email"
+                                value={authEmail}
+                                onChange={(e) => setAuthEmail(e.target.value)}
+                                required
                                 className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
                                 style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
-                                placeholder="Your name"
+                                placeholder="you@example.com"
                               />
                             </div>
-                          )}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                              Email
-                            </label>
-                            <input
-                              type="email"
-                              value={authEmail}
-                              onChange={(e) => setAuthEmail(e.target.value)}
-                              required
-                              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
-                              style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
-                              placeholder="you@example.com"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                              Password
-                            </label>
-                            <div className="relative">
-                              <input
-                                type={showPassword ? "text" : "password"}
-                                value={authPassword}
-                                onChange={(e) => setAuthPassword(e.target.value)}
-                                required
-                                minLength={6}
-                                className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
-                                style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
-                                placeholder="••••••••"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-                              >
-                                {showPassword ? Icons.eyeOff : Icons.eye}
-                              </button>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
+                              <div className="relative">
+                                <input
+                                  type={showPassword ? "text" : "password"}
+                                  value={authPassword}
+                                  onChange={(e) => setAuthPassword(e.target.value)}
+                                  required
+                                  minLength={6}
+                                  className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
+                                  style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                  placeholder="••••••••"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                                >
+                                  {showPassword ? Icons.eyeOff : Icons.eye}
+                                </button>
+                              </div>
                             </div>
-                          </div>
-
-                          {authError && (
-                            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
-                              {authError}
-                            </div>
-                          )}
-
-                          <button
-                            type="submit"
-                            disabled={authSubmitting}
-                            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-                            style={{ backgroundColor: eventColor }}
-                          >
-                            {authSubmitting ? (
-                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                              <>
-                                {authMode === "register" ? "Create Account" : "Sign In"}
-                                {Icons.arrow}
-                              </>
+                            {authError && (
+                              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{authError}</div>
                             )}
-                          </button>
-                        </form>
+                            <button
+                              type="submit"
+                              disabled={authSubmitting}
+                              className="w-full py-3.5 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                              style={{ backgroundColor: eventColor }}
+                            >
+                              {authSubmitting ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : (
+                                <>Sign In {Icons.arrow}</>
+                              )}
+                            </button>
+                          </form>
+                        ) : (
+                          /* ── Register Wizard ── */
+                          <div>
+                            {/* Step Indicator */}
+                            <div className="flex items-center justify-between mb-6">
+                              {[
+                                { key: "details", label: "Details" },
+                                { key: "otp", label: "Verify" },
+                                { key: "phone", label: "Phone" },
+                              ].map((s, i) => {
+                                const steps = ["details", "otp", "phone"];
+                                const currentIdx = steps.indexOf(regStep);
+                                const isDone = i < currentIdx;
+                                const isActive = i === currentIdx;
+                                return (
+                                  <React.Fragment key={s.key}>
+                                    {i > 0 && (
+                                      <div className={`flex-1 h-0.5 mx-2 rounded ${isDone ? "bg-green-500" : "bg-gray-200 dark:bg-gray-600"}`} />
+                                    )}
+                                    <div className="flex flex-col items-center">
+                                      <div
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                          isDone
+                                            ? "bg-green-500 text-white"
+                                            : isActive
+                                            ? "text-white"
+                                            : "bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400"
+                                        }`}
+                                        style={isActive ? { backgroundColor: eventColor } : undefined}
+                                      >
+                                        {isDone ? Icons.check : i + 1}
+                                      </div>
+                                      <span className={`text-[10px] mt-1 ${isActive ? "font-semibold text-gray-900 dark:text-white" : "text-gray-400"}`}>
+                                        {s.label}
+                                      </span>
+                                    </div>
+                                  </React.Fragment>
+                                );
+                              })}
+                            </div>
+
+                            {/* Step 1: Name + Email + Password */}
+                            {regStep === "details" && (
+                              <form onSubmit={handleRegSendOTP} className="space-y-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Full Name</label>
+                                  <input
+                                    type="text"
+                                    value={authName}
+                                    onChange={(e) => setAuthName(e.target.value)}
+                                    required
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
+                                    style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                    placeholder="Your name"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
+                                  <input
+                                    type="email"
+                                    value={authEmail}
+                                    onChange={(e) => setAuthEmail(e.target.value)}
+                                    required
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
+                                    style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                    placeholder="you@example.com"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
+                                  <div className="relative">
+                                    <input
+                                      type={showPassword ? "text" : "password"}
+                                      value={authPassword}
+                                      onChange={(e) => setAuthPassword(e.target.value)}
+                                      required
+                                      minLength={6}
+                                      className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
+                                      style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                      placeholder="••••••••"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowPassword(!showPassword)}
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                                    >
+                                      {showPassword ? Icons.eyeOff : Icons.eye}
+                                    </button>
+                                  </div>
+                                </div>
+                                {authError && (
+                                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{authError}</div>
+                                )}
+                                <button
+                                  type="submit"
+                                  disabled={authSubmitting}
+                                  className="w-full py-3.5 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                                  style={{ backgroundColor: eventColor }}
+                                >
+                                  {authSubmitting ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <>Continue {Icons.arrow}</>
+                                  )}
+                                </button>
+                              </form>
+                            )}
+
+                            {/* Step 2: OTP Verification */}
+                            {regStep === "otp" && (
+                              <div className="space-y-4">
+                                <div className="text-center">
+                                  <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: `${eventColor}15` }}>
+                                    {Icons.mail}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Enter the 6-digit code sent to
+                                  </p>
+                                  <p className="font-semibold text-gray-900 dark:text-white text-sm mt-1">{authEmail}</p>
+                                </div>
+                                <div className="flex gap-2 justify-center">
+                                  {regOtp.map((d, i) => (
+                                    <input
+                                      key={i}
+                                      ref={(el) => { otpRefs.current[i] = el; }}
+                                      type="text"
+                                      inputMode="numeric"
+                                      maxLength={1}
+                                      value={d}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/\D/g, "");
+                                        const next = [...regOtp];
+                                        next[i] = val;
+                                        setRegOtp(next);
+                                        if (val && i < 5) otpRefs.current[i + 1]?.focus();
+                                        if (val && i === 5 && next.join("").length === 6) handleRegVerifyOTP(next.join(""));
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Backspace" && !regOtp[i] && i > 0) otpRefs.current[i - 1]?.focus();
+                                      }}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                                        const next = [...regOtp];
+                                        for (let j = 0; j < pasted.length; j++) next[j] = pasted[j];
+                                        setRegOtp(next);
+                                        if (pasted.length === 6) handleRegVerifyOTP(pasted);
+                                      }}
+                                      className="w-11 h-12 text-center text-lg font-bold rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all"
+                                      style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                    />
+                                  ))}
+                                </div>
+                                {authError && (
+                                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm text-center">{authError}</div>
+                                )}
+                                {authSubmitting && (
+                                  <div className="flex justify-center">
+                                    <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: `${eventColor}40`, borderTopColor: eventColor }} />
+                                  </div>
+                                )}
+                                <div className="text-center">
+                                  <button
+                                    type="button"
+                                    disabled={otpCooldown > 0}
+                                    onClick={handleRegResendOTP}
+                                    className="text-sm font-medium disabled:opacity-50 transition-colors"
+                                    style={{ color: eventColor }}
+                                  >
+                                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend Code"}
+                                  </button>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => { setRegStep("details"); setAuthError(null); }}
+                                  className="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                  ← Back to details
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Step 3: Phone Number */}
+                            {regStep === "phone" && (
+                              <form onSubmit={handleRegComplete} className="space-y-4">
+                                <div className="text-center mb-2">
+                                  <div className="w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-3" style={{ backgroundColor: `${eventColor}15` }}>
+                                    {Icons.phone}
+                                  </div>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Enter your phone number to complete registration
+                                  </p>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Phone Number</label>
+                                  <div className="flex gap-2">
+                                    <select
+                                      value={regCountryCode}
+                                      onChange={(e) => setRegCountryCode(e.target.value)}
+                                      className="w-24 px-2 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 text-sm transition-all"
+                                      style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                    >
+                                      {REG_COUNTRY_CODES.map((c) => (
+                                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      type="tel"
+                                      value={regPhone}
+                                      onChange={(e) => { setRegPhone(e.target.value.replace(/[^\d\s-]/g, "")); setRegPhoneTouched(true); }}
+                                      required
+                                      className={`flex-1 px-4 py-3 rounded-xl border bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all ${
+                                        regPhoneError ? "border-red-400" : "border-gray-200 dark:border-gray-600"
+                                      }`}
+                                      style={{ "--tw-ring-color": eventColor } as React.CSSProperties}
+                                      placeholder="50 123 4567"
+                                    />
+                                  </div>
+                                  {regPhoneError && (
+                                    <p className="text-xs text-red-500 mt-1">{regPhoneError}</p>
+                                  )}
+                                </div>
+                                {authError && (
+                                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">{authError}</div>
+                                )}
+                                <button
+                                  type="submit"
+                                  disabled={authSubmitting || !!regPhoneError}
+                                  className="w-full py-3.5 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                                  style={{ backgroundColor: eventColor }}
+                                >
+                                  {authSubmitting ? (
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <>Complete Registration {Icons.arrow}</>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setRegStep("otp"); setAuthError(null); }}
+                                  className="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                >
+                                  ← Back
+                                </button>
+                              </form>
+                            )}
+                          </div>
+                        )}
 
                         {/* Price Info */}
                         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">

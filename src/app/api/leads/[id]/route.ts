@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -89,6 +91,13 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Fetch old lead for status change trigger
+    const { data: oldLead } = await supabase
+      .from("leads")
+      .select("status, tenant_id, name")
+      .eq("id", id)
+      .single();
+
     // Only allow updating specific fields
     const allowedFields = [
       "name",
@@ -149,6 +158,29 @@ export async function PATCH(
     if (error) {
       console.error("Update error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Trigger workflow automations for lead_status_changed
+    if (body.status && oldLead && body.status !== oldLead.status && oldLead.tenant_id) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey) {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        try {
+          await checkTriggers("lead_status_changed", {
+            entity_id: id,
+            entity_type: "lead",
+            entity_name: lead.name || oldLead.name,
+            lead_name: lead.name || oldLead.name,
+            from_status: oldLead.status,
+            to_status: body.status,
+            lead_email: lead.email,
+            lead_company: lead.company,
+          }, serviceClient, oldLead.tenant_id, user.id);
+        } catch (err) {
+          console.error("Workflow trigger error:", err);
+        }
+      }
     }
 
     return NextResponse.json({ lead });

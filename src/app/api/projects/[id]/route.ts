@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { checkTriggers } from "@/lib/workflows/triggers";
 
 export async function GET(
   request: NextRequest,
@@ -66,6 +68,13 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Fetch old project for status change trigger
+    const { data: oldProject } = await supabase
+      .from("projects")
+      .select("status, tenant_id, name")
+      .eq("id", id)
+      .single();
+
     const { data: project, error } = await supabase
       .from("projects")
       .update({
@@ -85,6 +94,27 @@ export async function PATCH(
     if (error) {
       console.error("Error updating project:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Trigger workflow automations for project_status_changed
+    if (body.status && oldProject && body.status !== oldProject.status && oldProject.tenant_id) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && supabaseServiceKey) {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        try {
+          await checkTriggers("project_status_changed", {
+            entity_id: id,
+            entity_type: "project",
+            entity_name: project.name || oldProject.name,
+            project_name: project.name || oldProject.name,
+            from_status: oldProject.status,
+            to_status: body.status,
+          }, serviceClient, oldProject.tenant_id, user.id);
+        } catch (err) {
+          console.error("Workflow trigger error:", err);
+        }
+      }
     }
 
     return NextResponse.json(project);

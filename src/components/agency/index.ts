@@ -42,5 +42,28 @@ export { WorkflowsTable } from "./WorkflowsTable";
 export { WorkflowTemplates } from "./WorkflowTemplates";
 export { IntegrationsSettings } from "./IntegrationsSettings";
 
+// Forms
+export { FormsTable } from "./FormsTable";
+export { FormBuilder } from "./FormBuilder";
+export { FormFieldPalette } from "./FormFieldPalette";
+export { FormFieldEditor } from "./FormFieldEditor";
+export { FormFieldRenderer } from "./FormFieldRenderer";
+export { FormPreview } from "./FormPreview";
+export { FormSubmissionsTable } from "./FormSubmissionsTable";
+export { FormSettingsPanel } from "./FormSettingsPanel";
+export { SignaturePad } from "./SignaturePad";
+
+// Proposals
+export { ProposalsTable } from "./ProposalsTable";
+export { ProposalBuilder } from "./ProposalBuilder";
+export { ProposalSectionEditor } from "./ProposalSectionEditor";
+export { ProposalPricingTable } from "./ProposalPricingTable";
+export { ProposalPreview } from "./ProposalPreview";
+export { ProposalTemplatesTable } from "./ProposalTemplatesTable";
+
+// Client Portal (Admin)
+export { PortalClientsTable } from "./PortalClientsTable";
+export { PortalApprovalsTable } from "./PortalApprovalsTable";
+
 // Sidebars
 export * from "./sidebars";

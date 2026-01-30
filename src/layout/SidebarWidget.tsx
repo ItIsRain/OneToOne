@@ -109,12 +109,12 @@ export default function SidebarWidget() {
         <div className="mb-3 space-y-2.5">
           <UsageBar
             label="Events"
-            used={typeof usage.events === "object" ? usage.events.used : usage.events}
+            used={typeof usage.events === "object" ? (usage.events as unknown as { used: number }).used : usage.events}
             limit={planInfo.limits.events as number}
           />
           <UsageBar
             label="Team"
-            used={typeof usage.team_members === "object" ? usage.team_members.used : usage.team_members}
+            used={typeof usage.team_members === "object" ? (usage.team_members as unknown as { used: number }).used : usage.team_members}
             limit={planInfo.limits.team_members as number}
           />
         </div>

@@ -35,6 +35,9 @@ export const PLAN_LIMITS = {
       payments: false, // payment tracking requires Professional+
       budgets: false, // budget management requires Business
       workflows: false, // workflow automation requires Professional+
+      forms: false, // form builder requires Starter+
+      proposals: false, // proposals requires Starter+
+      client_portal: false, // client portal requires Professional+
     },
   },
   starter: {
@@ -64,6 +67,9 @@ export const PLAN_LIMITS = {
       payments: false, // payment tracking requires Professional+
       budgets: false, // budget management requires Business
       workflows: false, // workflow automation requires Professional+
+      forms: true, // form builder enabled
+      proposals: true, // proposals enabled
+      client_portal: false, // client portal requires Professional+
     },
   },
   professional: {
@@ -94,6 +100,9 @@ export const PLAN_LIMITS = {
       payments: true, // payment tracking enabled
       budgets: false, // budget management requires Business
       workflows: true, // workflow automation enabled
+      forms: true, // form builder enabled
+      proposals: true, // proposals enabled
+      client_portal: true, // client portal enabled
     },
   },
   business: {
@@ -124,6 +133,9 @@ export const PLAN_LIMITS = {
       payments: true, // payment tracking enabled
       budgets: true, // budget management (Business exclusive)
       workflows: true, // workflow automation enabled
+      forms: true, // form builder enabled
+      proposals: true, // proposals enabled
+      client_portal: true, // client portal enabled
     },
   },
 } as const;

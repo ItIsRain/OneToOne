@@ -70,7 +70,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { steps, ...workflowFields } = body;
+    const { steps, graph_layout, ...workflowFields } = body;
+
+    // Persist graph_layout alongside other workflow fields
+    if (graph_layout !== undefined) {
+      workflowFields.graph_layout = graph_layout;
+    }
 
     const { data: workflow, error: updateError } = await supabase
       .from("workflows")

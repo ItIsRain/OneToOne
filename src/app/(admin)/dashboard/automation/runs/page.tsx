@@ -161,7 +161,7 @@ function RunsContent() {
 
               {expandedRun === run.id && run.steps && run.steps.length > 0 && (
                 <TableRow key={`${run.id}-steps`}>
-                  <TableCell className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30" colSpan={5}>
+                  <td className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30" colSpan={5}>
                     <div className="space-y-2">
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         Step Execution Details
@@ -201,7 +201,7 @@ function RunsContent() {
                         ))}
                       </div>
                     </div>
-                  </TableCell>
+                  </td>
                 </TableRow>
               )}
             </>

@@ -52,6 +52,81 @@ export async function checkTriggers(
             if (triggerConfig.event_type && triggerConfig.event_type !== triggerData.event_type) skip = true;
             break;
           }
+          case "project_status_changed": {
+            if (triggerConfig.from_status && triggerConfig.from_status !== triggerData.from_status) skip = true;
+            if (triggerConfig.to_status && triggerConfig.to_status !== triggerData.to_status) skip = true;
+            break;
+          }
+          case "lead_status_changed": {
+            if (triggerConfig.from_status && triggerConfig.from_status !== triggerData.from_status) skip = true;
+            if (triggerConfig.to_status && triggerConfig.to_status !== triggerData.to_status) skip = true;
+            break;
+          }
+          case "client_status_changed": {
+            if (triggerConfig.from_status && triggerConfig.from_status !== triggerData.from_status) skip = true;
+            if (triggerConfig.to_status && triggerConfig.to_status !== triggerData.to_status) skip = true;
+            break;
+          }
+          case "task_completed": {
+            // Always fires when a task is completed — no filter needed
+            break;
+          }
+          case "contact_created": {
+            // Always fires on contact creation — no filter needed
+            break;
+          }
+          case "task_created": {
+            if (triggerConfig.priority && triggerConfig.priority !== triggerData.priority) skip = true;
+            break;
+          }
+          case "invoice_created": {
+            if (triggerConfig.min_amount && Number(triggerData.invoice_amount) < Number(triggerConfig.min_amount)) skip = true;
+            break;
+          }
+          case "form_submitted": {
+            if (triggerConfig.form_id && triggerConfig.form_id !== triggerData.form_id) skip = true;
+            break;
+          }
+          case "form_published": {
+            // Always fires when a form is published — no filter needed
+            break;
+          }
+          case "proposal_created": {
+            // Always fires on proposal creation — no filter needed
+            break;
+          }
+          case "proposal_sent": {
+            // Always fires when a proposal is sent — no filter needed
+            break;
+          }
+          case "proposal_viewed": {
+            // Always fires when a proposal is viewed — no filter needed
+            break;
+          }
+          case "proposal_accepted": {
+            // Always fires when a proposal is accepted — no filter needed
+            break;
+          }
+          case "proposal_declined": {
+            // Always fires when a proposal is declined — no filter needed
+            break;
+          }
+          case "deliverable_approved": {
+            // Always fires when a deliverable is approved — no filter needed
+            break;
+          }
+          case "deliverable_rejected": {
+            // Always fires when a deliverable is rejected — no filter needed
+            break;
+          }
+          case "portal_file_uploaded": {
+            // Always fires when a portal file is uploaded — no filter needed
+            break;
+          }
+          case "portal_client_login": {
+            // Always fires on portal client login — no filter needed
+            break;
+          }
         }
 
         if (skip) continue;

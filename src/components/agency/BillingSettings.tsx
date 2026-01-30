@@ -679,7 +679,7 @@ export const BillingSettings = () => {
                   )}
                 </div>
               </div>
-              {subscription?.plan_type !== "free" && (subscription.next_billing_date || subscription.current_period_end) && (
+              {subscription?.plan_type !== "free" && (subscription?.next_billing_date || subscription?.current_period_end) && (
                 <div className="text-right">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {subscription.is_trialing ? "Trial ends" : "Next billing date"}

@@ -144,19 +144,28 @@ export async function PATCH(
       const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (supabaseUrl && supabaseServiceKey) {
         const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        const triggerData = {
+          entity_id: id,
+          entity_type: "task",
+          entity_name: task.title,
+          task_title: task.title,
+          from_status: oldTask.status,
+          to_status: body.status,
+          task_assignee_id: task.assigned_to,
+          task_project_id: task.project_id,
+        };
         try {
-          await checkTriggers("task_status_changed", {
-            entity_id: id,
-            entity_type: "task",
-            entity_name: task.title,
-            task_title: task.title,
-            from_status: oldTask.status,
-            to_status: body.status,
-            task_assignee_id: task.assigned_to,
-            task_project_id: task.project_id,
-          }, serviceClient, oldTask.tenant_id, user.id);
+          await checkTriggers("task_status_changed", triggerData, serviceClient, oldTask.tenant_id, user.id);
         } catch (err) {
           console.error("Workflow trigger error:", err);
+        }
+        // Also fire task_completed trigger when completing
+        if (body.status === "completed") {
+          try {
+            await checkTriggers("task_completed", triggerData, serviceClient, oldTask.tenant_id, user.id);
+          } catch (err) {
+            console.error("Workflow trigger error (task_completed):", err);
+          }
         }
       }
     }

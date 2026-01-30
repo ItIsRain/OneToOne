@@ -71,7 +71,7 @@ export default async function PublicEventsPage() {
       />
       <main className="flex-1">
         <EventsListing
-          events={events}
+          events={events as never[]}
           tenantName={tenant.name || "Portal"}
           primaryColor={tenant.primaryColor || "#84cc16"}
         />
