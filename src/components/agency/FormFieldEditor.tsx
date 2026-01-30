@@ -45,6 +45,9 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   const isNumber = field.type === "number";
   const isFileUpload = field.type === "file_upload";
   const isRating = field.type === "rating";
+  const isNps = field.type === "nps";
+  const isScale = field.type === "scale";
+  const isTestimonial = field.type === "testimonial";
   const isLayout = ["section_heading", "paragraph"].includes(field.type);
 
   return (
@@ -274,6 +277,86 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* NPS: info only - fixed 0-10 */}
+      {isNps && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Net Promoter Score</p>
+          <p className="text-xs text-blue-600 dark:text-blue-400">
+            Fixed 0–10 scale. Respondents are categorized as Detractors (0-6), Passives (7-8), or Promoters (9-10).
+          </p>
+        </div>
+      )}
+
+      {/* Scale: range + labels */}
+      {isScale && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Min Value
+              </label>
+              <select
+                value={(field.validation.scale_min as number) ?? 1}
+                onChange={(e) => handleValidationChange("scale_min", Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                {[0, 1].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Max Value
+              </label>
+              <select
+                value={(field.validation.scale_max as number) ?? 5}
+                onChange={(e) => handleValidationChange("scale_max", Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                {[3, 5, 7, 10].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Low Label
+            </label>
+            <input
+              type="text"
+              value={(field.validation.low_label as string) ?? ""}
+              onChange={(e) => handleValidationChange("low_label", e.target.value)}
+              placeholder="e.g. Poor"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              High Label
+            </label>
+            <input
+              type="text"
+              value={(field.validation.high_label as string) ?? ""}
+              onChange={(e) => handleValidationChange("high_label", e.target.value)}
+              placeholder="e.g. Excellent"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Testimonial: info */}
+      {isTestimonial && (
+        <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3">
+          <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">Testimonial Field</p>
+          <p className="text-xs text-purple-600 dark:text-purple-400">
+            Collects a text response with an opt-in permission checkbox for public use as a testimonial.
+          </p>
         </div>
       )}
     </div>

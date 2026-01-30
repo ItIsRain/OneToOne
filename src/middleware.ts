@@ -196,6 +196,9 @@ export async function middleware(request: NextRequest) {
     "/judge",
     "/share",
     "/api/portal",
+    "/api/events/public",
+    "/api/forms/public",
+    "/form",
   ];
 
   // Check if current path is public

@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from "react";
 import { ContractsTable, ContractDetailsSidebar } from "@/components/agency";
 import { NewContractModal } from "@/components/agency/modals";
+import FeatureGate from "@/components/ui/FeatureGate";
 import type { ContractRecord } from "@/components/agency/ContractsTable";
 
 export default function ContractsPage() {
@@ -111,42 +112,44 @@ export default function ContractsPage() {
   };
 
   return (
-    <>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Contracts</h1>
-            <p className="text-gray-500 dark:text-gray-400">Manage client contracts and agreements</p>
+    <FeatureGate feature="document_templates">
+      <>
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Contracts</h1>
+              <p className="text-gray-500 dark:text-gray-400">Manage client contracts and agreements</p>
+            </div>
           </div>
+
+          <ContractsTable
+            onContractSelect={handleContractSelect}
+            selectedContract={selectedContract}
+            onAddContract={handleAddContract}
+            refreshKey={refreshKey}
+          />
         </div>
 
-        <ContractsTable
-          onContractSelect={handleContractSelect}
-          selectedContract={selectedContract}
-          onAddContract={handleAddContract}
-          refreshKey={refreshKey}
+        <NewContractModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditContract(null);
+          }}
+          onSuccess={handleSuccess}
+          editContract={editContract}
         />
-      </div>
 
-      <NewContractModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditContract(null);
-        }}
-        onSuccess={handleSuccess}
-        editContract={editContract}
-      />
-
-      <ContractDetailsSidebar
-        isOpen={sidebarOpen}
-        onClose={handleCloseSidebar}
-        contract={selectedContract}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onStatusChange={handleStatusChange}
-        onSign={handleSign}
-      />
-    </>
+        <ContractDetailsSidebar
+          isOpen={sidebarOpen}
+          onClose={handleCloseSidebar}
+          contract={selectedContract}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+          onSign={handleSign}
+        />
+      </>
+    </FeatureGate>
   );
 }

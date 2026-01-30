@@ -127,6 +127,27 @@ export async function checkTriggers(
             // Always fires on portal client login — no filter needed
             break;
           }
+          case "booking_created": {
+            if (triggerConfig.booking_page_id && triggerConfig.booking_page_id !== triggerData.booking_page_id) skip = true;
+            break;
+          }
+          case "booking_cancelled": {
+            if (triggerConfig.booking_page_id && triggerConfig.booking_page_id !== triggerData.booking_page_id) skip = true;
+            break;
+          }
+          case "booking_rescheduled": {
+            if (triggerConfig.booking_page_id && triggerConfig.booking_page_id !== triggerData.booking_page_id) skip = true;
+            break;
+          }
+          case "event_ended": {
+            if (triggerConfig.event_id && triggerConfig.event_id !== triggerData.event_id) skip = true;
+            if (triggerConfig.event_type && triggerConfig.event_type !== triggerData.event_type) skip = true;
+            break;
+          }
+          case "survey_response_submitted": {
+            if (triggerConfig.survey_id && triggerConfig.survey_id !== triggerData.survey_id) skip = true;
+            break;
+          }
         }
 
         if (skip) continue;

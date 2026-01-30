@@ -1,6 +1,6 @@
 // Import feature TypeScript definitions
 
-export type EntityType = 'contacts' | 'leads' | 'clients';
+export type EntityType = 'contacts' | 'leads' | 'clients' | 'vendors';
 
 export type FieldType =
   | 'string'

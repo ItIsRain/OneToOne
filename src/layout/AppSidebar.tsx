@@ -21,6 +21,7 @@ import {
   PageIcon,
   PieChartIcon,
   PlugInIcon,
+  ShootingStarIcon,
   TaskIcon,
   TimeIcon,
   UserCircleIcon,
@@ -66,6 +67,23 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <ShootingStarIcon />,
+    name: "Vendors",
+    subItems: [
+      { name: "All Vendors", path: "/dashboard/vendors" },
+      { name: "Categories", path: "/dashboard/vendors/categories", new: true },
+    ],
+  },
+  {
+    icon: <TimeIcon />,
+    name: "Booking",
+    subItems: [
+      { name: "Booking Pages", path: "/dashboard/booking/pages", new: true },
+      { name: "Appointments", path: "/dashboard/booking/appointments" },
+      { name: "Availability", path: "/dashboard/booking/availability" },
+    ],
+  },
+  {
     icon: <DollarLineIcon />,
     name: "Finance",
     subItems: [
@@ -91,7 +109,6 @@ const navItems: NavItem[] = [
     name: "Documents",
     subItems: [
       { name: "All Files", path: "/dashboard/documents" },
-      { name: "Contracts", path: "/dashboard/documents/contracts" },
       { name: "Templates", path: "/dashboard/documents/templates" },
       { name: "Shared", path: "/dashboard/documents/shared" },
     ],
@@ -101,6 +118,7 @@ const navItems: NavItem[] = [
     name: "Forms",
     subItems: [
       { name: "All Forms", path: "/dashboard/forms", new: true },
+      { name: "Surveys", path: "/dashboard/surveys", new: true },
       { name: "Templates", path: "/dashboard/forms/templates" },
     ],
   },
@@ -110,6 +128,14 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "All Proposals", path: "/dashboard/proposals", new: true },
       { name: "Templates", path: "/dashboard/proposals/templates" },
+    ],
+  },
+  {
+    icon: <FileIcon />,
+    name: "Contracts",
+    subItems: [
+      { name: "All Contracts", path: "/dashboard/contracts", new: true },
+      { name: "Templates", path: "/dashboard/contracts/templates" },
     ],
   },
   {

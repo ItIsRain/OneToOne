@@ -127,6 +127,66 @@ export async function POST(
       console.error("Workflow trigger error:", err);
     }
 
+    // Check if this form belongs to a survey and fire survey_response_submitted + update response count
+    try {
+      const { data: survey } = await serviceClient
+        .from("surveys")
+        .select("id, title, event_id")
+        .eq("form_id", form.id)
+        .single();
+
+      if (survey) {
+        // Increment survey response count
+        const { data: surveyData } = await serviceClient
+          .from("surveys")
+          .select("response_count")
+          .eq("id", survey.id)
+          .single();
+        if (surveyData) {
+          await serviceClient
+            .from("surveys")
+            .update({ response_count: (surveyData.response_count || 0) + 1 })
+            .eq("id", survey.id);
+        }
+
+        // Look up event title if linked
+        let eventTitle: string | null = null;
+        if (survey.event_id) {
+          const { data: event } = await serviceClient
+            .from("events")
+            .select("title")
+            .eq("id", survey.event_id)
+            .single();
+          eventTitle = event?.title ?? null;
+        }
+
+        // Extract NPS value if any NPS field exists
+        const formFields = form.fields as { id: string; type: string }[] | null;
+        let npsScore: number | null = null;
+        if (formFields) {
+          const npsField = formFields.find((f) => f.type === "nps");
+          if (npsField && body.data[npsField.id] !== undefined) {
+            npsScore = Number(body.data[npsField.id]);
+          }
+        }
+
+        await checkTriggers("survey_response_submitted", {
+          entity_id: submission.id,
+          entity_type: "survey_response",
+          entity_name: survey.title,
+          survey_id: survey.id,
+          survey_title: survey.title,
+          event_id: survey.event_id,
+          event_title: eventTitle,
+          form_id: form.id,
+          submission_data: body.data,
+          nps_score: npsScore,
+        }, serviceClient, form.tenant_id, form.created_by);
+      }
+    } catch (err) {
+      console.error("Survey response trigger error:", err);
+    }
+
     return NextResponse.json({
       submission: { id: submission.id },
       thank_you_title: form.thank_you_title,

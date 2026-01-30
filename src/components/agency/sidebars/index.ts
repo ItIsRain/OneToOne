@@ -18,3 +18,6 @@ export { GoalDetailsSidebar } from "./GoalDetailsSidebar";
 export { ContractDetailsSidebar } from "./ContractDetailsSidebar";
 export { TemplateDetailsSidebar } from "./TemplateDetailsSidebar";
 export { ShareDetailsSidebar } from "./ShareDetailsSidebar";
+export { VendorDetailsSidebar } from "./VendorDetailsSidebar";
+export { AppointmentDetailsSidebar } from "./AppointmentDetailsSidebar";
+export { BookingPageDetailsSidebar } from "./BookingPageDetailsSidebar";

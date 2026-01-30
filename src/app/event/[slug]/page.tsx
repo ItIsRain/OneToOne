@@ -9,6 +9,8 @@ import { getPortalTabsForEventType } from "@/config/portalTabConfig";
 import { DashboardTab, TeamsTab, SubmissionsTab, ProfileTab, ScheduleTab, ChallengesTab, PrizesTab, InfoTab, PortalIcons } from "@/components/events/portal";
 import type { Team, Attendee, Submission, TabType } from "@/components/events/portal/types";
 import { DotPattern, GlowCard, ShimmerButton, ShineBorder, BorderBeam, GradientText } from "@/components/ui/magic";
+import { PublicFormRenderer } from "@/components/form/PublicFormRenderer";
+import type { PublicForm } from "@/components/agency/FormsTable";
 
 interface Event {
   id: string;
@@ -2085,6 +2087,19 @@ function EventPageContent() {
   const [mySubmission, setMySubmission] = useState<Submission | null>(null);
   const [problemStatements, setProblemStatements] = useState<{ id: string; title: string; description?: string; category?: string }[]>([]);
 
+  // Survey modal state
+  interface EventSurvey {
+    id: string;
+    title: string;
+    description: string | null;
+    survey_type: string;
+    form: PublicForm;
+  }
+  const [activeSurveys, setActiveSurveys] = useState<EventSurvey[]>([]);
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [currentSurveyIndex, setCurrentSurveyIndex] = useState(0);
+  const [dismissedSurveyIds, setDismissedSurveyIds] = useState<Set<string>>(new Set());
+
   // Fetch event data
   useEffect(() => {
     const fetchEvent = async () => {
@@ -2114,6 +2129,56 @@ function EventPageContent() {
       fetchEvent();
     }
   }, [slug]);
+
+  // Fetch active surveys for this event
+  useEffect(() => {
+    if (!event || !slug) return;
+
+    const storageKey = `dismissed_surveys_${event.id}`;
+    const dismissed = JSON.parse(localStorage.getItem(storageKey) || "[]") as string[];
+    setDismissedSurveyIds(new Set(dismissed));
+
+    const fetchSurveys = async () => {
+      try {
+        const res = await fetch(`/api/events/public/${slug}/surveys`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.surveys?.length > 0) {
+          // Filter out already-dismissed surveys
+          const available = data.surveys.filter(
+            (s: EventSurvey) => !dismissed.includes(s.id)
+          );
+          setActiveSurveys(available);
+          if (available.length > 0) {
+            setCurrentSurveyIndex(0);
+            setShowSurveyModal(true);
+          }
+        }
+      } catch {
+        // Silently fail - surveys are optional
+      }
+    };
+
+    fetchSurveys();
+  }, [event, slug]);
+
+  const handleDismissSurvey = useCallback(() => {
+    const current = activeSurveys[currentSurveyIndex];
+    if (current && event) {
+      const storageKey = `dismissed_surveys_${event.id}`;
+      const newDismissed = new Set(dismissedSurveyIds);
+      newDismissed.add(current.id);
+      setDismissedSurveyIds(newDismissed);
+      localStorage.setItem(storageKey, JSON.stringify([...newDismissed]));
+    }
+
+    // Move to next survey or close
+    if (currentSurveyIndex < activeSurveys.length - 1) {
+      setCurrentSurveyIndex((i) => i + 1);
+    } else {
+      setShowSurveyModal(false);
+    }
+  }, [activeSurveys, currentSurveyIndex, dismissedSurveyIds, event]);
 
   // Get tabs config (pass requirements to filter out teams tab for solo events)
   const tabs = event ? getPortalTabsForEventType(event.event_type, event.requirements as Record<string, unknown>) : [];
@@ -3894,6 +3959,72 @@ function EventPageContent() {
           </div>
         )}
       </div>
+
+      {/* Survey Modal */}
+      {showSurveyModal && activeSurveys.length > 0 && activeSurveys[currentSurveyIndex] && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleDismissSurvey}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 dark:bg-brand-500/20">
+                  <svg className="w-5 h-5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {activeSurveys[currentSurveyIndex].title}
+                  </h2>
+                  {activeSurveys[currentSurveyIndex].description && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {activeSurveys[currentSurveyIndex].description}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleDismissSurvey}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Form content */}
+            <div className="px-6 py-5">
+              <PublicFormRenderer
+                form={activeSurveys[currentSurveyIndex].form}
+                accentColor={event?.color || "#465FFF"}
+                onSubmitSuccess={() => {
+                  // After successful submission, auto-dismiss after a delay
+                  setTimeout(() => {
+                    handleDismissSurvey();
+                  }, 3000);
+                }}
+              />
+            </div>
+
+            {/* Counter if multiple surveys */}
+            {activeSurveys.length > 1 && (
+              <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-3 text-center">
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  Survey {currentSurveyIndex + 1} of {activeSurveys.length}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-800 mt-12">

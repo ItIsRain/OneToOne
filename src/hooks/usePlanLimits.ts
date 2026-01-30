@@ -36,8 +36,12 @@ export const PLAN_LIMITS = {
       budgets: false, // budget management requires Business
       workflows: false, // workflow automation requires Professional+
       forms: false, // form builder requires Starter+
+      surveys: false, // surveys require Starter+
       proposals: false, // proposals requires Starter+
       client_portal: false, // client portal requires Professional+
+      vendors: false, // vendor management requires Starter+
+      contracts: false, // contracts builder requires Starter+
+      booking: false, // booking/scheduling requires Starter+
     },
   },
   starter: {
@@ -68,8 +72,12 @@ export const PLAN_LIMITS = {
       budgets: false, // budget management requires Business
       workflows: false, // workflow automation requires Professional+
       forms: true, // form builder enabled
+      surveys: true, // surveys enabled
       proposals: true, // proposals enabled
       client_portal: false, // client portal requires Professional+
+      vendors: true, // vendor management enabled
+      contracts: true, // contracts builder enabled
+      booking: true, // booking/scheduling enabled
     },
   },
   professional: {
@@ -101,8 +109,12 @@ export const PLAN_LIMITS = {
       budgets: false, // budget management requires Business
       workflows: true, // workflow automation enabled
       forms: true, // form builder enabled
+      surveys: true, // surveys enabled
       proposals: true, // proposals enabled
       client_portal: true, // client portal enabled
+      vendors: true, // vendor management enabled
+      contracts: true, // contracts builder enabled
+      booking: true, // booking/scheduling enabled
     },
   },
   business: {
@@ -134,8 +146,12 @@ export const PLAN_LIMITS = {
       budgets: true, // budget management (Business exclusive)
       workflows: true, // workflow automation enabled
       forms: true, // form builder enabled
+      surveys: true, // surveys enabled
       proposals: true, // proposals enabled
       client_portal: true, // client portal enabled
+      vendors: true, // vendor management enabled
+      contracts: true, // contracts builder enabled
+      booking: true, // booking/scheduling enabled
     },
   },
 } as const;

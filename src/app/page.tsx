@@ -60,7 +60,7 @@ export default async function RootPage() {
           .or("is_public.is.null,is_public.eq.true")
           .or("is_published.is.null,is_published.eq.true")
           .neq("status", "cancelled")
-          .gte("start_date", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+          .or(`start_date.gte.${new Date(new Date().setHours(0, 0, 0, 0)).toISOString()},end_date.gte.${new Date().toISOString()},start_date.is.null`)
           .order("start_date", { ascending: true })
           .limit(4),
       ]);

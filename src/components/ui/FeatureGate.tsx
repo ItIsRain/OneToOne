@@ -111,15 +111,35 @@ const FEATURE_INFO: Record<FeatureKey, { title: string; description: string; ico
     description: "Create custom intake forms, questionnaires, and surveys. Collect submissions, auto-create leads and contacts, and embed forms anywhere.",
     icon: "form",
   },
+  surveys: {
+    title: "Surveys & Feedback",
+    description: "Create post-event surveys with NPS scores, rating scales, and testimonial collection. Analyze responses, benchmark across events, and auto-send when events end.",
+    icon: "survey",
+  },
   proposals: {
     title: "Proposals & E-Signatures",
     description: "Build professional proposals with pricing tables, send them to clients, and collect legally-binding e-signatures — all in one place.",
     icon: "proposal",
   },
+  contracts: {
+    title: "Contracts & E-Signatures",
+    description: "Build professional contracts with a visual section editor, send them to clients for review, and collect legally-binding e-signatures — all in one place.",
+    icon: "contract",
+  },
   client_portal: {
     title: "Client Portal",
     description: "Give your clients a branded portal to view projects, approve deliverables, access invoices, and share files securely.",
     icon: "portal",
+  },
+  vendors: {
+    title: "Vendor Management",
+    description: "Manage your vendors, track services and rates, assign vendors to events, and organize them by category.",
+    icon: "vendor",
+  },
+  booking: {
+    title: "Booking & Scheduling",
+    description: "Create public booking pages, manage team availability, and let clients self-schedule appointments. Automate reminders and integrate with your workflow.",
+    icon: "calendar",
   },
 };
 
@@ -280,6 +300,18 @@ function FeatureIcon({ icon }: { icon: string }) {
       return (
         <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+        </svg>
+      );
+    case "contract":
+      return (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      );
+    case "vendor":
+      return (
+        <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       );
     default:

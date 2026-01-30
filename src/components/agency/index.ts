@@ -53,6 +53,10 @@ export { FormSubmissionsTable } from "./FormSubmissionsTable";
 export { FormSettingsPanel } from "./FormSettingsPanel";
 export { SignaturePad } from "./SignaturePad";
 
+// Surveys
+export { SurveysTable } from "./SurveysTable";
+export { SurveyAnalytics } from "./SurveyAnalytics";
+
 // Proposals
 export { ProposalsTable } from "./ProposalsTable";
 export { ProposalBuilder } from "./ProposalBuilder";
@@ -60,6 +64,20 @@ export { ProposalSectionEditor } from "./ProposalSectionEditor";
 export { ProposalPricingTable } from "./ProposalPricingTable";
 export { ProposalPreview } from "./ProposalPreview";
 export { ProposalTemplatesTable } from "./ProposalTemplatesTable";
+
+// Contracts
+export { ContractBuilder } from "./ContractBuilder";
+export { ContractSectionEditor } from "./ContractSectionEditor";
+export { ContractTemplatesTable } from "./ContractTemplatesTable";
+
+// Vendors
+export { VendorsTable } from "./VendorsTable";
+export { VendorCategoriesTable } from "./VendorCategoriesTable";
+
+// Booking & Scheduling
+export { BookingPagesTable } from "./BookingPagesTable";
+export { AppointmentsTable } from "./AppointmentsTable";
+export { AvailabilitySettings } from "./AvailabilitySettings";
 
 // Client Portal (Admin)
 export { PortalClientsTable } from "./PortalClientsTable";

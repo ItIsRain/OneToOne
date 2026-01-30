@@ -7,6 +7,7 @@ import type { PublicForm, FormField, ConditionalRule } from "@/components/agency
 interface PublicFormRendererProps {
   form: PublicForm;
   accentColor?: string;
+  onSubmitSuccess?: () => void;
 }
 
 interface FormErrors {
@@ -16,6 +17,7 @@ interface FormErrors {
 export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
   form,
   accentColor = "#84cc16",
+  onSubmitSuccess,
 }) => {
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<FormErrors>({});
@@ -149,6 +151,7 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
       }
 
       setSubmitted(true);
+      onSubmitSuccess?.();
 
       if (form.thank_you_redirect_url) {
         setTimeout(() => {

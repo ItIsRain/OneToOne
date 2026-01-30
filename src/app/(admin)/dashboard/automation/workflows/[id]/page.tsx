@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { WorkflowEditor } from "@/components/agency/WorkflowEditor";
+import FeatureGate from "@/components/ui/FeatureGate";
 
 export const metadata: Metadata = {
   title: "Workflow Editor | Automation",
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 
 export default async function WorkflowEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <WorkflowEditor workflowId={id} />;
+  return (
+    <FeatureGate feature="workflows">
+      <WorkflowEditor workflowId={id} />
+    </FeatureGate>
+  );
 }

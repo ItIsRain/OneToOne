@@ -295,6 +295,102 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
           />
         );
 
+      case "nps": {
+        const npsValue = (value as number) ?? -1;
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Not at all likely</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Extremely likely</span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 11 }, (_, i) => i).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onChange(n)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all border ${
+                    npsValue === n
+                      ? n <= 6
+                        ? "bg-red-500 border-red-500 text-white"
+                        : n <= 8
+                        ? "bg-yellow-500 border-yellow-500 text-white"
+                        : "bg-green-500 border-green-500 text-white"
+                      : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 bg-white dark:bg-gray-800"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between mt-1.5">
+              <span className="text-[10px] text-red-400">Detractor (0-6)</span>
+              <span className="text-[10px] text-yellow-500">Passive (7-8)</span>
+              <span className="text-[10px] text-green-500">Promoter (9-10)</span>
+            </div>
+          </div>
+        );
+      }
+
+      case "scale": {
+        const scaleMax = (field.validation?.scale_max as number) ?? 5;
+        const scaleMin = (field.validation?.scale_min as number) ?? 1;
+        const lowLabel = (field.validation?.low_label as string) || "Poor";
+        const highLabel = (field.validation?.high_label as string) || "Excellent";
+        const scaleValue = (value as number) ?? -1;
+        const range = Array.from({ length: scaleMax - scaleMin + 1 }, (_, i) => scaleMin + i);
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400">{lowLabel}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{highLabel}</span>
+            </div>
+            <div className="flex gap-1.5">
+              {range.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => onChange(n)}
+                  className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all border ${
+                    scaleValue === n
+                      ? "bg-brand-500 border-brand-500 text-white shadow-md"
+                      : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-brand-300 dark:hover:border-brand-600 bg-white dark:bg-gray-800"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      case "testimonial": {
+        const testimonialData = (value as { text?: string; permission?: boolean }) ?? {};
+        return (
+          <div className="space-y-3">
+            <textarea
+              value={testimonialData.text ?? ""}
+              onChange={(e) => onChange({ ...testimonialData, text: e.target.value })}
+              placeholder={field.placeholder || "Share your experience..."}
+              rows={4}
+              className={inputClass}
+            />
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={testimonialData.permission ?? false}
+                onChange={(e) => onChange({ ...testimonialData, permission: e.target.checked })}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800"
+              />
+              <span className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                I give permission to use my response as a public testimonial
+              </span>
+            </label>
+          </div>
+        );
+      }
+
       case "section_heading":
         return (
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90 border-b border-gray-200 dark:border-gray-700 pb-2">

@@ -69,6 +69,12 @@ const TRIGGER_TYPES = [
   { value: "invoice_created", label: "Invoice Created" },
   { value: "invoice_overdue", label: "Invoice Overdue" },
   { value: "payment_received", label: "Payment Received" },
+  { value: "form_submitted", label: "Form Submitted" },
+  { value: "booking_created", label: "Booking Created" },
+  { value: "booking_cancelled", label: "Booking Cancelled" },
+  { value: "booking_rescheduled", label: "Booking Rescheduled" },
+  { value: "event_ended", label: "Event Ended" },
+  { value: "survey_response_submitted", label: "Survey Response Submitted" },
 ];
 
 const ACTION_CATEGORIES = [
@@ -249,6 +255,27 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "payment_amount", label: "Payment amount" },
     { var: "payment_method", label: "Payment method" },
     { var: "client_name", label: "Client name" },
+  ],
+  form_submitted: [
+    { var: "form_id", label: "Form ID" },
+    { var: "form_title", label: "Form title" },
+    { var: "form_slug", label: "Form slug" },
+    { var: "submission_data", label: "Submission data", desc: "JSON object with all submitted field values" },
+  ],
+  event_ended: [
+    { var: "event_id", label: "Event ID" },
+    { var: "event_title", label: "Event title" },
+    { var: "event_type", label: "Event type" },
+    { var: "event_end_date", label: "Event end date" },
+    { var: "attendees_count", label: "Attendees count" },
+  ],
+  survey_response_submitted: [
+    { var: "survey_id", label: "Survey ID" },
+    { var: "survey_title", label: "Survey title" },
+    { var: "event_id", label: "Event ID" },
+    { var: "event_title", label: "Event title" },
+    { var: "submission_data", label: "Submission data", desc: "JSON object with all submitted field values" },
+    { var: "nps_score", label: "NPS score", desc: "NPS value if an NPS field was answered" },
   ],
 };
 
@@ -512,8 +539,8 @@ function ActionIcon({ type, size = 16 }: { type: string; size?: number }) {
 /*  Variable UI components                                             */
 /* ------------------------------------------------------------------ */
 
-function VariableTag({ name, label, desc, onInsert }: {
-  name: string; label: string; desc?: string; onInsert: (v: string) => void;
+function VariableTag({ name, label, desc, displayLabel, onInsert }: {
+  name: string; label: string; desc?: string; displayLabel?: string; onInsert: (v: string) => void;
 }) {
   const [flash, setFlash] = useState<string | null>(null);
   return (
@@ -539,19 +566,37 @@ function VariableTag({ name, label, desc, onInsert }: {
           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
         </svg>
       )}
-      <span>{`{{${name}}}`}</span>
+      <span>{displayLabel || `{{${name}}}`}</span>
     </button>
   );
 }
 
-function VariablePalette({ triggerType, nodes, connections, currentNodeId, onInsert }: {
+function VariablePalette({ triggerType, triggerConfig, forms, nodes, connections, currentNodeId, onInsert }: {
   triggerType: string;
+  triggerConfig?: Record<string, unknown>;
+  forms?: FormOption[];
   nodes: NodeData[];
   connections: Connection[];
   currentNodeId: string;
   onInsert: (v: string) => void;
 }) {
   const triggerVars = getVariablesForTrigger(triggerType);
+
+  // Build dynamic form field variables when a specific form is selected
+  const formFieldVars: { var: string; label: string; desc?: string }[] = [];
+  if (triggerType === "form_submitted" && triggerConfig?.form_id && forms) {
+    const selectedForm = forms.find((f) => f.id === triggerConfig.form_id);
+    if (selectedForm?.fields?.length) {
+      for (const field of selectedForm.fields) {
+        if (field.type === "section_heading" || field.type === "paragraph") continue;
+        formFieldVars.push({
+          var: `submission_data.${field.id}`,
+          label: field.label,
+          desc: `${field.type} field — value submitted for "${field.label}"`,
+        });
+      }
+    }
+  }
 
   const precedingSteps = getPrecedingNodes(currentNodeId, nodes, connections);
   const stepOutputVars: { var: string; label: string; desc?: string; from: string }[] = [];
@@ -581,6 +626,18 @@ function VariablePalette({ triggerType, nodes, connections, currentNodeId, onIns
           <VariableTag key={v.var} name={v.var} label={v.label} desc={v.desc} onInsert={onInsert} />
         ))}
       </div>
+      {formFieldVars.length > 0 && (
+        <>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1 mt-2">
+            Form Fields
+          </p>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {formFieldVars.map((v) => (
+              <VariableTag key={v.var} name={v.var} label={v.label} displayLabel={v.label} desc={v.desc} onInsert={onInsert} />
+            ))}
+          </div>
+        </>
+      )}
       {stepOutputVars.length > 0 && (
         <>
           <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1 mt-2">
@@ -609,11 +666,25 @@ interface EventOption {
   status: string | null;
 }
 
+interface FormField {
+  id: string;
+  label: string;
+  type: string;
+}
+
+interface FormOption {
+  id: string;
+  title: string;
+  status: string | null;
+  fields: FormField[];
+}
+
 function NodeConfigPanel({
   node,
   triggerType,
   triggerConfig,
   events,
+  forms,
   nodes,
   connections,
   actionCategories,
@@ -627,6 +698,7 @@ function NodeConfigPanel({
   triggerType: string;
   triggerConfig: Record<string, unknown>;
   events: EventOption[];
+  forms: FormOption[];
   nodes: NodeData[];
   connections: Connection[];
   actionCategories: typeof ACTION_CATEGORIES;
@@ -867,9 +939,64 @@ function NodeConfigPanel({
             <input className={inputClass} type="number" min={0} step="0.01" value={(triggerConfig.min_amount as number) ?? ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, min_amount: e.target.value ? Number(e.target.value) : null })} placeholder="e.g. 500 (leave empty for any)" />
           </div>
         )}
+        {triggerType === "form_submitted" && (
+          <div>
+            <label className={labelClass}>Specific Form</label>
+            <select className={inputClass} value={(triggerConfig.form_id as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, form_id: e.target.value || undefined })}>
+              <option value="">Any Form</option>
+              {forms.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.title}{f.status ? ` — ${f.status}` : ""}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Choose a specific form, or leave as &ldquo;Any Form&rdquo; to trigger on all form submissions.</p>
+          </div>
+        )}
+        {triggerType === "event_ended" && (
+          <>
+            <div>
+              <label className={labelClass}>Specific Event</label>
+              <select className={inputClass} value={(triggerConfig.event_id as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, event_id: e.target.value || undefined })}>
+                <option value="">Any Event</option>
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.title}{ev.event_type ? ` (${ev.event_type})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Event Type Filter</label>
+              <select className={inputClass} value={(triggerConfig.event_type as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, event_type: e.target.value || undefined })}>
+                <option value="">Any Type</option>
+                <option value="general">General</option>
+                <option value="meeting">Meeting</option>
+                <option value="conference">Conference</option>
+                <option value="workshop">Workshop</option>
+                <option value="webinar">Webinar</option>
+                <option value="hackathon">Hackathon</option>
+              </select>
+            </div>
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-300">Fires when an event status changes to &ldquo;completed&rdquo;. Linked surveys with auto-send enabled will be sent to attendees automatically.</p>
+            </div>
+          </>
+        )}
+        {triggerType === "survey_response_submitted" && (
+          <div>
+            <label className={labelClass}>Specific Survey</label>
+            <select className={inputClass} value={(triggerConfig.survey_id as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, survey_id: e.target.value || undefined })}>
+              <option value="">Any Survey</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Fires when someone submits a response to a survey.</p>
+          </div>
+        )}
 
         <VariablePalette
           triggerType={triggerType}
+          triggerConfig={triggerConfig}
+          forms={forms}
           nodes={nodes}
           connections={connections}
           currentNodeId={node.id}
@@ -1014,7 +1141,7 @@ function NodeConfigPanel({
                 Uses your Twilio credentials from <strong>Settings &rarr; Integrations</strong>. If not configured, falls back to environment variables.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1050,7 +1177,7 @@ function NodeConfigPanel({
                 Uses your Slack Webhook URL from <strong>Settings &rarr; Integrations</strong>.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1078,7 +1205,7 @@ function NodeConfigPanel({
                 Uses your WhatsApp Business API credentials from <strong>Settings &rarr; Integrations</strong>.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1125,7 +1252,7 @@ function NodeConfigPanel({
               <textarea className={inputClass} rows={3} value={(node.config.body_json as string) ?? ""} onChange={(e) => update("body_json", e.target.value)} onFocus={trackFocus("body_json")} placeholder='{"client_id": "{{entity_id}}"}' />
               <p className="mt-1 text-xs text-gray-400">For POST/PUT/PATCH. If empty, the full trigger context is sent automatically.</p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1148,7 +1275,7 @@ function NodeConfigPanel({
               <textarea className={inputClass} rows={3} value={(node.config.description as string) ?? ""} onChange={(e) => update("description", e.target.value)} onFocus={trackFocus("description")} placeholder="Client {{entity_name}} was onboarded successfully" />
               <p className="mt-1 text-xs text-gray-400">The activity log message. Supports template variables.</p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1316,7 +1443,7 @@ function NodeConfigPanel({
                 This step generates speech with ElevenLabs and calls the recipient via Twilio. Both integrations must be configured in <strong>Settings &rarr; Integrations</strong>.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1354,7 +1481,7 @@ function NodeConfigPanel({
                 Configure your API key and default model in <strong>Settings &rarr; Integrations &rarr; OpenAI</strong>.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1446,7 +1573,7 @@ function NodeConfigPanel({
                 Configure your OAuth credentials in <strong>Settings &rarr; Integrations &rarr; Google Calendar</strong>.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1470,7 +1597,7 @@ function NodeConfigPanel({
                 Configure your Zapier Webhook URL in <strong>Settings &rarr; Integrations &rarr; Zapier</strong>. Create a &ldquo;Catch Hook&rdquo; trigger in Zapier to receive the data.
               </p>
             </div>
-            <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>
         );
 
@@ -1515,7 +1642,7 @@ function NodeConfigPanel({
 
       {/* Universal variable palette for action types that don't include one inline */}
       {!["send_sms", "send_slack", "send_whatsapp", "http_request", "log_activity", "elevenlabs_tts", "openai_generate", "google_calendar_event", "zapier_trigger"].includes(at) && (
-        <VariablePalette triggerType={triggerType} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+        <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
       )}
     </div>
   );
@@ -1548,6 +1675,7 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
   const [recentRuns, setRecentRuns] = useState<WorkflowRun[]>([]);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [events, setEvents] = useState<EventOption[]>([]);
+  const [forms, setForms] = useState<FormOption[]>([]);
   const [activeProviders, setActiveProviders] = useState<Set<string>>(new Set());
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -1615,6 +1743,23 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchForms = useCallback(async () => {
+    try {
+      const res = await fetch("/api/forms");
+      if (!res.ok) return;
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : json.forms ?? [];
+      setForms(
+        list.map((f: Record<string, unknown>) => ({
+          id: f.id as string,
+          title: (f.title ?? f.name ?? "") as string,
+          status: (f.status ?? null) as string | null,
+          fields: Array.isArray(f.fields) ? (f.fields as FormField[]) : [],
+        }))
+      );
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchIntegrations = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/integrations");
@@ -1635,8 +1780,9 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
     fetchWorkflow();
     fetchRuns();
     fetchEvents();
+    fetchForms();
     fetchIntegrations();
-  }, [fetchWorkflow, fetchRuns, fetchEvents, fetchIntegrations]);
+  }, [fetchWorkflow, fetchRuns, fetchEvents, fetchForms, fetchIntegrations]);
 
   /** Action categories filtered to hide integrations without configured API keys */
   const filteredActionCategories = useMemo(() => {
@@ -2295,6 +2441,7 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
                   triggerType={meta.trigger_type}
                   triggerConfig={meta.trigger_config}
                   events={events}
+                  forms={forms}
                   nodes={nodes}
                   connections={connections}
                   actionCategories={filteredActionCategories}
