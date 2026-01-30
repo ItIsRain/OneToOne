@@ -92,6 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
 
+  // Guards to prevent the infinite token-refresh loop.
+  // When a refresh token is invalid, Supabase's internal Realtime auth
+  // listener can create a cycle: refresh fails → session removed →
+  // Realtime re-auths → getSession → refresh → fail → repeat.
+  // These refs ensure we only process the first SIGNED_OUT and redirect once.
+  const hadSessionRef = useRef(false);
+  const isRedirectingRef = useRef(false);
+
   const fetchProfile = useCallback(async (userId: string) => {
     const { data: profileData } = await supabase
       .from("profiles")
@@ -117,19 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const stillActive = getCookie("1i1_session_active");
 
       if (wasSessionOnly && !stillActive) {
-        // Clear the persistent marker
         clearSessionOnlyCookies();
-        // Also clear legacy localStorage flags
         localStorage.removeItem("last_login_session_only");
-        // Sign out — AWAIT so it completes before anything else happens
-        await supabase.auth.signOut();
+        // Use scope: 'local' to avoid a server call that could also get rate-limited
+        await supabase.auth.signOut({ scope: "local" });
         if (!cancelled) {
           setUser(null);
           setProfile(null);
           setLoading(false);
+          isRedirectingRef.current = true;
           window.location.href = "/signin";
         }
-        return; // Don't proceed to fetch session
+        return;
       }
 
       // ── Normal session initialization ──
@@ -139,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentUser ?? null);
 
       if (currentUser) {
+        hadSessionRef.current = true;
         await fetchProfile(currentUser.id);
       }
 
@@ -152,12 +160,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null);
+        // Skip if we're already redirecting (breaks the infinite loop)
+        if (isRedirectingRef.current) return;
 
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
+        // INITIAL_SESSION is handled by init() above — skip to avoid double work
+        if (event === "INITIAL_SESSION") return;
+
+        if (event === "SIGNED_OUT") {
+          setUser(null);
           setProfile(null);
+          setLoading(false);
+
+          // Only redirect if the user previously had a session (token expired
+          // or was revoked). Without this check we'd redirect on public pages
+          // where there was never a session to begin with.
+          if (hadSessionRef.current) {
+            isRedirectingRef.current = true;
+            window.location.href = "/signin";
+          }
+          return;
+        }
+
+        // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED — update state
+        if (session?.user) {
+          hadSessionRef.current = true;
+          setUser(session.user);
+          await fetchProfile(session.user.id);
         }
 
         setLoading(false);
@@ -172,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    isRedirectingRef.current = true;
     clearSessionOnlyCookies();
     await supabase.auth.signOut();
     setUser(null);

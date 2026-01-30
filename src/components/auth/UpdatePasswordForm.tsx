@@ -17,9 +17,10 @@ export default function UpdatePasswordForm() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // Supabase will automatically pick up the recovery token from the URL hash
     const supabase = createClient();
-    supabase.auth.onAuthStateChange((event) => {
+
+    // Supabase will automatically pick up the recovery token from the URL hash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setSessionReady(true);
       }
@@ -31,6 +32,10 @@ export default function UpdatePasswordForm() {
         setSessionReady(true);
       }
     });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
