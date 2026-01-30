@@ -25,9 +25,9 @@ export default function UpdatePasswordForm() {
       }
     });
 
-    // Also check if we already have a session (e.g., page refresh)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    // Also check if we already have a user (e.g., page refresh)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
         setSessionReady(true);
       }
     });

@@ -133,13 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // ── Normal session initialization ──
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (cancelled) return;
 
-      setUser(session?.user ?? null);
+      setUser(currentUser ?? null);
 
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+      if (currentUser) {
+        await fetchProfile(currentUser.id);
       }
 
       if (!cancelled) {
