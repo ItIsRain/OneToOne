@@ -43,34 +43,43 @@ export default function SignInForm() {
         clearSessionOnlyCookies();
       }
 
-      // Get user's tenant subdomain for redirect
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", authData.user.id)
-        .single();
-
       // Determine where to redirect
       // Only allow relative paths to prevent open redirect attacks
       const safeRedirect = redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")
         ? redirectPath
         : "/dashboard";
 
-      if (profile?.tenant_id) {
-        const { data: tenant } = await supabase
-          .from("tenants")
-          .select("subdomain")
-          .eq("id", profile.tenant_id)
-          .single();
+      // Get user's tenant subdomain for redirect
+      // Use timeout to ensure redirect always fires even if queries hang
+      const tenantRedirect = await Promise.race([
+        (async () => {
+          try {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("tenant_id")
+              .eq("id", authData.user.id)
+              .single();
 
-        if (tenant?.subdomain) {
-          window.location.href = getTenantUrl(tenant.subdomain, safeRedirect);
-          return;
-        }
-      }
+            if (profile?.tenant_id) {
+              const { data: tenant } = await supabase
+                .from("tenants")
+                .select("subdomain")
+                .eq("id", profile.tenant_id)
+                .single();
 
-      // Fallback: redirect on current domain
-      window.location.href = safeRedirect;
+              if (tenant?.subdomain) {
+                return getTenantUrl(tenant.subdomain, safeRedirect);
+              }
+            }
+          } catch (queryErr) {
+            console.error("Post-login query failed:", queryErr);
+          }
+          return null;
+        })(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+
+      window.location.href = tenantRedirect || safeRedirect;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

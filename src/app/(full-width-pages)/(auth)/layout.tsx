@@ -1,7 +1,6 @@
 import GridShape from "@/components/common/GridShape";
 import { ThemeProvider } from "@/context/ThemeContext";
 import Image from "next/image";
-import Link from "next/link";
 import React from "react";
 
 export default function AuthLayout({
@@ -21,19 +20,20 @@ export default function AuthLayout({
                 <GridShape />
               </div>
               <div className="flex flex-col items-center max-w-sm">
-                <Link href="/" className="block mb-6">
+                <div className="block mb-6">
                   <Image
                     width={180}
                     height={48}
                     src="/Logo.svg"
-                    alt="1i1"
+                    alt="Logo"
+                    className="dark:brightness-0 dark:invert"
                   />
-                </Link>
+                </div>
                 <p className="text-center text-gray-700 text-lg font-medium">
-                  Your Agency. Your Portal.
+                  Manage. Automate. Grow.
                 </p>
                 <p className="text-center text-gray-500 text-sm mt-2">
-                  White-label client portals built for SMEs
+                  Your all-in-one business management platform
                 </p>
               </div>
             </div>

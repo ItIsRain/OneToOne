@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { getMainUrl } from "@/lib/url";
 
 export const metadata: Metadata = {
   title: "Portal Not Found",
@@ -86,13 +87,13 @@ export default function InvalidSubdomainPage() {
         {/* CTA Buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="https://1i1.ae"
+            href={getMainUrl()}
             className="inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-600"
           >
-            Go to OneToOne
+            Go to Homepage
           </Link>
           <Link
-            href="https://1i1.ae/signup"
+            href={getMainUrl("/signup")}
             className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Create Your Portal
@@ -102,7 +103,7 @@ export default function InvalidSubdomainPage() {
 
       {/* Footer */}
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center text-sm text-gray-500 dark:text-gray-400">
-        &copy; {new Date().getFullYear()} OneToOne by Lunar Labs
+        &copy; {new Date().getFullYear()} Lunar Labs
       </p>
     </div>
   );

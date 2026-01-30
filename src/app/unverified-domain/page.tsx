@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { getMainUrl } from "@/lib/url";
 
 export const metadata: Metadata = {
   title: "Domain Pending Verification",
@@ -74,7 +75,7 @@ export default function UnverifiedDomainPage() {
                 For Portal Owners
               </h2>
               <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-                To complete the setup, log in to your OneToOne dashboard and navigate to
+                To complete the setup, log in to your dashboard and navigate to
                 Settings &rarr; Domains to verify your domain ownership via DNS records.
               </p>
             </div>
@@ -91,7 +92,7 @@ export default function UnverifiedDomainPage() {
               <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                 1
               </span>
-              Log in to your OneToOne dashboard
+              Log in to your dashboard
             </li>
             <li className="flex items-start gap-2">
               <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
@@ -117,13 +118,13 @@ export default function UnverifiedDomainPage() {
         {/* CTA Buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link
-            href="https://app.1i1.ae/signin"
+            href={getMainUrl("/signin")}
             className="inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-600"
           >
             Sign In to Dashboard
           </Link>
           <Link
-            href="https://1i1.ae"
+            href={getMainUrl()}
             className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Learn More
@@ -133,7 +134,7 @@ export default function UnverifiedDomainPage() {
 
       {/* Footer */}
       <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center text-sm text-gray-500 dark:text-gray-400">
-        &copy; {new Date().getFullYear()} OneToOne by Lunar Labs
+        &copy; {new Date().getFullYear()} Lunar Labs
       </p>
     </div>
   );

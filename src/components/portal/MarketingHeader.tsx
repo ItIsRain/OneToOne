@@ -15,7 +15,7 @@ export default function MarketingHeader() {
           <Link href="/" className="flex items-center">
             <Image
               src="/Logo.svg"
-              alt="OneToOne"
+              alt="Logo"
               width={160}
               height={52}
               className="h-13 w-auto dark:brightness-0 dark:invert"
