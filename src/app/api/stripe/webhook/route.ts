@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
-});
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+  return new Stripe(key, { apiVersion: "2025-12-15.clover" });
+}
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
-// Create admin supabase client for webhook (no user auth)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase env vars not configured");
+  return createClient(url, key);
+}
 
 const PLAN_NAMES: Record<string, string> = {
   starter: "Starter",
@@ -28,6 +29,14 @@ const PLAN_PRICES: Record<string, { monthly: number; yearly: number }> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
+    const supabase = getSupabase();
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret) {
+      throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
+    }
+
     const body = await request.text();
     const signature = request.headers.get("stripe-signature")!;
 
@@ -43,31 +52,31 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session);
+        await handleCheckoutCompleted(session, stripe, supabase);
         break;
       }
 
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionUpdated(subscription);
+        await handleSubscriptionUpdated(subscription, supabase);
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        await handleSubscriptionCanceled(subscription);
+        await handleSubscriptionCanceled(subscription, supabase);
         break;
       }
 
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
-        await handleInvoicePaid(invoice);
+        await handleInvoicePaid(invoice, stripe, supabase);
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        await handlePaymentFailed(invoice);
+        await handlePaymentFailed(invoice, stripe, supabase);
         break;
       }
     }
@@ -79,7 +88,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session, stripe: Stripe, supabase: SupabaseClient) {
   const tenantId = session.metadata?.tenant_id;
   const planType = session.metadata?.plan_type;
   const billingInterval = session.metadata?.billing_interval as "monthly" | "yearly";
@@ -157,7 +166,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(`Subscription activated for tenant ${tenantId}: ${planType} (${billingInterval})${isTrialing ? " - Trial" : ""}`);
 }
 
-async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription) {
+async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription, supabase: SupabaseClient) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscription = subscriptionEvent as any;
   const tenantId = subscription.metadata?.tenant_id;
@@ -217,7 +226,7 @@ async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription)
   }
 }
 
-async function handleSubscriptionCanceled(subscriptionEvent: Stripe.Subscription) {
+async function handleSubscriptionCanceled(subscriptionEvent: Stripe.Subscription, supabase: SupabaseClient) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscription = subscriptionEvent as any;
   const tenantId = subscription.metadata?.tenant_id;
@@ -248,7 +257,7 @@ async function handleSubscriptionCanceled(subscriptionEvent: Stripe.Subscription
   console.log(`Subscription canceled for tenant ${tenantId}, downgraded to free plan`);
 }
 
-async function handleInvoicePaid(invoiceEvent: Stripe.Invoice) {
+async function handleInvoicePaid(invoiceEvent: Stripe.Invoice, stripe: Stripe, supabase: SupabaseClient) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const invoice = invoiceEvent as any;
 
@@ -292,7 +301,7 @@ async function handleInvoicePaid(invoiceEvent: Stripe.Invoice) {
   }
 }
 
-async function handlePaymentFailed(invoiceEvent: Stripe.Invoice) {
+async function handlePaymentFailed(invoiceEvent: Stripe.Invoice, stripe: Stripe, supabase: SupabaseClient) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const invoice = invoiceEvent as any;
 

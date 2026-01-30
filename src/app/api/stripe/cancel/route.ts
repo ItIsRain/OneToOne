@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
-});
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+  return new Stripe(key, { apiVersion: "2025-12-15.clover" });
+}
 
 // POST - Cancel subscription in Stripe (cancel at period end)
 export async function POST() {
   try {
+    const stripe = getStripe();
     const supabase = await createClient();
     const {
       data: { user },
@@ -72,6 +75,7 @@ export async function POST() {
 // DELETE - Reactivate subscription (remove cancellation)
 export async function DELETE() {
   try {
+    const stripe = getStripe();
     const supabase = await createClient();
     const {
       data: { user },

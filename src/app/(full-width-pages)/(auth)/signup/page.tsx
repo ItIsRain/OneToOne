@@ -1,5 +1,6 @@
 import SignUpForm from "@/components/auth/SignUpForm";
 import { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Create Your Account - Start Free Trial",
@@ -11,5 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default function SignUp() {
-  return <SignUpForm />;
+  return (
+    <Suspense>
+      <SignUpForm />
+    </Suspense>
+  );
 }

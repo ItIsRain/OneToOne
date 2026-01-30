@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
-});
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
+  return new Stripe(key, { apiVersion: "2025-12-15.clover" });
+}
 
 // Stripe Price IDs for each plan (you'll need to create these in Stripe Dashboard)
 const STRIPE_PRICE_IDS: Record<string, { monthly: string; yearly: string }> = {
@@ -33,6 +35,7 @@ type BillingInterval = "monthly" | "yearly";
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
