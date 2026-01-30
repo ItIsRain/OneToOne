@@ -145,6 +145,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
+    // If a template is selected, fetch its sections and pricing items
+    let templateSections: unknown[] = [];
+    let templatePricingItems: unknown[] = [];
+    if (body.template_id) {
+      const { data: template } = await supabase
+        .from("proposal_templates")
+        .select("sections, pricing_items")
+        .eq("id", body.template_id)
+        .single();
+
+      if (template) {
+        templateSections = template.sections || [];
+        templatePricingItems = template.pricing_items || [];
+      }
+    }
+
     // Auto-generate slug from title
     const baseSlug = body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
@@ -158,8 +174,8 @@ export async function POST(request: Request) {
       client_id: body.client_id || null,
       lead_id: body.lead_id || null,
       project_id: body.project_id || null,
-      sections: body.sections || [],
-      pricing_items: body.pricing_items || [],
+      sections: body.sections?.length ? body.sections : templateSections,
+      pricing_items: body.pricing_items?.length ? body.pricing_items : templatePricingItems,
       currency: body.currency || "USD",
       valid_until: body.valid_until || null,
       notes: body.notes || null,

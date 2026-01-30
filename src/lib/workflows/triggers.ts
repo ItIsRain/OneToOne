@@ -148,6 +148,31 @@ export async function checkTriggers(
             if (triggerConfig.survey_id && triggerConfig.survey_id !== triggerData.survey_id) skip = true;
             break;
           }
+          case "contract_created": {
+            // Always fires on contract creation — no filter needed
+            break;
+          }
+          case "contract_sent": {
+            // Always fires when a contract is sent — no filter needed
+            break;
+          }
+          case "contract_signed": {
+            // Always fires when a contract is signed — no filter needed
+            break;
+          }
+          case "vendor_created": {
+            // Always fires on vendor creation — no filter needed
+            break;
+          }
+          case "vendor_status_changed": {
+            if (triggerConfig.from_status && triggerConfig.from_status !== triggerData.from_status) skip = true;
+            if (triggerConfig.to_status && triggerConfig.to_status !== triggerData.to_status) skip = true;
+            break;
+          }
+          case "form_created": {
+            // Always fires on form creation — no filter needed
+            break;
+          }
         }
 
         if (skip) continue;

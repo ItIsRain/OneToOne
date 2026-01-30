@@ -31,10 +31,6 @@ function formatDate(dateString: string | null): string {
 export const ContractTemplatesTable: React.FC = () => {
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [creating, setCreating] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -55,28 +51,6 @@ export const ContractTemplatesTable: React.FC = () => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/contracts/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim(), description: newDescription.trim() || null }),
-      });
-      if (res.ok) {
-        setNewName("");
-        setNewDescription("");
-        setShowCreate(false);
-        fetchTemplates();
-      }
-    } catch (err) {
-      console.error("Error creating template:", err);
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const handleUse = async (template: ContractTemplate) => {
     try {
       const res = await fetch("/api/contracts", {
@@ -96,6 +70,10 @@ export const ContractTemplatesTable: React.FC = () => {
     }
   };
 
+  const handleEdit = (templateId: string) => {
+    window.location.href = `/dashboard/contracts/templates/${templateId}`;
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this template?")) return;
     try {
@@ -112,53 +90,15 @@ export const ContractTemplatesTable: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-            Contract Templates
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Reusable templates for creating contracts quickly
-          </p>
-        </div>
-        <Button onClick={() => setShowCreate(!showCreate)}>
+      <div className="mb-6 flex items-center justify-end">
+        <Button
+          onClick={() =>
+            (window.location.href = "/dashboard/contracts/templates/new")
+          }
+        >
           Create Template
         </Button>
       </div>
-
-      {/* Inline create form */}
-      {showCreate && (
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Template Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Standard Service Agreement"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 focus:border-brand-300 focus:outline-hidden"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Description (optional)</label>
-              <input
-                type="text"
-                placeholder="Brief description of this template"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 focus:border-brand-300 focus:outline-hidden"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleCreate} disabled={creating || !newName.trim()}>
-                {creating ? "Creating..." : "Create"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -198,6 +138,15 @@ export const ContractTemplatesTable: React.FC = () => {
                           title="Use template"
                         >
                           Use
+                        </button>
+                        <button
+                          onClick={() => handleEdit(template.id)}
+                          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          title="Edit"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleDelete(template.id)}

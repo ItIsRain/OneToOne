@@ -146,13 +146,11 @@ export async function POST(request: Request) {
 
     const templateData = {
       tenant_id: profile.tenant_id,
-      created_by: user.id,
       name: body.name,
       description: body.description || null,
       category: body.category || null,
       fields: body.fields || [],
       settings: body.settings || {},
-      conditional_rules: body.conditional_rules || [],
       is_system: false,
     };
 

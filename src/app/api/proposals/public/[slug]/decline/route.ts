@@ -32,7 +32,7 @@ export async function POST(
         updated_at: now,
       })
       .eq("slug", slug)
-      .in("status", ["sent", "viewed"])
+      .in("status", ["draft", "sent", "viewed"])
       .select(`
         *,
         client:clients(id, name, email)

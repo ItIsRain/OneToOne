@@ -138,7 +138,6 @@ export async function PUT(
       "category",
       "fields",
       "settings",
-      "conditional_rules",
     ];
 
     const updates: Record<string, unknown> = {};

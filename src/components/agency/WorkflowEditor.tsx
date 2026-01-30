@@ -54,26 +54,57 @@ interface WorkflowMeta {
 
 const TRIGGER_TYPES = [
   { value: "manual", label: "Manual" },
+  // Clients
   { value: "client_created", label: "Client Created" },
   { value: "client_status_changed", label: "Client Status Changed" },
+  // Projects
   { value: "project_created", label: "Project Created" },
   { value: "project_status_changed", label: "Project Status Changed" },
-  { value: "task_status_changed", label: "Task Status Changed" },
+  // Tasks
   { value: "task_created", label: "Task Created" },
+  { value: "task_status_changed", label: "Task Status Changed" },
   { value: "task_completed", label: "Task Completed" },
+  // Leads
   { value: "lead_created", label: "Lead Created" },
   { value: "lead_status_changed", label: "Lead Status Changed" },
+  // Contacts
   { value: "contact_created", label: "Contact Created" },
-  { value: "event_created", label: "Event Created" },
-  { value: "event_registration", label: "Event Registration" },
+  // Proposals
+  { value: "proposal_created", label: "Proposal Created" },
+  { value: "proposal_sent", label: "Proposal Sent" },
+  { value: "proposal_viewed", label: "Proposal Viewed" },
+  { value: "proposal_accepted", label: "Proposal Accepted" },
+  { value: "proposal_declined", label: "Proposal Declined" },
+  // Contracts
+  { value: "contract_created", label: "Contract Created" },
+  { value: "contract_sent", label: "Contract Sent" },
+  { value: "contract_signed", label: "Contract Signed" },
+  // Invoices & Payments
   { value: "invoice_created", label: "Invoice Created" },
   { value: "invoice_overdue", label: "Invoice Overdue" },
   { value: "payment_received", label: "Payment Received" },
+  // Forms
+  { value: "form_created", label: "Form Created" },
+  { value: "form_published", label: "Form Published" },
   { value: "form_submitted", label: "Form Submitted" },
+  // Events
+  { value: "event_created", label: "Event Created" },
+  { value: "event_registration", label: "Event Registration" },
+  { value: "event_ended", label: "Event Ended" },
+  // Bookings
   { value: "booking_created", label: "Booking Created" },
   { value: "booking_cancelled", label: "Booking Cancelled" },
   { value: "booking_rescheduled", label: "Booking Rescheduled" },
-  { value: "event_ended", label: "Event Ended" },
+  // Vendors
+  { value: "vendor_created", label: "Vendor Created" },
+  { value: "vendor_status_changed", label: "Vendor Status Changed" },
+  // Deliverables
+  { value: "deliverable_approved", label: "Deliverable Approved" },
+  { value: "deliverable_rejected", label: "Deliverable Rejected" },
+  // Portal
+  { value: "portal_client_login", label: "Portal Client Login" },
+  { value: "portal_file_uploaded", label: "Portal File Uploaded" },
+  // Surveys
   { value: "survey_response_submitted", label: "Survey Response Submitted" },
 ];
 
@@ -177,6 +208,7 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "entity_name", label: "Entity name", desc: "Display name of the triggering record (e.g. client name, task title)" },
     { var: "now", label: "Current date/time", desc: "Timestamp when the workflow step executes, in ISO 8601 format" },
   ],
+  // --- Tasks ---
   task_status_changed: [
     { var: "from_status", label: "Previous status" },
     { var: "to_status", label: "New status" },
@@ -194,11 +226,18 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "task_assignee_id", label: "Assignee ID" },
     { var: "task_project_id", label: "Project ID" },
   ],
+  // --- Projects ---
+  project_created: [
+    { var: "project_name", label: "Project name" },
+    { var: "project_status", label: "Project status" },
+    { var: "project_client_id", label: "Client ID" },
+  ],
   project_status_changed: [
     { var: "from_status", label: "Previous status" },
     { var: "to_status", label: "New status" },
     { var: "project_name", label: "Project name" },
   ],
+  // --- Leads ---
   lead_created: [
     { var: "lead_name", label: "Lead name" },
     { var: "lead_email", label: "Lead email" },
@@ -211,6 +250,7 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "lead_email", label: "Lead email" },
     { var: "lead_company", label: "Lead company" },
   ],
+  // --- Clients ---
   client_created: [
     { var: "client_name", label: "Client name" },
     { var: "client_email", label: "Client email" },
@@ -223,6 +263,7 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "client_email", label: "Client email" },
     { var: "client_company", label: "Client company" },
   ],
+  // --- Contacts ---
   contact_created: [
     { var: "contact_first_name", label: "First name" },
     { var: "contact_last_name", label: "Last name" },
@@ -230,16 +271,54 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "contact_phone", label: "Phone" },
     { var: "contact_company", label: "Company" },
   ],
-  event_registration: [
-    { var: "event_id", label: "Event ID" },
-    { var: "event_title", label: "Event title" },
-    { var: "event_type", label: "Event type" },
-    { var: "attendee_id", label: "Attendee ID" },
-    { var: "attendee_name", label: "Attendee name" },
-    { var: "attendee_email", label: "Attendee email" },
-    { var: "attendee_phone", label: "Attendee phone" },
-    { var: "attendee_company", label: "Attendee company" },
+  // --- Proposals ---
+  proposal_created: [
+    { var: "proposal_title", label: "Proposal title" },
+    { var: "client_id", label: "Client ID" },
+    { var: "total", label: "Total amount", desc: "Total value of the proposal" },
   ],
+  proposal_sent: [
+    { var: "proposal_title", label: "Proposal title" },
+    { var: "client_name", label: "Client name" },
+    { var: "client_email", label: "Client email" },
+    { var: "total", label: "Total amount" },
+  ],
+  proposal_viewed: [
+    { var: "proposal_title", label: "Proposal title" },
+    { var: "client_id", label: "Client ID" },
+    { var: "total", label: "Total amount" },
+  ],
+  proposal_accepted: [
+    { var: "proposal_title", label: "Proposal title" },
+    { var: "client_name", label: "Client name" },
+    { var: "total", label: "Total amount" },
+    { var: "signature_name", label: "Signature name", desc: "Name of the person who signed" },
+  ],
+  proposal_declined: [
+    { var: "proposal_title", label: "Proposal title" },
+    { var: "client_name", label: "Client name" },
+    { var: "total", label: "Total amount" },
+    { var: "decline_reason", label: "Decline reason", desc: "Reason given for declining the proposal" },
+  ],
+  // --- Contracts ---
+  contract_created: [
+    { var: "contract_title", label: "Contract title" },
+    { var: "client_id", label: "Client ID" },
+    { var: "total", label: "Contract value" },
+  ],
+  contract_sent: [
+    { var: "contract_title", label: "Contract title" },
+    { var: "client_name", label: "Client name" },
+    { var: "client_email", label: "Client email" },
+    { var: "total", label: "Contract value" },
+  ],
+  contract_signed: [
+    { var: "contract_title", label: "Contract title" },
+    { var: "client_id", label: "Client ID" },
+    { var: "total", label: "Contract value" },
+    { var: "signature_name", label: "Signature name", desc: "Name of the person who signed" },
+  ],
+  // --- Invoices & Payments ---
   invoice_created: [
     { var: "invoice_amount", label: "Invoice amount" },
     { var: "invoice_number", label: "Invoice number" },
@@ -256,11 +335,37 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "payment_method", label: "Payment method" },
     { var: "client_name", label: "Client name" },
   ],
+  // --- Forms ---
+  form_created: [
+    { var: "form_title", label: "Form title" },
+    { var: "form_slug", label: "Form slug" },
+  ],
+  form_published: [
+    { var: "form_title", label: "Form title" },
+    { var: "public_url", label: "Public URL", desc: "The public URL where the form can be accessed" },
+  ],
   form_submitted: [
     { var: "form_id", label: "Form ID" },
     { var: "form_title", label: "Form title" },
     { var: "form_slug", label: "Form slug" },
     { var: "submission_data", label: "Submission data", desc: "JSON object with all submitted field values" },
+  ],
+  // --- Events ---
+  event_created: [
+    { var: "event_title", label: "Event title" },
+    { var: "event_type", label: "Event type" },
+    { var: "event_date", label: "Event date" },
+    { var: "event_client_id", label: "Client ID" },
+  ],
+  event_registration: [
+    { var: "event_id", label: "Event ID" },
+    { var: "event_title", label: "Event title" },
+    { var: "event_type", label: "Event type" },
+    { var: "attendee_id", label: "Attendee ID" },
+    { var: "attendee_name", label: "Attendee name" },
+    { var: "attendee_email", label: "Attendee email" },
+    { var: "attendee_phone", label: "Attendee phone" },
+    { var: "attendee_company", label: "Attendee company" },
   ],
   event_ended: [
     { var: "event_id", label: "Event ID" },
@@ -269,6 +374,74 @@ const TRIGGER_VARIABLES: Record<string, { var: string; label: string; desc?: str
     { var: "event_end_date", label: "Event end date" },
     { var: "attendees_count", label: "Attendees count" },
   ],
+  // --- Bookings ---
+  booking_created: [
+    { var: "client_name", label: "Client name" },
+    { var: "client_email", label: "Client email" },
+    { var: "client_phone", label: "Client phone" },
+    { var: "start_time", label: "Start time" },
+    { var: "end_time", label: "End time" },
+    { var: "booking_page_id", label: "Booking page ID" },
+    { var: "status", label: "Status" },
+  ],
+  booking_cancelled: [
+    { var: "client_name", label: "Client name" },
+    { var: "client_email", label: "Client email" },
+    { var: "booking_page_id", label: "Booking page ID" },
+    { var: "start_time", label: "Start time" },
+  ],
+  booking_rescheduled: [
+    { var: "client_name", label: "Client name" },
+    { var: "client_email", label: "Client email" },
+    { var: "booking_page_id", label: "Booking page ID" },
+    { var: "start_time", label: "New start time" },
+    { var: "end_time", label: "New end time" },
+  ],
+  // --- Vendors ---
+  vendor_created: [
+    { var: "vendor_name", label: "Vendor name" },
+    { var: "vendor_email", label: "Vendor email" },
+    { var: "vendor_phone", label: "Vendor phone" },
+    { var: "vendor_company", label: "Vendor company" },
+  ],
+  vendor_status_changed: [
+    { var: "from_status", label: "Previous status" },
+    { var: "to_status", label: "New status" },
+    { var: "vendor_name", label: "Vendor name" },
+    { var: "vendor_email", label: "Vendor email" },
+    { var: "vendor_company", label: "Vendor company" },
+  ],
+  // --- Deliverables ---
+  deliverable_approved: [
+    { var: "approval_title", label: "Deliverable title" },
+    { var: "approval_status", label: "Approval status" },
+    { var: "client_comment", label: "Client comment" },
+    { var: "portal_client_name", label: "Client name" },
+    { var: "portal_client_email", label: "Client email" },
+    { var: "project_id", label: "Project ID" },
+  ],
+  deliverable_rejected: [
+    { var: "approval_title", label: "Deliverable title" },
+    { var: "approval_status", label: "Approval status" },
+    { var: "client_comment", label: "Client comment", desc: "Reason or feedback from the client" },
+    { var: "portal_client_name", label: "Client name" },
+    { var: "portal_client_email", label: "Client email" },
+    { var: "project_id", label: "Project ID" },
+  ],
+  // --- Portal ---
+  portal_client_login: [
+    { var: "portal_client_name", label: "Client name" },
+    { var: "portal_client_email", label: "Client email" },
+    { var: "login_method", label: "Login method", desc: "How the client logged in (magic_link or password)" },
+  ],
+  portal_file_uploaded: [
+    { var: "file_name", label: "File name" },
+    { var: "file_type", label: "File type" },
+    { var: "portal_client_name", label: "Client name" },
+    { var: "portal_client_email", label: "Client email" },
+    { var: "project_id", label: "Project ID" },
+  ],
+  // --- Surveys ---
   survey_response_submitted: [
     { var: "survey_id", label: "Survey ID" },
     { var: "survey_title", label: "Survey title" },
@@ -679,12 +852,19 @@ interface FormOption {
   fields: FormField[];
 }
 
+interface BookingPageOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 function NodeConfigPanel({
   node,
   triggerType,
   triggerConfig,
   events,
   forms,
+  bookingPages,
   nodes,
   connections,
   actionCategories,
@@ -699,6 +879,7 @@ function NodeConfigPanel({
   triggerConfig: Record<string, unknown>;
   events: EventOption[];
   forms: FormOption[];
+  bookingPages: BookingPageOption[];
   nodes: NodeData[];
   connections: Connection[];
   actionCategories: typeof ACTION_CATEGORIES;
@@ -990,6 +1171,97 @@ function NodeConfigPanel({
               <option value="">Any Survey</option>
             </select>
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Fires when someone submits a response to a survey.</p>
+          </div>
+        )}
+        {/* --- Booking triggers --- */}
+        {(triggerType === "booking_created" || triggerType === "booking_cancelled" || triggerType === "booking_rescheduled") && (
+          <div>
+            <label className={labelClass}>Booking Page</label>
+            <select className={inputClass} value={(triggerConfig.booking_page_id as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, booking_page_id: e.target.value || undefined })}>
+              <option value="">Any Booking Page</option>
+              {bookingPages.map((bp) => (
+                <option key={bp.id} value={bp.id}>{bp.name}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              {triggerType === "booking_created" && "Fires when a new booking is created."}
+              {triggerType === "booking_cancelled" && "Fires when a booking is cancelled."}
+              {triggerType === "booking_rescheduled" && "Fires when a booking is rescheduled."}
+            </p>
+          </div>
+        )}
+        {/* --- Vendor status changed --- */}
+        {triggerType === "vendor_status_changed" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}>From Status</label>
+              <select className={inputClass} value={(triggerConfig.from_status as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, from_status: e.target.value })}>
+                <option value="">Any</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>To Status</label>
+              <select className={inputClass} value={(triggerConfig.to_status as string) || ""} onChange={(e) => onUpdateTrigger(triggerType, { ...triggerConfig, to_status: e.target.value })}>
+                <option value="">Any</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+          </div>
+        )}
+        {/* --- Proposal info panels --- */}
+        {(triggerType === "proposal_created" || triggerType === "proposal_sent" || triggerType === "proposal_viewed" || triggerType === "proposal_accepted" || triggerType === "proposal_declined") && (
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              {triggerType === "proposal_created" && "Fires when a new proposal is created."}
+              {triggerType === "proposal_sent" && "Fires when a proposal is sent to a client."}
+              {triggerType === "proposal_viewed" && "Fires when a client views a proposal via their link."}
+              {triggerType === "proposal_accepted" && "Fires when a client signs/accepts a proposal."}
+              {triggerType === "proposal_declined" && "Fires when a client declines a proposal."}
+            </p>
+          </div>
+        )}
+        {/* --- Contract info panels --- */}
+        {(triggerType === "contract_created" || triggerType === "contract_sent" || triggerType === "contract_signed") && (
+          <div className="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3">
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              {triggerType === "contract_created" && "Fires when a new contract is created."}
+              {triggerType === "contract_sent" && "Fires when a contract is sent to a client for signing."}
+              {triggerType === "contract_signed" && "Fires when a client signs a contract."}
+            </p>
+          </div>
+        )}
+        {/* --- Deliverable info panels --- */}
+        {(triggerType === "deliverable_approved" || triggerType === "deliverable_rejected") && (
+          <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3">
+            <p className="text-xs text-purple-700 dark:text-purple-300">
+              {triggerType === "deliverable_approved" && "Fires when a client approves a deliverable in the client portal."}
+              {triggerType === "deliverable_rejected" && "Fires when a client rejects a deliverable in the client portal."}
+            </p>
+          </div>
+        )}
+        {/* --- Portal info panels --- */}
+        {(triggerType === "portal_client_login" || triggerType === "portal_file_uploaded") && (
+          <div className="rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 p-3">
+            <p className="text-xs text-indigo-700 dark:text-indigo-300">
+              {triggerType === "portal_client_login" && "Fires when a client logs into the client portal (via magic link or password)."}
+              {triggerType === "portal_file_uploaded" && "Fires when a client uploads a file through the client portal."}
+            </p>
+          </div>
+        )}
+        {/* --- Form created / published --- */}
+        {(triggerType === "form_created" || triggerType === "form_published") && (
+          <div className="rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 p-3">
+            <p className="text-xs text-teal-700 dark:text-teal-300">
+              {triggerType === "form_created" && "Fires when a new form is created."}
+              {triggerType === "form_published" && "Fires when a form is published and becomes publicly accessible."}
+            </p>
           </div>
         )}
 
@@ -1676,6 +1948,7 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [events, setEvents] = useState<EventOption[]>([]);
   const [forms, setForms] = useState<FormOption[]>([]);
+  const [bookingPages, setBookingPages] = useState<BookingPageOption[]>([]);
   const [activeProviders, setActiveProviders] = useState<Set<string>>(new Set());
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -1760,6 +2033,22 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchBookingPages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/booking-pages");
+      if (!res.ok) return;
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : json.bookingPages ?? json.booking_pages ?? [];
+      setBookingPages(
+        list.map((bp: Record<string, unknown>) => ({
+          id: bp.id as string,
+          name: (bp.name ?? bp.title ?? "") as string,
+          slug: (bp.slug ?? "") as string,
+        }))
+      );
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchIntegrations = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/integrations");
@@ -1781,8 +2070,9 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
     fetchRuns();
     fetchEvents();
     fetchForms();
+    fetchBookingPages();
     fetchIntegrations();
-  }, [fetchWorkflow, fetchRuns, fetchEvents, fetchForms, fetchIntegrations]);
+  }, [fetchWorkflow, fetchRuns, fetchEvents, fetchForms, fetchBookingPages, fetchIntegrations]);
 
   /** Action categories filtered to hide integrations without configured API keys */
   const filteredActionCategories = useMemo(() => {
@@ -2442,6 +2732,7 @@ export const WorkflowEditor = ({ workflowId }: WorkflowEditorProps) => {
                   triggerConfig={meta.trigger_config}
                   events={events}
                   forms={forms}
+                  bookingPages={bookingPages}
                   nodes={nodes}
                   connections={connections}
                   actionCategories={filteredActionCategories}

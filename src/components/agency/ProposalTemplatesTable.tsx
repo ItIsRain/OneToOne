@@ -74,15 +74,7 @@ export const ProposalTemplatesTable: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-            Proposal Templates
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Reusable templates for creating proposals quickly
-          </p>
-        </div>
+      <div className="mb-6 flex items-center justify-end">
         <Button
           onClick={() =>
             (window.location.href = "/dashboard/proposals/templates/new")

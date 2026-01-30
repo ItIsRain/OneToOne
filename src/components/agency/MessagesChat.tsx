@@ -1834,7 +1834,7 @@ export const MessagesChat = () => {
 
       {/* New Message Modal */}
       {showNewMessageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
             {/* Modal Header */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-800">

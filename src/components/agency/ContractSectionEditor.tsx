@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useRef } from "react";
 
 export interface ContractSection {
   id: string;
@@ -83,6 +83,143 @@ const sectionTypeLabels: Record<string, string> = {
   custom: "Custom Section",
 };
 
+const CoverImageUploader: React.FC<{
+  imageUrl: string;
+  onImageChange: (url: string) => void;
+}> = ({ imageUrl, onImageChange }) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select an image file");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("Image must be under 10MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch("/api/upload/attachments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          file: base64,
+          fileName: file.name,
+          fileType: file.type,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        onImageChange(data.url);
+      } else {
+        setUploadError("Upload failed. Please try again.");
+      }
+    } catch {
+      setUploadError("Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemove = () => {
+    onImageChange("");
+  };
+
+  if (imageUrl) {
+    return (
+      <div className="space-y-2">
+        <div className="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+          <img
+            src={imageUrl}
+            alt="Cover"
+            className="w-full h-40 object-cover"
+          />
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-100 transition-colors"
+            >
+              Change
+            </button>
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="rounded-lg bg-error-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-error-600 transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        {uploadError && (
+          <p className="text-xs text-error-500">{uploadError}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 py-8 text-sm text-gray-500 hover:border-brand-400 hover:text-brand-500 dark:border-gray-700 dark:text-gray-400 dark:hover:border-brand-600 dark:hover:text-brand-400 transition-colors disabled:opacity-50"
+      >
+        {uploading ? (
+          <>
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+            Uploading...
+          </>
+        ) : (
+          <>
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Upload Cover Image
+          </>
+        )}
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      {uploadError && (
+        <p className="text-xs text-error-500">{uploadError}</p>
+      )}
+    </div>
+  );
+};
+
 export const ContractSectionEditor: React.FC<ContractSectionEditorProps> = ({
   section,
   onChange,
@@ -154,14 +291,14 @@ export const ContractSectionEditor: React.FC<ContractSectionEditorProps> = ({
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Cover Image URL
+            Cover Image
           </label>
-          <input
-            type="text"
-            placeholder="https://example.com/image.jpg"
-            value={coverData.imageUrl || ""}
-            onChange={(e) => updateCover("imageUrl", e.target.value)}
-            className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+          <p className="mb-2 text-xs text-gray-400 dark:text-gray-500">
+            Recommended: 1200 x 400px (3:1 ratio)
+          </p>
+          <CoverImageUploader
+            imageUrl={coverData.imageUrl || ""}
+            onImageChange={(url) => updateCover("imageUrl", url)}
           />
         </div>
       </div>

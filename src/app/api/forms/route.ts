@@ -146,6 +146,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
+    // If a template is selected, fetch its fields and settings
+    let templateFields: unknown[] = [];
+    let templateSettings: Record<string, unknown> = {};
+    if (body.template_id) {
+      const { data: template } = await supabase
+        .from("form_templates")
+        .select("fields, settings")
+        .eq("id", body.template_id)
+        .single();
+
+      if (template) {
+        templateFields = template.fields || [];
+        templateSettings = template.settings || {};
+      }
+    }
+
     // Auto-generate slug from title if not provided
     const baseSlug = body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
@@ -158,9 +174,9 @@ export async function POST(request: Request) {
       description: body.description || null,
       slug,
       status: body.status || "draft",
-      fields: body.fields || [],
+      fields: body.fields?.length ? body.fields : templateFields,
       conditional_rules: body.conditional_rules || [],
-      settings: body.settings || {},
+      settings: Object.keys(body.settings || {}).length ? body.settings : templateSettings,
       thank_you_title: body.thank_you_title || null,
       thank_you_message: body.thank_you_message || null,
       thank_you_redirect_url: body.thank_you_redirect_url || null,
