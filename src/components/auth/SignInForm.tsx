@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getTenantUrl } from "@/lib/url";
+import { setSessionOnlyCookies, clearSessionOnlyCookies } from "@/context/AuthContext";
 
 export default function SignInForm() {
   const searchParams = useSearchParams();
@@ -35,16 +36,11 @@ export default function SignInForm() {
         throw new Error(signInError.message);
       }
 
-      // Store session persistence preference
+      // Store session persistence preference using cross-subdomain cookies
       if (!isChecked) {
-        // User does NOT want to stay logged in — mark for session-only.
-        // sessionStorage is cleared when the browser/tab closes. On next
-        // open, AuthContext detects the missing flag and signs out.
-        sessionStorage.setItem("session_only", "true");
-        localStorage.setItem("last_login_session_only", "true");
+        setSessionOnlyCookies();
       } else {
-        sessionStorage.removeItem("session_only");
-        localStorage.removeItem("last_login_session_only");
+        clearSessionOnlyCookies();
       }
 
       // Get user's tenant subdomain for redirect

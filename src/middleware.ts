@@ -225,14 +225,30 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     // For API routes, return JSON instead of HTML redirect
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
+      const apiResponse = NextResponse.json(
         { error: "Unauthorized", redirect: "/signin" },
         { status: 401 }
       );
+      // Carry over any cookie-clearing headers from failed token refresh
+      response.cookies.getAll().forEach((c) =>
+        apiResponse.cookies.set(c.name, c.value, {
+          domain: cookieDomain ?? undefined,
+          path: "/",
+        })
+      );
+      return apiResponse;
     }
     const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(signinUrl);
+    const redirectResponse = NextResponse.redirect(signinUrl);
+    // Carry over any cookie-clearing headers from failed token refresh
+    response.cookies.getAll().forEach((c) =>
+      redirectResponse.cookies.set(c.name, c.value, {
+        domain: cookieDomain ?? undefined,
+        path: "/",
+      })
+    );
+    return redirectResponse;
   }
 
   // Allow bypass API routes (used for subscription management)

@@ -38,6 +38,52 @@ const AuthContext = createContext<AuthContextType>({
   updateProfile: async () => ({ success: false }),
 });
 
+/**
+ * Read a cookie by name from document.cookie.
+ */
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Cookie domain for cross-subdomain sharing.
+ * Returns ".1i1.ae" in production, undefined for localhost.
+ */
+function getCookieDomainAttr(): string {
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname;
+  if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
+    return "; Domain=.1i1.ae";
+  }
+  return "";
+}
+
+/**
+ * Set the session-only cookies. Uses two cookies shared across subdomains:
+ *   - `1i1_session_active` — session cookie (no Max-Age) that disappears on browser close
+ *   - `1i1_was_session_only` — persistent cookie (24h) marking that session-only was chosen
+ */
+export function setSessionOnlyCookies() {
+  const domain = getCookieDomainAttr();
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  // Session cookie — disappears when browser closes
+  document.cookie = `1i1_session_active=1; Path=/${domain}; SameSite=Lax${secure}`;
+  // Persistent marker — survives browser close (24h)
+  document.cookie = `1i1_was_session_only=1; Path=/${domain}; SameSite=Lax${secure}; Max-Age=86400`;
+}
+
+/**
+ * Clear the session-only cookies (used when "Keep me logged in" is checked).
+ */
+export function clearSessionOnlyCookies() {
+  const domain = getCookieDomainAttr();
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `1i1_session_active=; Path=/${domain}; SameSite=Lax${secure}; Max-Age=0`;
+  document.cookie = `1i1_was_session_only=; Path=/${domain}; SameSite=Lax${secure}; Max-Age=0`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -59,19 +105,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
+    let cancelled = false;
+
+    const init = async () => {
+      // ── Session-only check (cross-subdomain via cookies) ──
+      // `1i1_was_session_only` persists across browser restarts.
+      // `1i1_session_active` is a session cookie — gone after browser close.
+      // If was_session_only exists but session_active doesn't, the browser
+      // was closed → sign out and redirect.
+      const wasSessionOnly = getCookie("1i1_was_session_only");
+      const stillActive = getCookie("1i1_session_active");
+
+      if (wasSessionOnly && !stillActive) {
+        // Clear the persistent marker
+        clearSessionOnlyCookies();
+        // Also clear legacy localStorage flags
+        localStorage.removeItem("last_login_session_only");
+        // Sign out — AWAIT so it completes before anything else happens
+        await supabase.auth.signOut();
+        if (!cancelled) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          window.location.href = "/signin";
+        }
+        return; // Don't proceed to fetch session
+      }
+
+      // ── Normal session initialization ──
       const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
       setUser(session?.user ?? null);
 
       if (session?.user) {
         await fetchProfile(session.user.id);
       }
 
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     };
 
-    getSession();
+    init();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -89,40 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle session-only mode ("Keep me logged in" unchecked).
-  //
-  // sessionStorage is automatically cleared by the browser when the tab or
-  // window is closed. So instead of trying to detect close via unreliable
-  // browser events (beforeunload / pagehide / visibilitychange — all of which
-  // also fire during normal navigation and break the session), we simply check
-  // on page load: if the user previously opted out of persistence but
-  // sessionStorage is now empty (browser was closed & reopened), sign out.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // When session_only is set, it means the user is in a "don't persist" session.
-    // sessionStorage survives navigations within the same tab but is cleared on
-    // browser/tab close. So if we have a Supabase session but NO sessionStorage
-    // flag, AND localStorage says the last login was session-only, sign out.
-    const wasSessionOnly = localStorage.getItem("last_login_session_only");
-    const stillActive = sessionStorage.getItem("session_only");
-
-    if (wasSessionOnly === "true" && !stillActive) {
-      // Browser was closed and reopened — sign out
-      localStorage.removeItem("last_login_session_only");
-      supabase.auth.signOut().then(() => {
-        window.location.href = "/signin";
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const signOut = async () => {
+    clearSessionOnlyCookies();
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
