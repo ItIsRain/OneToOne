@@ -14,7 +14,7 @@ function getCookieDomain(): string | undefined {
 export function createClient() {
   const cookieDomain = getCookieDomain();
 
-  return createBrowserClient(
+  const client = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -26,4 +26,15 @@ export function createClient() {
       },
     }
   );
+
+  // Prevent infinite token-refresh loop. When a refresh token is invalid,
+  // Supabase's internal Realtime auth listener creates a cycle:
+  //   _removeSession → _notifyAllSubscribers → _handleTokenChanged →
+  //   realtime.setAuth → _performAuth → getSession → refresh → fail → repeat
+  // Neutralizing setAuth breaks this cycle. Safe because we don't use
+  // Realtime channels anywhere in this codebase.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (client.realtime as any).setAuth = () => {};
+
+  return client;
 }
