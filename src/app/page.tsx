@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import MarketingPage from "./MarketingPage";
 import TenantPortalLanding from "@/components/portal/TenantPortalLanding";
 import PortalHeader from "@/components/portal/PortalHeader";
-import PortalFooter from "@/components/portal/PortalFooter";
 import type { Metadata } from "next";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -113,11 +112,6 @@ export default async function RootPage() {
           upcomingEvents={upcomingEvents}
         />
       </main>
-      <PortalFooter
-        footerText={portalSettings?.footer_text}
-        showFooter={portalSettings?.show_footer !== false}
-        accentColor={portalSettings?.portal_accent_color || tenant.primaryColor}
-      />
     </div>
   );
 }
