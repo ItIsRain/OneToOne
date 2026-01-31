@@ -65,14 +65,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to generate magic link" }, { status: 500 });
     }
 
-    // NOTE: In production, this would send an email with the magic link URL.
-    // For now, return the token directly for development/testing purposes.
+    // Send magic link email
+    const { sendEmail } = await import("@/lib/email");
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const magicLinkUrl = `${APP_URL}/portal/login?token=${token}&tenant=${tenant_slug}`;
+
+    await sendEmail({
+      to: portalClient.email,
+      subject: "Your magic link to sign in",
+      html: `
+        <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #111; margin-bottom: 20px;">Sign in to your portal</h2>
+          <p style="color: #666; margin-bottom: 20px;">
+            Hi ${portalClient.name}, click the link below to sign in to your portal:
+          </p>
+          <div style="margin-bottom: 20px;">
+            <a href="${magicLinkUrl}" style="display:inline-block;padding:12px 24px;background-color:#72b81a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Sign In</a>
+          </div>
+          <p style="color: #999; font-size: 14px;">This link expires in 24 hours. If you didn't request this, you can safely ignore this email.</p>
+        </div>
+      `,
+    });
+
     return NextResponse.json({
       success: true,
       message: "If an account exists, a magic link has been sent.",
-      // Development only - remove in production
-      token,
-      expires_at: expiresAt,
     });
   } catch (error) {
     console.error("Magic link error:", error);

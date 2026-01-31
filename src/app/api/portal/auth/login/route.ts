@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import bcrypt from "bcryptjs";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 function getServiceClient() {
   return createServiceClient(
@@ -17,6 +19,18 @@ export async function POST(request: Request) {
 
     if (!tenant_slug) {
       return NextResponse.json({ error: "Tenant slug is required" }, { status: 400 });
+    }
+
+    // Rate limit: 10 login attempts per IP per 15 minutes
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit({
+      key: "portal-login",
+      identifier: ip,
+      maxRequests: 10,
+      windowSeconds: 15 * 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
     }
 
     const supabase = getServiceClient();
@@ -109,16 +123,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    // NOTE: In production, this should use bcrypt.compare() for proper password hashing.
-    // Using direct string comparison as a placeholder since bcrypt is not available in edge runtime.
-    if (portalClient.password !== password) {
+    // Verify password — support both bcrypt hashes and legacy plaintext
+    const isBcryptHash = /^\$2[aby]\$/.test(portalClient.password);
+    let isValidPassword = false;
+
+    if (isBcryptHash) {
+      isValidPassword = await bcrypt.compare(password, portalClient.password);
+    } else {
+      // Legacy plaintext comparison — rehash on success
+      isValidPassword = password === portalClient.password;
+    }
+
+    if (!isValidPassword) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    // Update last_login_at
+    // Rehash plaintext password to bcrypt and update last_login_at
+    const updateData: Record<string, string> = { last_login_at: new Date().toISOString() };
+    if (!isBcryptHash) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
     await supabase
       .from("portal_clients")
-      .update({ last_login_at: new Date().toISOString() })
+      .update(updateData)
       .eq("id", portalClient.id);
 
     // Trigger workflow

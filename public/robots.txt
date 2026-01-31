@@ -6,12 +6,19 @@ Allow: /
 Allow: /signin
 Allow: /signup
 Allow: /subscribe
+Allow: /events/public/
+Allow: /book/
+Allow: /portal/
 
 # Disallow admin/dashboard areas
 Disallow: /dashboard
 Disallow: /api/
+Disallow: /judge/
+Disallow: /share/
 Disallow: /invalid-subdomain
 Disallow: /unverified-domain
+Disallow: /reset-password
+Disallow: /update-password
 
 # Sitemap
 Sitemap: https://1i1.ae/sitemap.xml

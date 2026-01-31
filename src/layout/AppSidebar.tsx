@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
+import { useTenantInfo } from "@/context/TenantInfoContext";
 import SidebarWidget from "./SidebarWidget";
 import {
   BoltIcon,
@@ -196,6 +197,7 @@ const settingsItems: NavItem[] = [
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { logoUrl: customLogoUrl, loading: tenantInfoLoading } = useTenantInfo();
   const pathname = usePathname();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
@@ -204,40 +206,6 @@ const AppSidebar: React.FC = () => {
   } | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  // "pending" = not yet resolved (show nothing to avoid flash), null = no custom logo, string = custom logo URL
-  const [customLogoUrl, setCustomLogoUrl] = useState<string | null | "pending">("pending");
-
-  useEffect(() => {
-    // Read cached value immediately to avoid flash
-    const cached = localStorage.getItem("custom_logo_url");
-    setCustomLogoUrl(cached);
-
-    // Then validate against server
-    fetch("/api/tenant/info")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const url = data?.logo_url || null;
-        setCustomLogoUrl(url);
-        if (url) {
-          localStorage.setItem("custom_logo_url", url);
-        } else {
-          localStorage.removeItem("custom_logo_url");
-        }
-      })
-      .catch(() => {
-        // Keep cached value on error
-        if (!cached) setCustomLogoUrl(null);
-      });
-  }, []);
-
-  useEffect(() => {
-    const handleLogoChanged = (e: Event) => {
-      const url = (e as CustomEvent).detail as string | null;
-      setCustomLogoUrl(url);
-    };
-    window.addEventListener("logo-changed", handleLogoChanged);
-    return () => window.removeEventListener("logo-changed", handleLogoChanged);
-  }, []);
 
   const isActive = useCallback(
     (path: string, exactMatch: boolean = false) => {
@@ -450,7 +418,7 @@ const AppSidebar: React.FC = () => {
         className="flex items-center justify-center py-8"
       >
         <Link href="/dashboard" className="flex items-center justify-center">
-          {customLogoUrl === "pending" ? (
+          {tenantInfoLoading && !customLogoUrl ? (
             // Invisible placeholder to reserve space and prevent flash
             isExpanded || isHovered || isMobileOpen ? (
               <div className="h-10 w-[200px]" />

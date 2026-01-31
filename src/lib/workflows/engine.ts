@@ -306,13 +306,14 @@ async function executeStep(
       if (error) throw new Error(`Failed to assign: ${error.message}`);
 
       // Also send a notification to the assignee
-      await supabase.from("notifications").insert({
+      const { error: notifError } = await supabase.from("notifications").insert({
         user_id: assigneeId,
         type: "workflow",
         title: "You've been assigned",
         message: resolved.message || `You have been assigned to a ${entityType}.`,
         tenant_id: tenantId,
-      }).then(() => {});
+      });
+      if (notifError) console.error("Failed to send assignment notification:", notifError.message);
 
       return { assigned: true, assignee_id: assigneeId };
     }
@@ -373,14 +374,15 @@ async function executeStep(
       if (approvalError) throw new Error(`Failed to create approval: ${approvalError.message}`);
 
       // Notify the approver
-      await supabase.from("notifications").insert({
+      const { error: approvalNotifError } = await supabase.from("notifications").insert({
         user_id: approverId,
         type: "approval",
         title: "Approval Required",
         message: (resolved.instructions as string) || "A workflow step requires your approval.",
         tenant_id: tenantId,
         action_url: "/dashboard/automation/approvals",
-      }).then(() => {});
+      });
+      if (approvalNotifError) console.error("Failed to send approval notification:", approvalNotifError.message);
 
       await supabase.from("workflow_step_executions").update({ status: "waiting_approval" }).eq("id", stepExecId);
       await supabase.from("workflow_runs").update({ status: "waiting_approval" }).eq("id", runId);
@@ -1447,8 +1449,9 @@ async function executeStep(
         };
         const customerEmail = resolved.customer_email as string;
         if (customerEmail) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://1i1.ae";
           linkParams["after_completion[type]"] = "redirect";
-          linkParams["after_completion[redirect][url]"] = "https://example.com/thank-you";
+          linkParams["after_completion[redirect][url]"] = `${appUrl}/invoice/thank-you`;
         }
 
         const linkRes = await fetch("https://api.stripe.com/v1/payment_links", {

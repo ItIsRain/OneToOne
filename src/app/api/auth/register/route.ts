@@ -1,9 +1,23 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSubdomainSuffix } from "@/lib/url";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 3 registration attempts per IP per hour
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit({
+      key: "register",
+      identifier: ip,
+      maxRequests: 3,
+      windowSeconds: 60 * 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
+    }
+
     const { firstName, lastName, email, password, phone, useCase, subdomain, plan } = await request.json();
 
     // Validate required fields
@@ -32,7 +46,7 @@ export async function POST(request: Request) {
 
     if (!isSupabaseConfigured) {
       // Development mode - just log and return success
-      console.log("[DEV] Registration:", {
+      logger.debug("[DEV] Registration:", {
         firstName,
         lastName,
         email,
@@ -64,7 +78,7 @@ export async function POST(request: Request) {
 
     if (reservedSubdomain) {
       return NextResponse.json(
-        { error: "This subdomain is reserved and cannot be used" },
+        { error: "This subdomain is not available" },
         { status: 400 }
       );
     }
@@ -78,7 +92,7 @@ export async function POST(request: Request) {
 
     if (existingTenant) {
       return NextResponse.json(
-        { error: "This subdomain is already taken" },
+        { error: "This subdomain is not available" },
         { status: 400 }
       );
     }

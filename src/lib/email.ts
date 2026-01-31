@@ -1,5 +1,6 @@
 import { sendWithProvider } from './email/providers';
 import { EmailProvider, ProviderConfig } from './email/types';
+import { logger } from './logger';
 
 interface SendEmailOptions {
   to: string;
@@ -57,7 +58,7 @@ async function getTenantEmailSettings(
     tenantSettingsCache.set(tenantId, { settings, timestamp: Date.now() });
     return settings;
   } catch (error) {
-    console.error('[EMAIL] Failed to fetch tenant settings:', error);
+    logger.error('[EMAIL] Failed to fetch tenant settings:', error);
     return null;
   }
 }
@@ -71,11 +72,11 @@ async function sendWithSystemDefault(
   const resendApiKey = process.env.RESEND_API_KEY;
 
   if (!resendApiKey) {
-    console.log(`[DEV] No RESEND_API_KEY - Email would be sent to ${to}:`, subject);
+    logger.debug(`[DEV] No RESEND_API_KEY - Email would be sent to ${to}:`, subject);
     return true;
   }
 
-  console.log(`[EMAIL] Sending email via system default to ${to}: ${subject}`);
+  logger.info(`[EMAIL] Sending email via system default to ${to}: ${subject}`);
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -95,14 +96,14 @@ async function sendWithSystemDefault(
     const responseData = await res.json();
 
     if (!res.ok) {
-      console.error('[EMAIL] Resend error:', responseData);
+      logger.error('[EMAIL] Resend error:', responseData);
       return false;
     }
 
-    console.log('[EMAIL] Email sent successfully to:', to, '- Resend ID:', responseData.id);
+    logger.info('[EMAIL] Email sent successfully to:', to, '- Resend ID:', responseData.id);
     return true;
   } catch (error) {
-    console.error('[EMAIL] Send email error:', error);
+    logger.error('[EMAIL] Send email error:', error);
     return false;
   }
 }
@@ -123,7 +124,7 @@ export async function sendEmail({
       tenantSettings.is_verified &&
       tenantSettings.from_email
     ) {
-      console.log(
+      logger.info(
         `[EMAIL] Using tenant provider (${tenantSettings.provider}) for ${to}`
       );
 
@@ -140,7 +141,7 @@ export async function sendEmail({
       );
 
       if (result.success) {
-        console.log(
+        logger.info(
           '[EMAIL] Tenant provider sent successfully, messageId:',
           result.messageId
         );
@@ -148,7 +149,7 @@ export async function sendEmail({
       }
 
       // If tenant provider fails, log and fallback to system default
-      console.error(
+      logger.error(
         '[EMAIL] Tenant provider failed, falling back to system:',
         result.error
       );
@@ -181,7 +182,7 @@ export async function sendTeamInviteEmail({
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const inviteUrl = `${APP_URL}/invite/${inviteToken}`;
 
-  console.log(`[EMAIL] Preparing team invite email to ${to}, invite URL: ${inviteUrl}`);
+  logger.info(`[EMAIL] Preparing team invite email to ${to}, invite URL: ${inviteUrl}`);
 
   // Simple HTML template matching the OTP email style that works
   const html = `

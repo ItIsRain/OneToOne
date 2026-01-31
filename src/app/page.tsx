@@ -9,9 +9,30 @@ import type { Metadata } from "next";
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
   if (tenant.isSubdomainAccess && tenant.name) {
+    const tenantUrl = `https://${tenant.subdomain}.1i1.ae`;
     return {
-      title: tenant.name,
-      description: `Welcome to ${tenant.name}. Discover our upcoming events and get involved.`,
+      title: `${tenant.name} - Events & More on OneToOne`,
+      description: `Welcome to ${tenant.name} on OneToOne (1i1.ae). Discover upcoming events, hackathons, workshops, and more. Powered by OneToOne by Lunar Limited.`,
+      keywords: [tenant.name, 'OneToOne', '1i1', 'events', tenant.subdomain || ''],
+      openGraph: {
+        type: 'website',
+        url: tenantUrl,
+        title: `${tenant.name} - OneToOne`,
+        description: `Discover upcoming events and get involved with ${tenant.name}. Powered by OneToOne (1i1.ae).`,
+        siteName: `${tenant.name} on OneToOne`,
+        images: tenant.logoUrl
+          ? [{ url: tenant.logoUrl, alt: tenant.name }]
+          : [{ url: 'https://1i1.ae/Logo.svg', alt: 'OneToOne' }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${tenant.name} - OneToOne`,
+        description: `Discover upcoming events and get involved with ${tenant.name}. Powered by OneToOne (1i1.ae).`,
+        images: tenant.logoUrl ? [tenant.logoUrl] : ['https://1i1.ae/Logo.svg'],
+      },
+      alternates: {
+        canonical: tenantUrl,
+      },
     };
   }
   return {};

@@ -5,9 +5,10 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { checkTriggers } from "@/lib/workflows/triggers";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ATTENDEE_JWT_SECRET || "attendee-portal-secret-key-change-in-production"
-);
+if (!process.env.ATTENDEE_JWT_SECRET) {
+  throw new Error("ATTENDEE_JWT_SECRET environment variable is required");
+}
+const JWT_SECRET = new TextEncoder().encode(process.env.ATTENDEE_JWT_SECRET);
 
 // Helper to create JWT token
 async function createToken(attendeeId: string, eventId: string) {

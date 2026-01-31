@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import bcrypt from "bcryptjs";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -128,12 +129,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A portal client with this email already exists" }, { status: 409 });
     }
 
-    // NOTE: In production, password should be hashed with bcrypt before storing.
+    const hashedPassword = await bcrypt.hash(password, 10);
     const { data: portalClient, error: insertError } = await serviceClient
       .from("portal_clients")
       .insert({
         email: email.toLowerCase(),
-        password,
+        password: hashedPassword,
         name,
         client_id: client_id || null,
         avatar_url: avatar_url || null,
@@ -198,7 +199,7 @@ export async function PUT(request: Request) {
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
     if (email !== undefined) updates.email = email.toLowerCase();
-    if (password !== undefined) updates.password = password; // NOTE: Should be hashed in production
+    if (password !== undefined) updates.password = await bcrypt.hash(password, 10);
     if (is_active !== undefined) updates.is_active = is_active;
     if (client_id !== undefined) updates.client_id = client_id;
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;

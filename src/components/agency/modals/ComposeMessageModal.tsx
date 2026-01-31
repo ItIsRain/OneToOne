@@ -18,14 +18,41 @@ interface ComposeMessageModalProps {
   type?: "message" | "email";
 }
 
-const recipients = [
-  { value: "alex", label: "Alex Johnson", email: "alex@company.com" },
-  { value: "sarah", label: "Sarah Williams", email: "sarah@company.com" },
-  { value: "michael", label: "Michael Chen", email: "michael@company.com" },
-  { value: "emily", label: "Emily Davis", email: "emily@company.com" },
-  { value: "james", label: "James Wilson", email: "james@company.com" },
-  { value: "lisa", label: "Lisa Thompson", email: "lisa@company.com" },
-];
+interface Recipient {
+  value: string;
+  label: string;
+  email: string;
+}
+
+function useRecipients() {
+  const [recipients, setRecipients] = React.useState<Recipient[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function fetchRecipients() {
+      try {
+        const res = await fetch("/api/team/members");
+        if (res.ok) {
+          const data = await res.json();
+          const members = (data.members || data || []).map(
+            (m: { id: string; first_name?: string; last_name?: string; email: string }) => ({
+              value: m.id,
+              label: [m.first_name, m.last_name].filter(Boolean).join(" ") || m.email,
+              email: m.email,
+            })
+          );
+          if (!cancelled) setRecipients(members);
+        }
+      } catch {
+        // Fail silently — recipients will be empty
+      }
+    }
+    fetchRecipients();
+    return () => { cancelled = true; };
+  }, []);
+
+  return recipients;
+}
 
 const priorityOptions = [
   { value: "low", label: "Low" },
@@ -42,6 +69,7 @@ const categoryOptions = [
 ];
 
 export function ComposeMessageModal({ isOpen, onClose, type = "message" }: ComposeMessageModalProps) {
+  const recipients = useRecipients();
   const [formData, setFormData] = useState({
     to: "",
     cc: "",
@@ -134,10 +162,56 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
       })),
     };
 
-    console.log("Message data:", messageData);
+    try {
+      // Step 1: Create or find an existing conversation with the recipient
+      const convRes = await fetch("/api/messages/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId: messageData.to }),
+      });
 
-    // TODO: Send to API
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!convRes.ok) {
+        const errorData = await convRes.json().catch(() => ({}));
+        alert(errorData.error || "Failed to create conversation");
+        setIsSending(false);
+        return;
+      }
+
+      const conversation = await convRes.json();
+
+      // Step 2: Send the message in that conversation
+      const msgRes = await fetch(`/api/messages/conversations/${conversation.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: `${messageData.subject ? `**${messageData.subject}**\n\n` : ""}${messageData.message}`,
+        }),
+      });
+
+      if (!msgRes.ok) {
+        const errorData = await msgRes.json().catch(() => ({}));
+        alert(errorData.error || "Failed to send message");
+        setIsSending(false);
+        return;
+      }
+
+      // Send attachments as separate file messages if any
+      for (const attachment of messageData.attachments) {
+        await fetch(`/api/messages/conversations/${conversation.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "file",
+            fileName: attachment.fileName,
+            fileUrl: attachment.url,
+          }),
+        });
+      }
+    } catch {
+      alert("Failed to send message. Please try again.");
+      setIsSending(false);
+      return;
+    }
 
     setIsSending(false);
     onClose();

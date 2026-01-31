@@ -1286,7 +1286,7 @@ export default function MarketingPage() {
           {/* Bottom Bar */}
           <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-gray-500">
-              © 2025 One To One. All rights reserved.
+              © 2025 One To One (1i1.ae) by Lunar Limited. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
               <span className="text-xs text-gray-600">Made with</span>

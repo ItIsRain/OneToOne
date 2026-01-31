@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { getBaseDomain, isLocalDev } from "@/lib/url";
 
 export type Profile = {
   id: string;
@@ -49,13 +50,15 @@ function getCookie(name: string): string | null {
 
 /**
  * Cookie domain for cross-subdomain sharing.
- * Returns ".1i1.ae" in production, undefined for localhost.
+ * Returns ".; Domain=.{baseDomain}" in production, empty for localhost.
  */
 function getCookieDomainAttr(): string {
   if (typeof window === "undefined") return "";
+  if (isLocalDev()) return "";
+  const base = getBaseDomain();
   const host = window.location.hostname;
-  if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
-    return "; Domain=.1i1.ae";
+  if (host === base || host.endsWith(`.${base}`)) {
+    return `; Domain=.${base}`;
   }
   return "";
 }
@@ -100,36 +103,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hadSessionRef = useRef(false);
   const isRedirectingRef = useRef(false);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, signal?: AbortSignal) => {
+    if (signal?.aborted) return null;
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
 
+    if (signal?.aborted) return null;
     setProfile(profileData);
     return profileData;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
+    const signal = abortController.signal;
 
     const init = async () => {
       // ── Session-only check (cross-subdomain via cookies) ──
-      // `1i1_was_session_only` persists across browser restarts.
-      // `1i1_session_active` is a session cookie — gone after browser close.
-      // If was_session_only exists but session_active doesn't, the browser
-      // was closed → sign out and redirect.
       const wasSessionOnly = getCookie("1i1_was_session_only");
       const stillActive = getCookie("1i1_session_active");
 
       if (wasSessionOnly && !stillActive) {
         clearSessionOnlyCookies();
         localStorage.removeItem("last_login_session_only");
-        // Use scope: 'local' to avoid a server call that could also get rate-limited
         await supabase.auth.signOut({ scope: "local" });
-        if (!cancelled) {
+        if (!signal.aborted) {
           setUser(null);
           setProfile(null);
           setLoading(false);
@@ -141,16 +142,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // ── Normal session initialization ──
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (cancelled) return;
+      if (signal.aborted) return;
 
       setUser(currentUser ?? null);
 
       if (currentUser) {
         hadSessionRef.current = true;
-        await fetchProfile(currentUser.id);
+        await fetchProfile(currentUser.id, signal);
       }
 
-      if (!cancelled) {
+      if (!signal.aborted) {
         setLoading(false);
       }
     };
@@ -160,10 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Skip if we're already redirecting (breaks the infinite loop)
-        if (isRedirectingRef.current) return;
+        if (isRedirectingRef.current || signal.aborted) return;
 
-        // INITIAL_SESSION is handled by init() above — skip to avoid double work
         if (event === "INITIAL_SESSION") return;
 
         if (event === "SIGNED_OUT") {
@@ -171,9 +170,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setLoading(false);
 
-          // Only redirect if the user previously had a session (token expired
-          // or was revoked). Without this check we'd redirect on public pages
-          // where there was never a session to begin with.
           if (hadSessionRef.current) {
             isRedirectingRef.current = true;
             window.location.href = "/signin";
@@ -181,19 +177,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED — update state
-        if (session?.user) {
+        if (session?.user && !signal.aborted) {
           hadSessionRef.current = true;
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, signal);
         }
 
-        setLoading(false);
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
     );
 
     return () => {
-      cancelled = true;
+      abortController.abort();
       subscription.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

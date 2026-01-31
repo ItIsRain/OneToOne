@@ -9,9 +9,30 @@ import type { Metadata } from "next";
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
   if (tenant.isSubdomainAccess && tenant.name) {
+    const tenantUrl = `https://${tenant.subdomain}.1i1.ae/events`;
     return {
       title: `Events - ${tenant.name}`,
-      description: `Browse all events from ${tenant.name}.`,
+      description: `Browse all upcoming events, hackathons, workshops, and conferences from ${tenant.name}. Powered by OneToOne (1i1.ae) by Lunar Limited.`,
+      keywords: [tenant.name, 'events', 'hackathons', 'workshops', 'OneToOne', '1i1'],
+      openGraph: {
+        type: 'website',
+        url: tenantUrl,
+        title: `Events - ${tenant.name}`,
+        description: `Browse all events from ${tenant.name}. Powered by OneToOne (1i1.ae).`,
+        siteName: `${tenant.name} on OneToOne`,
+        images: tenant.logoUrl
+          ? [{ url: tenant.logoUrl, alt: tenant.name }]
+          : [{ url: 'https://1i1.ae/Logo.svg', alt: 'OneToOne' }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `Events - ${tenant.name}`,
+        description: `Browse all events from ${tenant.name}. Powered by OneToOne (1i1.ae).`,
+        images: tenant.logoUrl ? [tenant.logoUrl] : ['https://1i1.ae/Logo.svg'],
+      },
+      alternates: {
+        canonical: tenantUrl,
+      },
     };
   }
   return { title: "Events" };

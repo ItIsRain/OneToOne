@@ -1,0 +1,23 @@
+{
+  "name": "OneToOne - Business Management Platform",
+  "short_name": "OneToOne",
+  "description": "All-in-one platform for managing CRM, projects, events, finance, team, and documents.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1D4ED8",
+  "icons": [
+    {
+      "src": "/LogoSmall.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/Logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

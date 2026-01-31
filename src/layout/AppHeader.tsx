@@ -3,13 +3,14 @@ import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
+import { useTenantInfo } from "@/context/TenantInfoContext";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState ,useEffect,useRef} from "react";
 
 const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-  const [customLogoUrl, setCustomLogoUrl] = useState<string | null>(null);
+  const { logoUrl: customLogoUrl } = useTenantInfo();
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
@@ -41,25 +42,6 @@ const AppHeader: React.FC = () => {
     };
   }, []);
 
-  // Fetch tenant logo for mobile/tablet header
-  useEffect(() => {
-    const cached = localStorage.getItem("custom_logo_url");
-    if (cached) setCustomLogoUrl(cached);
-
-    fetch("/api/tenant/info")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const url = data?.logo_url || null;
-        setCustomLogoUrl(url);
-      })
-      .catch(() => {});
-
-    const handleLogoChanged = (e: Event) => {
-      setCustomLogoUrl((e as CustomEvent).detail as string | null);
-    };
-    window.addEventListener("logo-changed", handleLogoChanged);
-    return () => window.removeEventListener("logo-changed", handleLogoChanged);
-  }, []);
 
   return (
     <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">

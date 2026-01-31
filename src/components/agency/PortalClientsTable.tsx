@@ -36,7 +36,7 @@ export const PortalClientsTable: React.FC = () => {
       const res = await fetch("/api/portal/clients");
       if (!res.ok) throw new Error("Failed to load portal clients");
       const json = await res.json();
-      setClients(json);
+      setClients(json.portal_clients ?? []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { otpStore } from "@/lib/otp-store";
+import { verifyOtp } from "@/lib/otp-store";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -9,23 +10,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email and OTP are required" }, { status: 400 });
     }
 
-    const stored = otpStore.get(email);
-
-    if (!stored) {
-      return NextResponse.json({ error: "OTP expired or not found" }, { status: 400 });
+    // Rate limit: 5 verification attempts per email per 15 minutes
+    const rateCheck = await checkRateLimit({
+      key: "verify-otp",
+      identifier: email.toLowerCase(),
+      maxRequests: 5,
+      windowSeconds: 15 * 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
     }
 
-    if (Date.now() > stored.expires) {
-      otpStore.delete(email);
-      return NextResponse.json({ error: "OTP expired" }, { status: 400 });
-    }
+    const isValid = await verifyOtp(email, otp);
 
-    if (stored.otp !== otp) {
-      return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
+    if (!isValid) {
+      return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 400 });
     }
-
-    // OTP verified, remove from store
-    otpStore.delete(email);
 
     return NextResponse.json({ success: true, message: "Email verified" });
   } catch (error) {

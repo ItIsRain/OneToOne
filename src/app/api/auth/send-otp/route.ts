@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { otpStore } from "@/lib/otp-store";
+import { storeOtp } from "@/lib/otp-store";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -9,21 +11,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
+    // Rate limit: 5 OTP requests per email per 15 minutes
+    const rateCheck = await checkRateLimit({
+      key: "send-otp",
+      identifier: email.toLowerCase(),
+      maxRequests: 5,
+      windowSeconds: 15 * 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
+    }
+
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store OTP with 10-minute expiry
-    otpStore.set(email, {
-      otp,
-      expires: Date.now() + 10 * 60 * 1000,
-    });
+    // Store OTP in Supabase with 10-minute expiry
+    await storeOtp(email, otp);
 
     // Send OTP via Resend
     const resendApiKey = process.env.RESEND_API_KEY;
 
     if (!resendApiKey) {
       // For development, log OTP to console
-      console.log(`[DEV] OTP for ${email}: ${otp}`);
+      logger.debug(`[DEV] OTP for ${email}: ${otp}`);
       return NextResponse.json({ success: true, message: "OTP sent (check console in dev)" });
     }
 

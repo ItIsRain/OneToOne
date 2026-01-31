@@ -82,12 +82,54 @@ function parseHostname(hostname: string): {
   return { isMainDomain: false, subdomain: null, isCustomDomain: true };
 }
 
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("X-XSS-Protection", "0");
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+  );
+  if (!isLocalDev()) {
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   const hostname = request.headers.get("host") || "";
   const { pathname } = request.nextUrl;
 
   const { isMainDomain, subdomain, isCustomDomain } = parseHostname(hostname);
+
+  // ── CSRF: Origin check for state-changing requests ──
+  const CSRF_EXEMPT = ["/api/stripe/webhook", "/api/cron"];
+  if (
+    ["POST", "PUT", "PATCH", "DELETE"].includes(request.method) &&
+    pathname.startsWith("/api/") &&
+    !CSRF_EXEMPT.some((p) => pathname.startsWith(p))
+  ) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      const originHost = new URL(origin).hostname;
+      const host = hostname.split(":")[0];
+      const baseDomain = isLocalDev() ? "localhost" : "1i1.ae";
+      const isValidOrigin =
+        originHost === host ||
+        originHost === baseDomain ||
+        originHost.endsWith(`.${baseDomain}`);
+      if (!isValidOrigin) {
+        return applySecurityHeaders(
+          NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        );
+      }
+    }
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -116,12 +158,12 @@ export async function middleware(request: NextRequest) {
       tenant = data;
 
       if (tenant && !tenant.custom_domain_verified) {
-        return NextResponse.redirect(new URL("/unverified-domain", request.url));
+        return applySecurityHeaders(NextResponse.redirect(new URL("/unverified-domain", request.url)));
       }
     }
 
     if (!tenant && (subdomain || isCustomDomain)) {
-      return NextResponse.redirect(new URL("/invalid-subdomain", getMainUrl()));
+      return applySecurityHeaders(NextResponse.redirect(new URL("/invalid-subdomain", getMainUrl())));
     }
 
     if (tenant) {
@@ -135,7 +177,7 @@ export async function middleware(request: NextRequest) {
 
   // ── Step 2: Public routes — return immediately, NO auth work ──
   if (isPublicRoute(pathname)) {
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
   // ── Step 3: Protected routes — create Supabase auth client ──
@@ -223,7 +265,7 @@ export async function middleware(request: NextRequest) {
           path: "/",
         })
       );
-      return apiResponse;
+      return applySecurityHeaders(apiResponse);
     }
     const signinUrl = new URL("/signin", request.url);
     signinUrl.searchParams.set("redirect", pathname);
@@ -234,7 +276,7 @@ export async function middleware(request: NextRequest) {
         path: "/",
       })
     );
-    return redirectResponse;
+    return applySecurityHeaders(redirectResponse);
   }
 
   // ── Step 5: Subscription check (only for dashboard pages, not every API call) ──
@@ -264,7 +306,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response;
+  return applySecurityHeaders(response);
 }
 
 export const config = {

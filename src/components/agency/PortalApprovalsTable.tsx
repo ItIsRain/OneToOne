@@ -67,7 +67,7 @@ export const PortalApprovalsTable: React.FC = () => {
       const res = await fetch("/api/portal/approvals/manage");
       if (!res.ok) throw new Error("Failed to load approvals");
       const json = await res.json();
-      setApprovals(json);
+      setApprovals(json.approvals ?? []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {

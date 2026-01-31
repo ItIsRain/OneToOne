@@ -339,8 +339,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
       {showSidebar && contract && (
         <ContractDetailsSidebar
           isOpen={showSidebar}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          contract={contract as any}
+          contract={contract as unknown as import("@/components/agency/ContractsTable").ContractRecord}
           onClose={() => setShowSidebar(false)}
           onEdit={() => {}}
         />
