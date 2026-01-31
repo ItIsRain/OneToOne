@@ -18,6 +18,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: task, error } = await supabase
       .from("tasks")
       .select(`
@@ -28,6 +39,7 @@ export async function GET(
         parent_task:parent_task_id(id, title, task_number, status)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -86,13 +98,37 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
+    // Allowlist fields to prevent mass assignment
+    const allowedFields = [
+      "title", "description", "status", "priority", "assigned_to",
+      "project_id", "client_id", "event_id", "parent_task_id",
+      "due_date", "start_date", "completed_at", "started_at",
+      "estimated_hours", "actual_hours", "position", "tags",
+      "category", "notes", "is_recurring", "recurrence_pattern",
+      "kanban_column_id", "board_id",
+    ];
+    const updates: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key];
+    }
+
     // Fetch old task for status change trigger
-    const { data: oldTask } = await supabase.from("tasks").select("status, tenant_id").eq("id", id).single();
+    const { data: oldTask } = await supabase.from("tasks").select("status, tenant_id").eq("id", id).eq("tenant_id", profile.tenant_id).single();
 
     // Auto-set timestamps based on status changes
-    const updates = { ...body };
     if (body.status === "in_progress" && !body.started_at) {
       updates.started_at = new Date().toISOString();
     }
@@ -104,6 +140,7 @@ export async function PATCH(
       .from("tasks")
       .update(updates)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         project:project_id(id, name, project_code, color),
@@ -195,7 +232,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("tasks").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Error deleting task:", error);

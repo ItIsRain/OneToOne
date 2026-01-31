@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
+import { validateAttachmentUpload } from "@/lib/upload-validation";
 
 // Configure Cloudinary - support both URL format and separate env vars
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -65,17 +66,24 @@ function sanitizePublicId(fileName: string): string {
 
 export async function POST(request: Request) {
   try {
-    // Auth is optional for now - uncomment below to require login
-    // const supabase = await getSupabaseClient();
-    // const { data: { user }, error: authError } = await supabase.auth.getUser();
-    // if (authError || !user) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
+    const supabase = await getSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { file, fileName, fileType } = await request.json();
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Validate file type and size
+    if (typeof file === "string" && file.startsWith("data:")) {
+      const validation = validateAttachmentUpload(file, fileType);
+      if (!validation.valid) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
     }
 
     // Check if Cloudinary is configured
@@ -164,6 +172,16 @@ export async function PUT(request: Request) {
       return NextResponse.json({
         error: "Cloudinary not configured. Please check your environment variables."
       }, { status: 500 });
+    }
+
+    // Validate all files before uploading
+    for (const { file: f, fileType: ft } of files) {
+      if (typeof f === "string" && f.startsWith("data:")) {
+        const validation = validateAttachmentUpload(f, ft);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+      }
     }
 
     const uploadPromises = files.map(async ({ file, fileName, fileType }) => {

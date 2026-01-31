@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createBudgetSchema, validateBody } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -101,17 +102,28 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createBudgetSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const v = validation.data;
+
     // Calculate end date based on period type if not provided
-    let endDate = body.end_date || null;
-    if (!endDate && body.start_date && body.period_type) {
-      const startDate = new Date(body.start_date);
-      switch (body.period_type) {
+    let endDate = v.end_date || null;
+    if (!endDate && v.start_date && v.period_type) {
+      const startDate = new Date(v.start_date);
+      switch (v.period_type) {
         case "monthly":
           endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).toISOString().split("T")[0];
           break;
-        case "quarterly":
-          endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0).toISOString().split("T")[0];
+        case "quarterly": {
+          const quarterEnd = new Date(startDate);
+          quarterEnd.setMonth(quarterEnd.getMonth() + 3);
+          quarterEnd.setDate(0); // last day of the previous month (i.e. end of 3-month span)
+          endDate = quarterEnd.toISOString().split("T")[0];
           break;
+        }
         case "yearly":
           endDate = new Date(startDate.getFullYear(), 11, 31).toISOString().split("T")[0];
           break;
@@ -120,28 +132,28 @@ export async function POST(request: Request) {
 
     const budgetData = {
       tenant_id: profile.tenant_id,
-      name: body.name,
-      description: body.description || null,
-      amount: parseFloat(body.amount) || 0,
-      spent: parseFloat(body.spent) || 0,
-      currency: body.currency || "USD",
-      period_type: body.period_type || "monthly",
-      start_date: body.start_date,
+      name: v.name,
+      description: v.description || null,
+      amount: v.amount,
+      spent: v.spent,
+      currency: v.currency,
+      period_type: v.period_type,
+      start_date: v.start_date,
       end_date: endDate,
-      category: body.category || null,
-      project_id: body.project_id || null,
-      client_id: body.client_id || null,
-      department: body.department || null,
-      alert_threshold: parseFloat(body.alert_threshold) || 80,
+      category: v.category || null,
+      project_id: v.project_id || null,
+      client_id: v.client_id || null,
+      department: v.department || null,
+      alert_threshold: v.alert_threshold,
       alert_sent: false,
-      status: body.status || "active",
-      notes: body.notes || null,
-      tags: body.tags || null,
-      rollover_enabled: body.rollover_enabled || false,
-      rollover_amount: parseFloat(body.rollover_amount) || 0,
-      fiscal_year: body.fiscal_year || new Date().getFullYear(),
-      is_recurring: body.is_recurring || false,
-      recurrence_interval: body.recurrence_interval || null,
+      status: v.status,
+      notes: v.notes || null,
+      tags: v.tags || null,
+      rollover_enabled: v.rollover_enabled,
+      rollover_amount: v.rollover_amount,
+      fiscal_year: v.fiscal_year || new Date().getFullYear(),
+      is_recurring: v.is_recurring,
+      recurrence_interval: v.recurrence_interval || null,
       created_by: user.id,
     };
 

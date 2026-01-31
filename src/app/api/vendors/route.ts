@@ -80,7 +80,8 @@ export async function GET() {
       .from("vendors")
       .select("*")
       .eq("tenant_id", profile.tenant_id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

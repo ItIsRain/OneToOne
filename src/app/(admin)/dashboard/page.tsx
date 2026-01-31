@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback, useEffect, Suspense } from "react";
+import { motion } from "framer-motion";
 import {
   DashboardMetrics,
   DashboardActivity,
@@ -50,6 +51,16 @@ const defaultSettings: DashboardSettings = {
   accent_color: null,
   banner_image_url: null,
   banner_message: null,
+};
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
+};
+
+const staggerContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1 } },
 };
 
 export default function Dashboard() {
@@ -270,12 +281,17 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="space-y-6">
+      <motion.div
+        className="space-y-6"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+      >
         {/* Customize Button */}
-        <div className="flex justify-end">
+        <motion.div className="flex justify-end" variants={sectionVariants}>
           <button
             onClick={() => setCustomizeOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-all"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -283,34 +299,44 @@ export default function Dashboard() {
             </svg>
             Customize
           </button>
-        </div>
+        </motion.div>
 
         {/* Banner */}
         {dashSettings.banner_message && (
-          <DashboardBanner
-            message={dashSettings.banner_message}
-            imageUrl={dashSettings.banner_image_url}
-          />
+          <motion.div variants={sectionVariants}>
+            <DashboardBanner
+              message={dashSettings.banner_message}
+              imageUrl={dashSettings.banner_image_url}
+            />
+          </motion.div>
         )}
 
         {/* Full-width widgets */}
-        {fullWidgets.map((key) => renderWidget(key))}
+        {fullWidgets.map((key) => (
+          <motion.div key={key} variants={sectionVariants}>
+            {renderWidget(key)}
+          </motion.div>
+        ))}
 
         {/* Main Grid */}
         {(leftWidgets.length > 0 || rightWidgets.length > 0) && (
-          <div className="grid grid-cols-12 gap-6">
+          <motion.div className="grid grid-cols-12 gap-6" variants={sectionVariants}>
             {/* Left Column */}
             <div className="col-span-12 xl:col-span-8 space-y-6">
-              {leftWidgets.map((key) => renderLeftWidget(key))}
+              {leftWidgets.map((key) => (
+                <div key={key}>{renderLeftWidget(key)}</div>
+              ))}
             </div>
 
             {/* Right Column */}
             <div className="col-span-12 xl:col-span-4 space-y-6">
-              {rightWidgets.map((key) => renderRightWidget(key))}
+              {rightWidgets.map((key) => (
+                <div key={key}>{renderRightWidget(key)}</div>
+              ))}
             </div>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Customize Panel */}
       <DashboardCustomizePanel

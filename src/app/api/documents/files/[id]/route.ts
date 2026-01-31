@@ -59,6 +59,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: file, error } = await supabase
       .from("files")
       .select(`
@@ -66,6 +77,7 @@ export async function GET(
         folder:folders(id, name, color, parent_folder_id)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -102,6 +114,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Build update object with only provided fields
@@ -119,6 +142,7 @@ export async function PATCH(
       .from("files")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         folder:folders(id, name, color)
@@ -155,11 +179,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get file to get Cloudinary public ID
     const { data: file, error: fetchError } = await supabase
       .from("files")
       .select("cloudinary_public_id, file_type")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (fetchError || !file) {
@@ -167,7 +203,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error } = await supabase.from("files").delete().eq("id", id);
+    const { error } = await supabase.from("files").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete file error:", error);

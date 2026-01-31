@@ -168,12 +168,12 @@ export const PortalProjectDetail: React.FC<PortalProjectDetailProps> = ({
             {project.tasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3 dark:border-gray-800"
+                className="flex flex-col gap-2 rounded-lg border border-gray-100 px-4 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between"
               >
-                <span className="text-sm text-gray-900 dark:text-white">
+                <span className="min-w-0 truncate text-sm text-gray-900 dark:text-white">
                   {task.title}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   {task.priority && (
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       {task.priority}

@@ -95,7 +95,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
   const fetchContract = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/contracts/${contractId}`);
+      const res = await fetch(`/api/documents/contracts/${contractId}`);
       if (res.ok) {
         const data = await res.json();
         const c = data.contract;
@@ -121,8 +121,8 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(`/api/contracts/${contractId}`, {
-        method: "PUT",
+      const res = await fetch(`/api/documents/contracts/${contractId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: title,

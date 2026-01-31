@@ -174,6 +174,42 @@ export async function PATCH(
       updates.amount = total; // Backward compatibility
     }
 
+    // Keep total and amount in sync if only one was updated directly
+    if (updates.total !== undefined && updates.amount === undefined) {
+      updates.amount = updates.total;
+    } else if (updates.amount !== undefined && updates.total === undefined) {
+      updates.total = updates.amount;
+    }
+
+    // Validate status transitions
+    if (updates.status) {
+      const { data: currentInvoice } = await supabase
+        .from("invoices")
+        .select("status")
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (currentInvoice) {
+        const validTransitions: Record<string, string[]> = {
+          draft: ["sent", "cancelled", "void"],
+          sent: ["paid", "overdue", "cancelled", "void", "draft"],
+          overdue: ["paid", "cancelled", "void", "sent"],
+          paid: ["void", "refunded"],
+          cancelled: ["draft"],
+          void: [],
+          refunded: [],
+        };
+        const allowed = validTransitions[currentInvoice.status] || [];
+        if (!allowed.includes(updates.status as string)) {
+          return NextResponse.json(
+            { error: `Cannot transition from "${currentInvoice.status}" to "${updates.status}"` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Handle status transitions
     if (body.status === 'sent' && !body.sent_date) {
       updates.sent_date = new Date().toISOString();
@@ -206,13 +242,6 @@ export async function PATCH(
 
     // Update items if provided
     if (body.items && Array.isArray(body.items)) {
-      // Delete existing items
-      await supabase
-        .from("invoice_items")
-        .delete()
-        .eq("invoice_id", id);
-
-      // Insert new items
       if (body.items.length > 0) {
         const itemsData = body.items.map((item: Record<string, unknown>, index: number) => ({
           invoice_id: id,
@@ -228,7 +257,30 @@ export async function PATCH(
           notes: item.notes || null,
         }));
 
-        await supabase.from("invoice_items").insert(itemsData);
+        // Delete existing items then insert new ones
+        const { error: deleteError } = await supabase
+          .from("invoice_items")
+          .delete()
+          .eq("invoice_id", id);
+
+        if (deleteError) {
+          console.error("Failed to delete old invoice items:", deleteError);
+        }
+
+        const { error: insertError } = await supabase.from("invoice_items").insert(itemsData);
+        if (insertError) {
+          console.error("Failed to insert invoice items:", insertError);
+          return NextResponse.json(
+            { error: "Invoice updated but failed to save line items", invoice },
+            { status: 207 }
+          );
+        }
+      } else {
+        // If items array is empty, delete all items
+        await supabase
+          .from("invoice_items")
+          .delete()
+          .eq("invoice_id", id);
       }
     }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 function getServiceClient() {
   return createServiceClient(
@@ -17,6 +18,29 @@ export async function POST(request: Request) {
 
     if (!email || !tenant_slug) {
       return NextResponse.json({ error: "Email and tenant slug are required" }, { status: 400 });
+    }
+
+    // Rate limit: 5 magic link requests per email per hour
+    const ip = getClientIp(request);
+    const emailRateCheck = await checkRateLimit({
+      key: "magic-link",
+      identifier: email.toLowerCase(),
+      maxRequests: 5,
+      windowSeconds: 60 * 60,
+    });
+    if (!emailRateCheck.allowed) {
+      // Return success message to prevent email enumeration even when rate limited
+      return NextResponse.json({ success: true, message: "If an account exists, a magic link has been sent." });
+    }
+
+    const ipRateCheck = await checkRateLimit({
+      key: "magic-link-ip",
+      identifier: ip,
+      maxRequests: 15,
+      windowSeconds: 60 * 60,
+    });
+    if (!ipRateCheck.allowed) {
+      return NextResponse.json({ success: true, message: "If an account exists, a magic link has been sent." });
     }
 
     const supabase = getServiceClient();

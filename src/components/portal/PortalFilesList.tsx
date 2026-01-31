@@ -175,93 +175,127 @@ export const PortalFilesList: React.FC<PortalFilesListProps> = ({
         </form>
       )}
 
-      {/* Files Table */}
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm dark:bg-gray-900">
-        <div className="overflow-x-auto">
-          <Table className="w-full">
-            <TableHeader className="border-b border-gray-100 dark:border-gray-800">
-              <TableRow>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  File Name
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Type
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Size
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Uploaded By
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Date
-                </TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {files.length === 0 ? (
-                <TableRow>
-                  <TableCell className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No files shared yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                files.map((file) => (
-                  <TableRow
-                    key={file.id}
-                    className="border-b border-gray-50 dark:border-gray-800"
+      {files.length === 0 ? (
+        <div className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
+          No files shared yet.
+        </div>
+      ) : (
+        <>
+          {/* Mobile Card View */}
+          <div className="space-y-3 sm:hidden">
+            {files.map((file) => (
+              <div
+                key={file.id}
+                className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <a
+                    href={file.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 truncate text-sm font-medium text-lime-600 hover:underline dark:text-lime-400"
                   >
-                    <TableCell className="px-5 py-3.5">
-                      <a
-                        href={file.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-lime-600 hover:underline dark:text-lime-400"
-                      >
-                        {file.file_name}
-                      </a>
+                    {file.file_name}
+                  </a>
+                  <Badge
+                    color={file.uploaded_by === "agency" ? "info" : "success"}
+                    size="sm"
+                  >
+                    {file.uploaded_by === "agency" ? "Agency" : "Client"}
+                  </Badge>
+                </div>
+                <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                  <span>{file.file_type || "-"}</span>
+                  <span>{formatFileSize(file.file_size)}</span>
+                </div>
+                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  {new Date(file.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm dark:bg-gray-900 sm:block">
+            <div className="overflow-x-auto">
+              <Table className="w-full">
+                <TableHeader className="border-b border-gray-100 dark:border-gray-800">
+                  <TableRow>
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      File Name
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
-                      {file.file_type || "-"}
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Type
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
-                      {formatFileSize(file.file_size)}
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Size
                     </TableCell>
-                    <TableCell className="px-5 py-3.5">
-                      <Badge
-                        color={
-                          file.uploaded_by === "agency" ? "info" : "success"
-                        }
-                        size="sm"
-                      >
-                        {file.uploaded_by === "agency" ? "Agency" : "Client"}
-                      </Badge>
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Uploaded By
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
-                      {new Date(file.created_at).toLocaleDateString()}
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Date
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                </TableHeader>
+                <TableBody>
+                  {files.map((file) => (
+                    <TableRow
+                      key={file.id}
+                      className="border-b border-gray-50 dark:border-gray-800"
+                    >
+                      <TableCell className="px-5 py-3.5">
+                        <a
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-lime-600 hover:underline dark:text-lime-400"
+                        >
+                          {file.file_name}
+                        </a>
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                        {file.file_type || "-"}
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                        {formatFileSize(file.file_size)}
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5">
+                        <Badge
+                          color={
+                            file.uploaded_by === "agency" ? "info" : "success"
+                          }
+                          size="sm"
+                        >
+                          {file.uploaded_by === "agency" ? "Agency" : "Client"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                        {new Date(file.created_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

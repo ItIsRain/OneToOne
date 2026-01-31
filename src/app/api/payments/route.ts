@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { createPaymentSchema, validateBody } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -63,7 +64,8 @@ export async function GET() {
         invoice:invoices(id, invoice_number, total, currency, status)
       `)
       .eq("tenant_id", profile.tenant_id)
-      .order("payment_date", { ascending: false });
+      .order("payment_date", { ascending: false })
+      .limit(500);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -103,19 +105,26 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createPaymentSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const v = validation.data;
+
     const paymentData = {
       tenant_id: profile.tenant_id,
-      invoice_id: body.invoice_id || null,
-      client_id: body.client_id || null,
-      client_name: body.client_name || null,
-      amount: parseFloat(body.amount) || 0,
-      currency: body.currency || "USD",
-      payment_date: body.payment_date || new Date().toISOString().split("T")[0],
-      payment_method: body.payment_method || null,
-      transaction_id: body.transaction_id || null,
-      reference_number: body.reference_number || null,
-      status: body.status || "completed",
-      notes: body.notes || null,
+      invoice_id: v.invoice_id || null,
+      client_id: v.client_id || null,
+      client_name: v.client_name || null,
+      amount: v.amount,
+      currency: v.currency,
+      payment_date: v.payment_date || new Date().toISOString().split("T")[0],
+      payment_method: v.payment_method || null,
+      transaction_id: v.transaction_id || null,
+      reference_number: v.reference_number || null,
+      status: v.status,
+      notes: v.notes || null,
       created_by: user.id,
     };
 
@@ -139,24 +148,28 @@ export async function POST(request: Request) {
       // Get current invoice
       const { data: invoice } = await supabase
         .from("invoices")
-        .select("amount_paid, total, amount")
+        .select("amount_paid, total, amount, status")
         .eq("id", body.invoice_id)
         .single();
 
       if (invoice) {
-        const newAmountPaid = (invoice.amount_paid || 0) + parseFloat(body.amount);
-        const invoiceTotal = invoice.total || invoice.amount || 0;
-        const newStatus = newAmountPaid >= invoiceTotal ? "paid" : "partially_paid";
+        // Don't update cancelled/void/refunded invoices
+        const nonPayableStatuses = ["cancelled", "void", "refunded"];
+        if (!nonPayableStatuses.includes(invoice.status)) {
+          const newAmountPaid = (invoice.amount_paid || 0) + parseFloat(body.amount);
+          const invoiceTotal = invoice.total || invoice.amount || 0;
+          const newStatus = newAmountPaid >= invoiceTotal ? "paid" : "partially_paid";
 
-        await supabase
-          .from("invoices")
-          .update({
-            amount_paid: newAmountPaid,
-            status: newStatus,
-            paid_at: newAmountPaid >= invoiceTotal ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", body.invoice_id);
+          await supabase
+            .from("invoices")
+            .update({
+              amount_paid: newAmountPaid,
+              status: newStatus,
+              paid_at: newAmountPaid >= invoiceTotal ? new Date().toISOString() : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", body.invoice_id);
+        }
       }
     }
 

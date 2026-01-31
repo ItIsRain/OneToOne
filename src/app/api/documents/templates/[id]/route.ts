@@ -59,10 +59,22 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: template, error } = await supabase
       .from("document_templates")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -116,6 +128,7 @@ export async function PATCH(
       .from("document_templates")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!existing) {
@@ -135,6 +148,7 @@ export async function PATCH(
         .from("document_templates")
         .update(updateData)
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .select()
         .single();
 
@@ -210,6 +224,7 @@ export async function PATCH(
       .from("document_templates")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 
@@ -243,11 +258,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get template for cleanup
     const { data: template } = await supabase
       .from("document_templates")
       .select("cloudinary_public_id, name")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!template) {
@@ -255,7 +282,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error } = await supabase.from("document_templates").delete().eq("id", id);
+    const { error } = await supabase.from("document_templates").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete template error:", error);

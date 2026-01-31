@@ -59,10 +59,22 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: announcement, error } = await supabase
       .from("announcements")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -78,7 +90,8 @@ export async function GET(
     await supabase
       .from("announcements")
       .update({ views_count: (announcement.views_count || 0) + 1 })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     return NextResponse.json({ announcement });
   } catch (error) {
@@ -123,6 +136,7 @@ export async function PATCH(
       .from("announcements")
       .select("image_public_id, attachments")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     // Build update object
@@ -183,6 +197,7 @@ export async function PATCH(
         .from("announcements")
         .select("reactions")
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .single();
 
       const reactions = current?.reactions || {};
@@ -194,6 +209,7 @@ export async function PATCH(
       .from("announcements")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 
@@ -227,11 +243,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get announcement to clean up Cloudinary assets
     const { data: announcement } = await supabase
       .from("announcements")
       .select("image_public_id, attachments, title, tenant_id")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!announcement) {
@@ -239,7 +267,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error } = await supabase.from("announcements").delete().eq("id", id);
+    const { error } = await supabase.from("announcements").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete announcement error:", error);

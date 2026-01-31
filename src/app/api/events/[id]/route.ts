@@ -121,8 +121,22 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Process dates if they come as separate date and time
-    const updateData = { ...body };
+    // Allowlist fields to prevent mass assignment
+    const allowedFields = [
+      "title", "description", "event_type", "status", "is_public", "is_published",
+      "start_date", "end_date", "start_time", "end_time", "date", "end_date_value",
+      "location", "address", "city", "venue_id", "client_id",
+      "max_attendees", "registration_required", "registration_deadline",
+      "cover_image", "color", "tags", "category", "notes",
+      "ticket_price", "currency", "is_free", "slug",
+      "agenda", "sponsors", "speakers", "custom_fields",
+      "judging_enabled", "judging_criteria", "judging_start", "judging_end",
+      "teams_enabled", "max_team_size", "min_team_size",
+    ];
+    const updateData: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) updateData[key] = body[key];
+    }
 
     if (body.date && body.start_time && !body.start_date) {
       updateData.start_date = `${body.date}T${body.start_time}:00`;

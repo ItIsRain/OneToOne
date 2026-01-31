@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
+import { useCountUp } from "@/hooks/useCountUp";
 import Badge from "@/components/ui/badge/Badge";
 import {
   ArrowDownIcon,
@@ -28,6 +30,24 @@ interface DashboardMetricsData {
 
 interface DashboardMetricsProps {
   onDataLoaded?: (data: DashboardMetricsData) => void;
+}
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: "easeOut" as const } },
+};
+
+function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0 }: { value: number; prefix?: string; suffix?: string; decimals?: number }) {
+  const animated = useCountUp(value, 1200, decimals);
+  const formatted = decimals > 0
+    ? animated.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    : animated.toLocaleString("en-US");
+  return <>{prefix}{formatted}{suffix}</>;
 }
 
 export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded }) => {
@@ -64,28 +84,20 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
     fetchMetrics();
   }, [fetchMetrics]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-5">
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 animate-pulse"
+            className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 animate-pulse"
           >
-            <div className="h-12 w-12 rounded-xl bg-gray-200 dark:bg-gray-700" />
-            <div className="mt-5 space-y-2">
-              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-              <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-10 w-10 rounded-xl bg-gray-100 dark:bg-gray-800" />
+              <div className="h-4 w-24 bg-gray-100 dark:bg-gray-800 rounded" />
             </div>
+            <div className="h-8 w-20 bg-gray-100 dark:bg-gray-800 rounded mb-2" />
+            <div className="h-4 w-28 bg-gray-50 dark:bg-gray-800/50 rounded" />
           </div>
         ))}
       </div>
@@ -94,7 +106,7 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-error-200 bg-error-50 p-6 dark:border-error-800 dark:bg-error-900/20">
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 dark:border-error-800 dark:bg-error-900/20">
         <p className="text-error-600 dark:text-error-400">{error}</p>
         <button
           onClick={fetchMetrics}
@@ -108,91 +120,94 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
 
   if (!metrics) return null;
 
+  const cards = [
+    {
+      label: "Active Clients",
+      value: metrics.activeClients,
+      icon: <GroupIcon className="size-5" />,
+      iconBg: "bg-brand-100 dark:bg-brand-500/15",
+      iconColor: "text-brand-600 dark:text-brand-400",
+      badge: (
+        <Badge color={metrics.clientsGrowth > 0 ? "success" : "light"}>
+          {metrics.clientsGrowth > 0 && <ArrowUpIcon />}
+          +{metrics.clientsGrowth} this month
+        </Badge>
+      ),
+    },
+    {
+      label: "Upcoming Events",
+      value: metrics.upcomingEvents,
+      icon: <CalenderIcon className="size-5" />,
+      iconBg: "bg-amber-100 dark:bg-amber-500/15",
+      iconColor: "text-amber-600 dark:text-amber-400",
+      badge: (
+        <Badge color="warning">
+          <ArrowUpIcon />
+          {metrics.eventsThisWeek} this week
+        </Badge>
+      ),
+    },
+    {
+      label: "Monthly Revenue",
+      value: metrics.monthlyRevenue,
+      prefix: "$",
+      decimals: 2,
+      icon: <DollarLineIcon className="size-5" />,
+      iconBg: "bg-emerald-100 dark:bg-emerald-500/15",
+      iconColor: "text-emerald-600 dark:text-emerald-400",
+      badge: (
+        <Badge color={metrics.revenueGrowth >= 0 ? "success" : "error"}>
+          {metrics.revenueGrowth >= 0 ? <ArrowUpIcon /> : <ArrowDownIcon className="text-error-500" />}
+          {Math.abs(metrics.revenueGrowth)}%
+        </Badge>
+      ),
+    },
+    {
+      label: "Pending Tasks",
+      value: metrics.pendingTasks,
+      icon: <TaskIcon className="size-5" />,
+      iconBg: "bg-blue-100 dark:bg-blue-500/15",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      badge: (
+        <Badge color={metrics.overdueTasks > 0 ? "error" : "success"}>
+          {metrics.overdueTasks > 0 && <ArrowDownIcon className="text-error-500" />}
+          {metrics.overdueTasks} overdue
+        </Badge>
+      ),
+    },
+  ];
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
-      {/* Active Clients */}
-      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-brand-500 bg-white p-5 dark:border-gray-800 dark:border-l-brand-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600">
-          <GroupIcon className="text-white size-6" />
-        </div>
-        <div className="flex items-end justify-between mt-5">
-          <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Active Clients
+    <motion.div
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-5"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
+      {cards.map((card) => (
+        <motion.div
+          key={card.label}
+          variants={item}
+          className="group rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 hover:shadow-lg hover:border-gray-200 dark:hover:border-gray-700 transition-all duration-300 cursor-default"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${card.iconBg}`}>
+              <span className={card.iconColor}>{card.icon}</span>
+            </div>
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {card.label}
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              {metrics.activeClients}
-            </h4>
           </div>
-          <Badge color={metrics.clientsGrowth > 0 ? "success" : "light"}>
-            {metrics.clientsGrowth > 0 && <ArrowUpIcon />}
-            +{metrics.clientsGrowth} this month
-          </Badge>
-        </div>
-      </div>
-
-      {/* Upcoming Events */}
-      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-warning-500 bg-white p-5 dark:border-gray-800 dark:border-l-warning-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-warning-400 to-warning-600">
-          <CalenderIcon className="text-white size-6" />
-        </div>
-        <div className="flex items-end justify-between mt-5">
-          <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Upcoming Events
-            </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              {metrics.upcomingEvents}
-            </h4>
-          </div>
-          <Badge color="warning">
-            <ArrowUpIcon />
-            {metrics.eventsThisWeek} this week
-          </Badge>
-        </div>
-      </div>
-
-      {/* Monthly Revenue */}
-      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-success-500 bg-white p-5 dark:border-gray-800 dark:border-l-success-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-600">
-          <DollarLineIcon className="text-white size-6" />
-        </div>
-        <div className="flex items-end justify-between mt-5">
-          <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Monthly Revenue
-            </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              {formatCurrency(metrics.monthlyRevenue)}
-            </h4>
-          </div>
-          <Badge color={metrics.revenueGrowth >= 0 ? "success" : "error"}>
-            {metrics.revenueGrowth >= 0 ? <ArrowUpIcon /> : <ArrowDownIcon className="text-error-500" />}
-            {Math.abs(metrics.revenueGrowth)}%
-          </Badge>
-        </div>
-      </div>
-
-      {/* Pending Tasks */}
-      <div className="rounded-2xl border border-gray-200 border-l-4 border-l-blue-500 bg-white p-5 dark:border-gray-800 dark:border-l-blue-500 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600">
-          <TaskIcon className="text-white size-6" />
-        </div>
-        <div className="flex items-end justify-between mt-5">
-          <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Pending Tasks
-            </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              {metrics.pendingTasks}
-            </h4>
-          </div>
-          <Badge color={metrics.overdueTasks > 0 ? "error" : "success"}>
-            {metrics.overdueTasks > 0 && <ArrowDownIcon className="text-error-500" />}
-            {metrics.overdueTasks} overdue
-          </Badge>
-        </div>
-      </div>
-    </div>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-2">
+            <AnimatedNumber
+              value={card.value}
+              prefix={card.prefix}
+              decimals={card.decimals}
+            />
+          </h3>
+          <div>{card.badge}</div>
+        </motion.div>
+      ))}
+    </motion.div>
   );
 };

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // POST - Client decline contract (NO AUTH)
 export async function POST(
@@ -8,6 +9,18 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+
+    // Rate limit: 5 decline attempts per IP per minute
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "contract-decline",
+      identifier: ip,
+      maxRequests: 5,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

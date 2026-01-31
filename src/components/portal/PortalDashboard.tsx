@@ -148,7 +148,7 @@ export const PortalDashboard: React.FC<PortalDashboardProps> = ({
           <Link
             key={card.label}
             href={card.href}
-            className="group rounded-xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900"
+            className="group rounded-xl bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900 sm:p-5"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -170,7 +170,7 @@ export const PortalDashboard: React.FC<PortalDashboardProps> = ({
       </div>
 
       {/* Recent Activity */}
-      <div className="rounded-xl bg-white p-6 shadow-sm dark:bg-gray-900">
+      <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900 sm:p-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
           Recent Activity
         </h2>
@@ -183,21 +183,24 @@ export const PortalDashboard: React.FC<PortalDashboardProps> = ({
             {data.recentActivity.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between rounded-lg border border-gray-100 p-3 dark:border-gray-800"
+                className="rounded-lg border border-gray-100 p-3 dark:border-gray-800"
               >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${activityTypeBadgeColor(item.type)}`}
-                  >
-                    {activityTypeLabel(item.type)}
-                  </span>
-                  <span className="text-sm text-gray-900 dark:text-white">
-                    {item.title}
+                {/* Mobile: stacked layout */}
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${activityTypeBadgeColor(item.type)}`}
+                    >
+                      {activityTypeLabel(item.type)}
+                    </span>
+                    <span className="truncate text-sm text-gray-900 dark:text-white">
+                      {item.title}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 sm:text-right">
+                    {new Date(item.date).toLocaleDateString()}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {new Date(item.date).toLocaleDateString()}
-                </span>
               </div>
             ))}
           </div>

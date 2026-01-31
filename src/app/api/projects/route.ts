@@ -77,11 +77,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Allowlist fields to prevent mass assignment
+    const allowedFields = [
+      "name", "description", "project_code", "status", "priority",
+      "client_id", "primary_contact_id", "project_manager_id", "team_lead_id",
+      "start_date", "end_date", "deadline", "budget", "currency",
+      "color", "tags", "category", "notes", "is_template",
+      "billing_type", "hourly_rate", "estimated_hours",
+    ];
+    const filtered: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) filtered[key] = body[key];
+    }
+
     // Create the project with tenant_id and created_by
     const { data: project, error } = await supabase
       .from("projects")
       .insert({
-        ...body,
+        ...filtered,
         tenant_id: profile.tenant_id,
         created_by: user.id,
       })

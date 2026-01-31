@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/lib/email";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+
+const MAX_RECIPIENTS_PER_BROADCAST = 500;
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -221,6 +224,25 @@ export async function POST(request: Request) {
 
     if (!subject || !content || !recipients || recipients.length === 0) {
       return NextResponse.json({ error: "Subject, content, and recipients are required" }, { status: 400 });
+    }
+
+    if (recipients.length > MAX_RECIPIENTS_PER_BROADCAST) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_RECIPIENTS_PER_BROADCAST} recipients per broadcast` },
+        { status: 400 }
+      );
+    }
+
+    // Rate limit: 10 broadcasts per hour per user
+    const rateLimit = await checkRateLimit({
+      key: "email-broadcast",
+      identifier: user.id,
+      maxRequests: 10,
+      windowSeconds: 3600,
+    });
+
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
     }
 
     // Create the broadcast record

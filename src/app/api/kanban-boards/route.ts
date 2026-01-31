@@ -10,6 +10,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("project_id");
 
@@ -20,6 +31,7 @@ export async function GET(request: Request) {
         project:projects(id, name, project_code, color),
         creator:profiles!kanban_boards_created_by_fkey(id, first_name, last_name)
       `)
+      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 
     if (projectId) {

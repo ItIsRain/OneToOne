@@ -33,9 +33,24 @@ function generateShareLink(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
-// Simple password hashing (in production, use bcrypt)
+// Hash password using scrypt (constant-time, memory-hard)
 function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password).digest("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+// Verify password against scrypt hash (supports legacy SHA-256 hashes for migration)
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (storedHash.includes(":")) {
+    // New scrypt format: salt:hash
+    const [salt, hash] = storedHash.split(":");
+    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(derived, "hex"));
+  }
+  // Legacy SHA-256 format (no colon separator)
+  const legacyHash = crypto.createHash("sha256").update(password).digest("hex");
+  return legacyHash === storedHash;
 }
 
 // GET - Fetch all file shares

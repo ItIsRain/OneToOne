@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     const { data: invoices, error: invoicesError } = await supabase
       .from("invoices")
-      .select("id, invoice_number, status, total_amount, due_date, created_at, paid_at, currency, description")
+      .select("id, invoice_number, status, total, amount, due_date, created_at, paid_at, currency, description")
       .eq("client_id", portalClient.client_id)
       .eq("tenant_id", portalClient.tenant_id)
       .order("created_at", { ascending: false });

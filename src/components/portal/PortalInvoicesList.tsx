@@ -97,84 +97,121 @@ export const PortalInvoicesList: React.FC<PortalInvoicesListProps> = ({
         Invoices
       </h1>
 
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm dark:bg-gray-900">
-        <div className="overflow-x-auto">
-          <Table className="w-full">
-            <TableHeader className="border-b border-gray-100 dark:border-gray-800">
-              <TableRow>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Invoice #
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Amount
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Status
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Due Date
-                </TableCell>
-                <TableCell
-                  isHeader
-                  className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  Issued Date
-                </TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.length === 0 ? (
-                <TableRow>
-                  <TableCell className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No invoices found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                invoices.map((invoice) => (
-                  <TableRow
-                    key={invoice.id}
-                    className="border-b border-gray-50 dark:border-gray-800"
-                  >
-                    <TableCell className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">
+      {invoices.length === 0 ? (
+        <div className="rounded-xl bg-white p-8 text-center text-sm text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
+          No invoices found.
+        </div>
+      ) : (
+        <>
+          {/* Mobile Card View */}
+          <div className="space-y-3 sm:hidden">
+            {invoices.map((invoice) => (
+              <div
+                key={invoice.id}
+                className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {invoice.invoice_number}
-                    </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">
+                    </p>
+                    <p className="mt-0.5 text-lg font-bold text-gray-900 dark:text-white">
                       {formatAmount(invoice.amount)}
+                    </p>
+                  </div>
+                  <Badge
+                    color={statusBadgeColor(invoice.status)}
+                    size="sm"
+                  >
+                    {invoice.status.charAt(0).toUpperCase() +
+                      invoice.status.slice(1)}
+                  </Badge>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <div>
+                    <span className="font-medium">Due:</span> {formatDate(invoice.due_date)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Issued:</span> {formatDate(invoice.issued_date)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden overflow-hidden rounded-xl bg-white shadow-sm dark:bg-gray-900 sm:block">
+            <div className="overflow-x-auto">
+              <Table className="w-full">
+                <TableHeader className="border-b border-gray-100 dark:border-gray-800">
+                  <TableRow>
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Invoice #
                     </TableCell>
-                    <TableCell className="px-5 py-3.5">
-                      <Badge
-                        color={statusBadgeColor(invoice.status)}
-                        size="sm"
-                      >
-                        {invoice.status.charAt(0).toUpperCase() +
-                          invoice.status.slice(1)}
-                      </Badge>
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Amount
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
-                      {formatDate(invoice.due_date)}
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Status
                     </TableCell>
-                    <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
-                      {formatDate(invoice.issued_date)}
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Due Date
+                    </TableCell>
+                    <TableCell
+                      isHeader
+                      className="px-5 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Issued Date
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow
+                      key={invoice.id}
+                      className="border-b border-gray-50 dark:border-gray-800"
+                    >
+                      <TableCell className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">
+                        {invoice.invoice_number}
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">
+                        {formatAmount(invoice.amount)}
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5">
+                        <Badge
+                          color={statusBadgeColor(invoice.status)}
+                          size="sm"
+                        >
+                          {invoice.status.charAt(0).toUpperCase() +
+                            invoice.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                        {formatDate(invoice.due_date)}
+                      </TableCell>
+                      <TableCell className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                        {formatDate(invoice.issued_date)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

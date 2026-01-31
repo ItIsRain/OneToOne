@@ -47,10 +47,22 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: vendor, error } = await supabase
       .from("vendors")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -86,6 +98,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Fetch old vendor for status change trigger
@@ -93,6 +116,7 @@ export async function PATCH(
       .from("vendors")
       .select("status, tenant_id, name")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     // Only allow updating specific fields
@@ -127,6 +151,7 @@ export async function PATCH(
       .from("vendors")
       .update(updates)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 
@@ -183,10 +208,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { error } = await supabase
       .from("vendors")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete error:", error);

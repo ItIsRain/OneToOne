@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSubdomainSuffix } from "@/lib/url";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { registerSchema, validateBody } from "@/lib/validations";
 
 export async function POST(request: Request) {
   try {
@@ -18,20 +19,26 @@ export async function POST(request: Request) {
       return rateLimitResponse(rateCheck.retryAfterSeconds!);
     }
 
-    const { firstName, lastName, email, password, phone, useCase, subdomain, plan } = await request.json();
+    const rawBody = await request.json();
 
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !useCase || !subdomain) {
-      return NextResponse.json(
-        { error: "All fields are required" },
-        { status: 400 }
-      );
+    // Validate input with Zod
+    const validation = validateBody(registerSchema, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { firstName, lastName, email, password, phone, useCase, subdomain, plan } = validation.data;
 
-    // Validate subdomain format
-    if (!/^[a-z0-9-]+$/.test(subdomain)) {
+    // Check against hardcoded reserved subdomains
+    const reservedSubdomains = [
+      "admin", "api", "www", "mail", "smtp", "ftp", "blog", "shop", "store",
+      "app", "dashboard", "portal", "support", "help", "docs", "status",
+      "billing", "account", "login", "signup", "register", "auth",
+      "cdn", "assets", "static", "media", "images", "files",
+      "test", "staging", "dev", "demo", "sandbox",
+    ];
+    if (reservedSubdomains.includes(subdomain)) {
       return NextResponse.json(
-        { error: "Invalid subdomain format" },
+        { error: "This subdomain is reserved" },
         { status: 400 }
       );
     }

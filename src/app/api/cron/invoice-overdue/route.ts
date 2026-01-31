@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().slice(0, 10);
     const { data: overdueInvoices, error } = await supabase
       .from("invoices")
-      .select("id, invoice_number, total_amount, due_date, client_id, tenant_id, status")
+      .select("id, invoice_number, total, amount, due_date, client_id, tenant_id, status")
       .lt("due_date", today)
       .not("status", "eq", "paid")
       .not("status", "eq", "cancelled")
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
               entity_type: "invoice",
               entity_name: invoice.invoice_number || `Invoice ${invoice.id}`,
               invoice_number: invoice.invoice_number || "",
-              invoice_amount: String(invoice.total_amount || 0),
+              invoice_amount: String(invoice.total || invoice.amount || 0),
               invoice_due_date: invoice.due_date,
               invoice_client_id: invoice.client_id || null,
               days_overdue: String(daysOverdue),

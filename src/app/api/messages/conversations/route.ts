@@ -102,62 +102,57 @@ export async function GET() {
       return NextResponse.json({ error: convError.message }, { status: 500 });
     }
 
-    // Fetch last message and unread count for each conversation
-    const conversationsWithDetails = await Promise.all(
-      (conversations || []).map(async (conv) => {
-        // Get last message
-        const { data: lastMessages } = await supabase
-          .from("messages")
-          .select("id, content, type, file_name, created_at, sender_id")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
+    // Batch-fetch last messages for all conversations at once
+    const allConvIds = (conversations || []).map((c) => c.id);
+    const lastMessageMap = new Map<string, Record<string, unknown>>();
+    const unreadCountMap = new Map<string, number>();
 
-        const lastMessage = lastMessages?.[0] || null;
+    if (allConvIds.length > 0) {
+      // Fetch recent messages for all conversations in one query, then pick last per conversation
+      // Limit to last 1000 messages across all conversations for performance
+      const { data: recentMessages } = await supabase
+        .from("messages")
+        .select("id, content, type, file_name, created_at, sender_id, conversation_id")
+        .in("conversation_id", allConvIds)
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
-        // Get unread count (messages after last_read_at)
-        const lastReadAt = lastReadMap[conv.id];
-        let unreadCount = 0;
-
-        if (lastReadAt) {
-          const { count } = await supabase
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", user.id)
-            .gt("created_at", lastReadAt);
-          unreadCount = count || 0;
-        } else {
-          // If never read, count all messages from others
-          const { count } = await supabase
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", user.id);
-          unreadCount = count || 0;
+      // Group by conversation_id and pick the first (most recent)
+      for (const msg of recentMessages || []) {
+        if (!lastMessageMap.has(msg.conversation_id)) {
+          lastMessageMap.set(msg.conversation_id, msg);
         }
+      }
 
-        // Get the other participant(s) - exclude current user
-        // For self-messaging, include the user themselves
-        let otherParticipants = conv.conversation_participants
-          .filter((p: { user_id: string }) => p.user_id !== user.id)
+      // Compute unread counts from the same message set
+      for (const msg of recentMessages || []) {
+        if (msg.sender_id === user.id) continue;
+        const lastReadAt = lastReadMap[msg.conversation_id];
+        if (lastReadAt && msg.created_at <= lastReadAt) continue;
+        unreadCountMap.set(msg.conversation_id, (unreadCountMap.get(msg.conversation_id) || 0) + 1);
+      }
+    }
+
+    const conversationsWithDetails = (conversations || []).map((conv) => {
+      // Get the other participant(s) - exclude current user
+      let otherParticipants = conv.conversation_participants
+        .filter((p: { user_id: string }) => p.user_id !== user.id)
+        .map((p: { profiles: unknown }) => p.profiles);
+
+      // If no other participants (self-messaging), include self
+      if (otherParticipants.length === 0) {
+        otherParticipants = conv.conversation_participants
           .map((p: { profiles: unknown }) => p.profiles);
+      }
 
-        // If no other participants (self-messaging), include self
-        if (otherParticipants.length === 0) {
-          otherParticipants = conv.conversation_participants
-            .map((p: { profiles: unknown }) => p.profiles);
-        }
-
-        return {
-          id: conv.id,
-          participants: otherParticipants,
-          lastMessage,
-          lastMessageAt: conv.last_message_at,
-          unreadCount,
-        };
-      })
-    );
+      return {
+        id: conv.id,
+        participants: otherParticipants,
+        lastMessage: lastMessageMap.get(conv.id) ?? null,
+        lastMessageAt: conv.last_message_at,
+        unreadCount: unreadCountMap.get(conv.id) ?? 0,
+      };
+    });
 
     return NextResponse.json({ conversations: conversationsWithDetails });
   } catch (error) {

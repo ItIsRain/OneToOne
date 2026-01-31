@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
 
+    query = query.limit(200);
+
     const { data: runs, error } = await query;
 
     if (error) {

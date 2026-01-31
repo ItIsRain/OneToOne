@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // POST - Submit eSignature for contract (NO AUTH)
 export async function POST(
@@ -9,6 +10,19 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+
+    // Rate limit: 5 sign attempts per IP per minute
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "contract-sign",
+      identifier: ip,
+      maxRequests: 5,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
+
     const body = await request.json();
 
     const { signature_name, signature_data } = body;
@@ -48,9 +62,7 @@ export async function POST(
       return NextResponse.json({ error: "Contract was declined" }, { status: 400 });
     }
 
-    // Get client IP
-    const forwarded = request.headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+    // Reuse IP from rate limit check above
 
     // Update contract with signature
     const { error: updateError } = await serviceClient

@@ -45,6 +45,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: contract, error } = await supabase
       .from("contracts")
       .select(`
@@ -53,6 +64,7 @@ export async function GET(
         project:projects(id, name, project_code)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -88,6 +100,17 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     const allowedFields = [
@@ -119,6 +142,7 @@ export async function PUT(
       .from("contracts")
       .update(updates)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         client:clients(id, name, company, email),
@@ -156,10 +180,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { error } = await supabase
       .from("contracts")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete error:", error);

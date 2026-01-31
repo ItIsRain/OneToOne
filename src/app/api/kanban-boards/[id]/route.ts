@@ -13,6 +13,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { id } = await params;
 
     const { data, error } = await supabase
@@ -23,6 +34,7 @@ export async function GET(
         creator:profiles!kanban_boards_created_by_fkey(id, first_name, last_name)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -49,6 +61,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -59,6 +82,7 @@ export async function PATCH(
         updated_by: user.id,
       })
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 
@@ -86,12 +110,24 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { id } = await params;
 
     const { error } = await supabase
       .from("kanban_boards")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Error deleting kanban board:", error);

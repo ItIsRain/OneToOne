@@ -59,6 +59,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: contract, error } = await supabase
       .from("contracts")
       .select(`
@@ -68,6 +79,7 @@ export async function GET(
         document_file:files(id, name, file_url, file_type, file_size)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -84,6 +96,7 @@ export async function GET(
       .from("contract_activities")
       .select("*")
       .eq("contract_id", id)
+      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false })
       .limit(20);
 
@@ -130,6 +143,7 @@ export async function PATCH(
       .from("contracts")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!existing) {
@@ -230,6 +244,7 @@ export async function PATCH(
       .from("contracts")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         client:clients(id, name, email, company),
@@ -292,11 +307,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get contract for cleanup and activity log
     const { data: contract } = await supabase
       .from("contracts")
       .select("name, document_public_id, tenant_id")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!contract) {
@@ -304,7 +331,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error } = await supabase.from("contracts").delete().eq("id", id);
+    const { error } = await supabase.from("contracts").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete contract error:", error);

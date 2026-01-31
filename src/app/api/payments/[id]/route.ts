@@ -241,7 +241,7 @@ export async function DELETE(
           .update({
             amount_paid: newAmountPaid,
             status: newStatus,
-            paid_at: newStatus === "paid" ? invoice.amount_paid : null,
+            paid_at: newStatus === "paid" ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingPayment.invoice_id);

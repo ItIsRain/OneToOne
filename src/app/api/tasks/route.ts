@@ -54,7 +54,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Order by position then created_at
-    query = query.order("position", { ascending: true }).order("created_at", { ascending: false });
+    query = query
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     const { data: tasks, error } = await query;
 
@@ -63,33 +66,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Fetch assignee info separately for tasks that have assigned_to
-    const tasksWithAssignees = await Promise.all(
-      (tasks || []).map(async (task) => {
-        let assignee = null;
-        let creator = null;
+    // Batch-fetch all assignees and creators in one query instead of N+1
+    const userIds = new Set<string>();
+    for (const task of tasks || []) {
+      if (task.assigned_to) userIds.add(task.assigned_to);
+      if (task.created_by) userIds.add(task.created_by);
+    }
 
-        if (task.assigned_to) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name, avatar_url")
-            .eq("id", task.assigned_to)
-            .single();
-          assignee = data;
-        }
+    const profileMap = new Map<string, { id: string; first_name: string; last_name: string; avatar_url?: string }>();
+    if (userIds.size > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, avatar_url")
+        .in("id", Array.from(userIds));
+      for (const p of profiles || []) {
+        profileMap.set(p.id, p);
+      }
+    }
 
-        if (task.created_by) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .eq("id", task.created_by)
-            .single();
-          creator = data;
-        }
-
-        return { ...task, assignee, creator };
-      })
-    );
+    const tasksWithAssignees = (tasks || []).map((task) => ({
+      ...task,
+      assignee: task.assigned_to ? profileMap.get(task.assigned_to) ?? null : null,
+      creator: task.created_by ? profileMap.get(task.created_by) ?? null : null,
+    }));
 
     return NextResponse.json(tasksWithAssignees);
   } catch (error) {
@@ -125,11 +124,25 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Allowlist fields to prevent mass assignment
+    const allowedFields = [
+      "title", "description", "status", "priority", "assigned_to",
+      "project_id", "client_id", "event_id", "parent_task_id",
+      "due_date", "start_date", "completed_at", "started_at",
+      "estimated_hours", "actual_hours", "position", "tags",
+      "category", "notes", "is_recurring", "recurrence_pattern",
+      "kanban_column_id", "board_id",
+    ];
+    const filtered: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) filtered[key] = body[key];
+    }
+
     // Create the task with tenant_id and created_by
     const { data: task, error } = await supabase
       .from("tasks")
       .insert({
-        ...body,
+        ...filtered,
         tenant_id: profile.tenant_id,
         created_by: user.id,
       })

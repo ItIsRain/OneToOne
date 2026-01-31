@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // PUBLIC route - no auth required, uses service role client
 // POST - Submit a booking
@@ -10,6 +11,18 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+
+    // Rate limit: 10 bookings per IP per minute
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "booking-submit",
+      identifier: ip,
+      maxRequests: 10,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

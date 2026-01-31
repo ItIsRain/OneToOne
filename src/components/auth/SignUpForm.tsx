@@ -169,6 +169,10 @@ export default function SignUpForm() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [affiliatedPortal, setAffiliatedPortal] = useState("");
+  const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "unavailable">("idle");
+  const [subdomainError, setSubdomainError] = useState("");
+  const subdomainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -189,6 +193,7 @@ export default function SignUpForm() {
   const updateFormData = (field: string, value: string | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError("");
+    if (field === "email") setAffiliatedPortal("");
   };
 
   // Resend OTP cooldown timer
@@ -203,6 +208,46 @@ export default function SignUpForm() {
     if (!phoneTouched) return;
     setPhoneError(validatePhone(formData.countryCode, formData.phoneNumber));
   }, [formData.phoneNumber, formData.countryCode, phoneTouched]);
+
+  // Debounced subdomain availability check
+  useEffect(() => {
+    if (subdomainTimerRef.current) clearTimeout(subdomainTimerRef.current);
+
+    const subdomain = formData.subdomain;
+    if (!subdomain || subdomain.length < 3) {
+      setSubdomainStatus("idle");
+      setSubdomainError(subdomain.length > 0 && subdomain.length < 3 ? "Must be at least 3 characters" : "");
+      return;
+    }
+
+    setSubdomainStatus("checking");
+    setSubdomainError("");
+
+    subdomainTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/auth/check-subdomain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subdomain }),
+        });
+        const data = await res.json();
+        if (data.available) {
+          setSubdomainStatus("available");
+          setSubdomainError("");
+        } else {
+          setSubdomainStatus("unavailable");
+          setSubdomainError(data.error || "Not available");
+        }
+      } catch {
+        setSubdomainStatus("unavailable");
+        setSubdomainError("Unable to verify");
+      }
+    }, 500);
+
+    return () => {
+      if (subdomainTimerRef.current) clearTimeout(subdomainTimerRef.current);
+    };
+  }, [formData.subdomain]);
 
   /* ---------- Handlers ---------- */
 
@@ -223,8 +268,15 @@ export default function SignUpForm() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to send OTP");
+      if (!res.ok) {
+        if (data.code === "EMAIL_AFFILIATED") {
+          setAffiliatedPortal(data.error);
+          return;
+        }
+        throw new Error(data.error || "Failed to send OTP");
+      }
 
+      setAffiliatedPortal("");
       setStep("otp");
       setResendCooldown(60);
       // Focus first OTP input after transition
@@ -499,28 +551,53 @@ export default function SignUpForm() {
             )}
           </div>
 
-          {error && (
+          {affiliatedPortal && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{affiliatedPortal}</p>
+                  <Link
+                    href="/signin"
+                    className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                  >
+                    Go to Sign In &rarr;
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && !affiliatedPortal && (
             <p className="text-sm text-error-500">{error}</p>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading || formData.password.length < 8}
-            className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Sending code...
-              </>
-            ) : (
-              "Continue"
-            )}
-          </button>
+          {!affiliatedPortal && (
+            <>
+              <button
+                type="submit"
+                disabled={isLoading || formData.password.length < 8}
+                className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Sending code...
+                  </>
+                ) : (
+                  "Continue"
+                )}
+              </button>
 
-          <p className="text-xs text-center text-gray-400 dark:text-gray-500">
-            We&apos;ll send a verification code to your email
-          </p>
+              <p className="text-xs text-center text-gray-400 dark:text-gray-500">
+                We&apos;ll send a verification code to your email
+              </p>
+            </>
+          )}
         </div>
       </form>
     );
@@ -712,7 +789,7 @@ export default function SignUpForm() {
   /* ---- Step 4: Onboarding (name, use case, subdomain) ---- */
   const renderOnboardingStep = () => (
     <form onSubmit={handleComplete}>
-      <div className="space-y-5">
+      <div className="space-y-5 pt-4 pb-8">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
             <Label>
@@ -796,9 +873,43 @@ export default function SignUpForm() {
               {getSubdomainSuffix()}
             </span>
           </div>
-          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            This will be your unique portal URL
-          </p>
+          {/* Subdomain validation feedback */}
+          {formData.subdomain.length > 0 && (
+            <div className="mt-1.5">
+              {subdomainStatus === "idle" && subdomainError && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {subdomainError}
+                </p>
+              )}
+              {subdomainStatus === "checking" && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  Checking availability...
+                </p>
+              )}
+              {subdomainStatus === "available" && (
+                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {formData.subdomain}{getSubdomainSuffix()} is available
+                </p>
+              )}
+              {subdomainStatus === "unavailable" && subdomainError && (
+                <p className="text-xs text-error-500 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  {subdomainError}
+                </p>
+              )}
+            </div>
+          )}
+          {formData.subdomain.length === 0 && (
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              This will be your unique portal URL (minimum 3 characters)
+            </p>
+          )}
         </div>
 
         {error && (
@@ -807,7 +918,7 @@ export default function SignUpForm() {
 
         <button
           type="submit"
-          disabled={isLoading || !formData.useCase || !formData.subdomain || !formData.firstName || !formData.lastName}
+          disabled={isLoading || !formData.useCase || !formData.subdomain || !formData.firstName || !formData.lastName || subdomainStatus !== "available"}
           className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? "Creating your portal..." : "Continue"}
@@ -816,7 +927,7 @@ export default function SignUpForm() {
         <button
           type="button"
           onClick={() => setStep("mobile")}
-          className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 pb-2"
         >
           &larr; Back
         </button>
@@ -826,8 +937,8 @@ export default function SignUpForm() {
 
   /* ---- Step 5: Plan ---- */
   const renderPlanStep = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3">
+    <div className="space-y-4 pt-4 pb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {planOptions.map((plan) => (
           <div
             key={plan.value}
@@ -843,17 +954,17 @@ export default function SignUpForm() {
                 Popular
               </span>
             )}
-            <div className="flex items-start justify-between">
-              <div>
+            <div>
+              <div className="flex items-baseline justify-between">
                 <h3 className="font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{plan.description}</p>
+                <div>
+                  <span className="text-xl font-bold text-gray-900 dark:text-white">${plan.price}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">/mo</span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">${plan.price}</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">/mo</span>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{plan.description}</p>
             </div>
-            <ul className="mt-3 grid grid-cols-2 gap-1">
+            <ul className="mt-3 space-y-1">
               {plan.features.map((feature) => (
                 <li key={feature} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
                   <svg className="w-3.5 h-3.5 text-brand-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -881,7 +992,7 @@ export default function SignUpForm() {
       <button
         type="button"
         onClick={() => setStep("onboarding")}
-        className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 pb-2"
       >
         &larr; Back
       </button>
@@ -916,7 +1027,7 @@ export default function SignUpForm() {
           Back to home
         </Link>
       </div>
-      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4">
+      <div className={`flex flex-col justify-center flex-1 w-full mx-auto px-4 ${step === "plan" ? "max-w-xl" : "max-w-md"}`}>
         <div>
           {renderStepIndicator()}
 

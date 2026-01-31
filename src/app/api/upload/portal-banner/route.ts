@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
+import { validateImageUpload } from "@/lib/upload-validation";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -42,6 +43,11 @@ export async function POST(request: Request) {
 
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    }
+
+    const validation = validateImageUpload(image);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     // Upload to Cloudinary — optimised for a full-width hero banner

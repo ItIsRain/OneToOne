@@ -163,13 +163,6 @@ export async function POST(
     // Generate judging URL
     const judgingUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/judge/${judge.access_token}`;
 
-    // Log the judging URL for debugging (remove in production)
-    console.log(`\n=== JUDGE INVITATION ===`);
-    console.log(`Judge: ${name || email}`);
-    console.log(`Email: ${email}`);
-    console.log(`Judging URL: ${judgingUrl}`);
-    console.log(`========================\n`);
-
     // Send invitation email
     let emailSent = false;
     try {

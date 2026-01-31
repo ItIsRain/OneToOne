@@ -45,6 +45,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Verify user is a participant
     const { data: participation } = await supabase
       .from("conversation_participants")
@@ -77,6 +88,7 @@ export async function GET(
         )
       `)
       .eq("conversation_id", conversationId)
+      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: true });
 
     if (msgError) {
@@ -89,7 +101,8 @@ export async function GET(
       .from("conversation_participants")
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id);
 
     // Get conversation participants for header display
     const { data: participants } = await supabase
@@ -105,7 +118,8 @@ export async function GET(
           last_active_at
         )
       `)
-      .eq("conversation_id", conversationId);
+      .eq("conversation_id", conversationId)
+      .eq("tenant_id", profile.tenant_id);
 
     // Get other participants, or self for self-messaging
     let otherParticipants = participants
@@ -146,12 +160,24 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Verify user is a participant
     const { data: participation } = await supabase
       .from("conversation_participants")
       .select("id")
       .eq("conversation_id", conversationId)
       .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!participation) {
@@ -171,6 +197,7 @@ export async function POST(
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
+        tenant_id: profile.tenant_id,
         content: content || null,
         type,
         file_name: fileName || null,
@@ -205,7 +232,8 @@ export async function POST(
       .from("conversation_participants")
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("tenant_id", profile.tenant_id);
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {

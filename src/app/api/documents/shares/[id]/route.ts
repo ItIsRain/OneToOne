@@ -45,6 +45,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: share, error } = await supabase
       .from("file_shares")
       .select(`
@@ -53,6 +64,7 @@ export async function GET(
         client:clients(id, name, email, company)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -89,6 +101,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Get existing share
@@ -96,6 +119,7 @@ export async function PATCH(
       .from("file_shares")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!existing) {
@@ -115,6 +139,7 @@ export async function PATCH(
         .from("file_shares")
         .update(updateData)
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .select(`
           *,
           file:files(id, name, file_url, file_type, file_size, thumbnail_url),
@@ -141,6 +166,7 @@ export async function PATCH(
         .from("file_shares")
         .update(updateData)
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .select(`
           *,
           file:files(id, name, file_url, file_type, file_size, thumbnail_url),
@@ -171,6 +197,7 @@ export async function PATCH(
       .from("file_shares")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         file:files(id, name, file_url, file_type, file_size, thumbnail_url),
@@ -208,11 +235,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get share to find file_id
     const { data: share } = await supabase
       .from("file_shares")
       .select("file_id")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!share) {
@@ -220,7 +259,7 @@ export async function DELETE(
     }
 
     // Delete share
-    const { error } = await supabase.from("file_shares").delete().eq("id", id);
+    const { error } = await supabase.from("file_shares").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete share error:", error);
@@ -232,6 +271,7 @@ export async function DELETE(
       .from("file_shares")
       .select("id")
       .eq("file_id", share.file_id)
+      .eq("tenant_id", profile.tenant_id)
       .limit(1);
 
     // If no remaining shares, update file's is_shared status
@@ -239,7 +279,8 @@ export async function DELETE(
       await supabase
         .from("files")
         .update({ is_shared: false })
-        .eq("id", share.file_id);
+        .eq("id", share.file_id)
+        .eq("tenant_id", profile.tenant_id);
     }
 
     return NextResponse.json({ success: true });

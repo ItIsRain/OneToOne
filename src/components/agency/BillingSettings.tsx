@@ -974,7 +974,7 @@ export const BillingSettings = () => {
                           {formatDate(invoice.created_at)}
                         </td>
                         <td className="py-4 text-sm font-medium text-gray-800 dark:text-white">
-                          ${invoice.amount.toFixed(2)} {invoice.currency}
+                          ${(invoice.amount || 0).toFixed(2)} {invoice.currency}
                         </td>
                         <td className="py-4">
                           <span className={`rounded-full px-2 py-1 text-xs font-medium ${

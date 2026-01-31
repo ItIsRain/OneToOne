@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantSubscription, checkAttendeeLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(
   request: NextRequest,
@@ -10,6 +11,19 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+
+    // Rate limit: 10 registrations per IP per minute
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "event-register",
+      identifier: ip,
+      maxRequests: 10,
+      windowSeconds: 60,
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
+
     const supabase = await createClient();
     const body = await request.json();
 
@@ -103,11 +117,8 @@ export async function POST(
       );
     }
 
-    // Increment attendees count
-    await supabase
-      .from("events")
-      .update({ attendees_count: (event.attendees_count || 0) + 1 })
-      .eq("id", event.id);
+    // Increment attendees count atomically to avoid race conditions
+    await supabase.rpc("increment_attendee_count", { event_id: event.id });
 
     // Trigger event_registration workflows using a standalone service client
     // so the workflow execution survives after the response is sent

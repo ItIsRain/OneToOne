@@ -252,12 +252,13 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or new_status for update_status");
       }
 
-      const tableName = entityType === "client" ? "clients" : entityType === "project" ? "projects" : entityType === "event" ? "events" : "tasks";
+      const tableName = resolveTableName(entityType);
 
       const { error } = await supabase
         .from(tableName)
         .update({ status: newStatus })
-        .eq("id", entityId);
+        .eq("id", entityId)
+        .eq("tenant_id", tenantId);
 
       if (error) throw new Error(`Failed to update status: ${error.message}`);
       return { status_updated: true, entity_id: entityId, new_status: newStatus };
@@ -274,12 +275,13 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or field_name for update_field");
       }
 
-      const tableName = entityType === "client" ? "clients" : entityType === "project" ? "projects" : entityType === "event" ? "events" : "tasks";
+      const tableName = resolveTableName(entityType);
 
       const { error } = await supabase
         .from(tableName)
         .update({ [fieldName]: fieldValue })
-        .eq("id", entityId);
+        .eq("id", entityId)
+        .eq("tenant_id", tenantId);
 
       if (error) throw new Error(`Failed to update field: ${error.message}`);
       return { field_updated: true, field_name: fieldName };
@@ -295,13 +297,14 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or assignee_id for assign_to");
       }
 
-      const tableName = entityType === "client" ? "clients" : entityType === "project" ? "projects" : entityType === "event" ? "events" : "tasks";
+      const tableName = resolveTableName(entityType);
       const assignField = entityType === "project" ? "project_manager_id" : "assigned_to";
 
       const { error } = await supabase
         .from(tableName)
         .update({ [assignField]: assigneeId })
-        .eq("id", entityId);
+        .eq("id", entityId)
+        .eq("tenant_id", tenantId);
 
       if (error) throw new Error(`Failed to assign: ${error.message}`);
 
@@ -328,13 +331,14 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or tag for add_tag");
       }
 
-      const tableName = entityType === "client" ? "clients" : entityType === "project" ? "projects" : entityType === "event" ? "events" : "tasks";
+      const tableName = resolveTableName(entityType);
 
       // Fetch current tags
       const { data: entity } = await supabase
         .from(tableName)
         .select("tags")
         .eq("id", entityId)
+        .eq("tenant_id", tenantId)
         .single();
 
       const currentTags = Array.isArray(entity?.tags) ? entity.tags : [];
@@ -343,7 +347,8 @@ async function executeStep(
         const { error } = await supabase
           .from(tableName)
           .update({ tags: currentTags })
-          .eq("id", entityId);
+          .eq("id", entityId)
+          .eq("tenant_id", tenantId);
 
         if (error) throw new Error(`Failed to add tag: ${error.message}`);
       }
@@ -632,11 +637,15 @@ async function executeStep(
         dueDate.setDate(dueDate.getDate() + Number(resolved.due_date_offset_days));
       }
 
+      const invoiceAmount = Number(resolved.amount) || 0;
       const { data: invoice, error } = await supabase
         .from("invoices")
         .insert({
           client_id: resolved.client_id || (context.entity_type === "client" ? context.entity_id : null),
-          amount: Number(resolved.amount) || 0,
+          amount: invoiceAmount,
+          total: invoiceAmount,
+          subtotal: invoiceAmount,
+          currency: (resolved.currency as string) || "USD",
           due_date: dueDate.toISOString(),
           status: "draft",
           tenant_id: tenantId,
@@ -767,12 +776,13 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or tag for remove_tag");
       }
 
-      const tableName = entityType === "client" ? "clients" : entityType === "project" ? "projects" : entityType === "event" ? "events" : "tasks";
+      const tableName = resolveTableName(entityType);
 
       const { data: entity } = await supabase
         .from(tableName)
         .select("tags")
         .eq("id", entityId)
+        .eq("tenant_id", tenantId)
         .single();
 
       const currentTags = Array.isArray(entity?.tags) ? entity.tags : [];
@@ -782,7 +792,8 @@ async function executeStep(
         const { error } = await supabase
           .from(tableName)
           .update({ tags: newTags })
-          .eq("id", entityId);
+          .eq("id", entityId)
+          .eq("tenant_id", tenantId);
 
         if (error) throw new Error(`Failed to remove tag: ${error.message}`);
       }
@@ -1807,6 +1818,27 @@ async function resolveRecipientEmail(
     email: contextEmail || null,
     name: contextName || "there",
   };
+}
+
+/**
+ * Map entity type strings to their database table names.
+ */
+function resolveTableName(entityType: string): string {
+  const map: Record<string, string> = {
+    client: "clients",
+    project: "projects",
+    event: "events",
+    task: "tasks",
+    lead: "leads",
+    invoice: "invoices",
+    proposal: "proposals",
+    contract: "contracts",
+    expense: "expenses",
+    payment: "payments",
+    contact: "contacts",
+    vendor: "vendors",
+  };
+  return map[entityType] || "tasks";
 }
 
 async function markRunStatus(supabase: SupabaseClient, runId: string, status: string) {

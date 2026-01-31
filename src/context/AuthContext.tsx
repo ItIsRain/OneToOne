@@ -199,7 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     isRedirectingRef.current = true;
     clearSessionOnlyCookies();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Proceed with redirect even if Supabase signOut fails
+    }
     setUser(null);
     setProfile(null);
     window.location.href = "/signin";

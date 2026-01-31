@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { createExpenseSchema, validateBody } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -62,7 +63,8 @@ export async function GET() {
         event:events(id, title)
       `)
       .eq("tenant_id", profile.tenant_id)
-      .order("expense_date", { ascending: false });
+      .order("expense_date", { ascending: false })
+      .limit(500);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -102,26 +104,33 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createExpenseSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const v = validation.data;
+
     const expenseData = {
       tenant_id: profile.tenant_id,
-      description: body.description,
-      amount: parseFloat(body.amount) || 0,
-      currency: body.currency || "USD",
-      expense_date: body.expense_date || new Date().toISOString().split("T")[0],
-      category: body.category || null,
-      project_id: body.project_id || null,
-      event_id: body.event_id || null,
-      client_id: body.client_id || null,
+      description: v.description,
+      amount: v.amount,
+      currency: v.currency,
+      expense_date: v.expense_date || new Date().toISOString().split("T")[0],
+      category: v.category || null,
+      project_id: v.project_id || null,
+      event_id: v.event_id || null,
+      client_id: v.client_id || null,
       vendor_name: body.vendor_name || null,
       payment_method: body.payment_method || null,
       is_reimbursable: body.is_reimbursable || false,
       is_billable: body.is_billable || false,
-      receipt_url: body.receipt_url || null,
+      receipt_url: v.receipt_url || null,
       receipt_number: body.receipt_number || null,
-      status: body.status || "pending",
+      status: v.status,
       tax_deductible: body.tax_deductible !== false,
       tax_category: body.tax_category || null,
-      notes: body.notes || null,
+      notes: v.notes || null,
       tags: body.tags || null,
       created_by: user.id,
     };

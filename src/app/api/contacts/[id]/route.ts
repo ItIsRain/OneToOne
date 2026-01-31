@@ -45,6 +45,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: contact, error } = await supabase
       .from("contacts")
       .select(`
@@ -54,6 +65,7 @@ export async function GET(
         assigned_to_profile:profiles!contacts_assigned_to_fkey(id, first_name, last_name, avatar_url)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -87,6 +99,17 @@ export async function PATCH(
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
     const body = await request.json();
@@ -147,6 +170,7 @@ export async function PATCH(
       .from("contacts")
       .update(updates)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         client:clients(id, name, company),
@@ -185,10 +209,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { error } = await supabase
       .from("contacts")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete error:", error);

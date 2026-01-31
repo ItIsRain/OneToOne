@@ -187,25 +187,25 @@ export const PortalApprovalCard: React.FC<PortalApprovalCardProps> = ({
             className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-lime-500 focus:ring-1 focus:ring-lime-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-lime-500"
           />
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               onClick={() => handleAction("approved")}
               disabled={submitting}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50 sm:w-auto"
             >
               Approve
             </button>
             <button
               onClick={() => handleAction("revision_requested")}
               disabled={submitting}
-              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+              className="w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50 sm:w-auto"
             >
               Request Revision
             </button>
             <button
               onClick={() => handleAction("rejected")}
               disabled={submitting}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
             >
               Reject
             </button>

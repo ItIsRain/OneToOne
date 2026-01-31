@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
 import { storeOtp } from "@/lib/otp-store";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -22,8 +24,34 @@ export async function POST(request: Request) {
       return rateLimitResponse(rateCheck.retryAfterSeconds!);
     }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Check if email is already affiliated with a portal
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const isSupabaseConfigured = supabaseUrl && supabaseServiceKey && supabaseUrl.startsWith("http");
+
+    if (isSupabaseConfigured) {
+      const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id, tenant_id, tenants:tenant_id(name, subdomain)")
+        .eq("email", email.toLowerCase())
+        .single();
+
+      if (existingProfile) {
+        const tenantInfo = existingProfile.tenants as unknown as { name: string; subdomain: string } | null;
+        const portalName = tenantInfo?.name || "another portal";
+        return NextResponse.json(
+          { error: `This email is already affiliated with ${portalName}. Please sign in instead.`, code: "EMAIL_AFFILIATED" },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Generate cryptographically secure 6-digit OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
 
     // Store OTP in Supabase with 10-minute expiry
     await storeOtp(email, otp);

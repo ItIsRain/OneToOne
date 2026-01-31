@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateImageUpload } from "@/lib/upload-validation";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -39,10 +41,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
+    // Check plan allows custom branding
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const brandingCheck = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
+    if (!brandingCheck.allowed) {
+      return NextResponse.json(
+        { error: "Custom branding requires the Starter plan or above" },
+        { status: 403 }
+      );
+    }
+
     const { image } = await request.json();
 
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
+    }
+
+    const validation = validateImageUpload(image);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     // Upload to Cloudinary
@@ -94,6 +111,16 @@ export async function DELETE() {
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check plan allows custom branding
+    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const brandingCheck = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
+    if (!brandingCheck.allowed) {
+      return NextResponse.json(
+        { error: "Custom branding requires the Starter plan or above" },
+        { status: 403 }
+      );
     }
 
     // Clear logo_url from tenant

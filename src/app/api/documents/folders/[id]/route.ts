@@ -45,10 +45,22 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: folder, error } = await supabase
       .from("folders")
       .select(`*`)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -65,11 +77,13 @@ export async function GET(
       supabase
         .from("files")
         .select("id", { count: "exact", head: true })
-        .eq("folder_id", id),
+        .eq("folder_id", id)
+        .eq("tenant_id", profile.tenant_id),
       supabase
         .from("folders")
         .select("id", { count: "exact", head: true })
-        .eq("parent_folder_id", id),
+        .eq("parent_folder_id", id)
+        .eq("tenant_id", profile.tenant_id),
     ]);
 
     return NextResponse.json({
@@ -103,6 +117,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Build update object with only provided fields
@@ -119,6 +144,7 @@ export async function PATCH(
       .from("folders")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`*`)
       .single();
 
@@ -152,8 +178,19 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Delete the folder (files will have folder_id set to null due to ON DELETE SET NULL)
-    const { error } = await supabase.from("folders").delete().eq("id", id);
+    const { error } = await supabase.from("folders").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete folder error:", error);

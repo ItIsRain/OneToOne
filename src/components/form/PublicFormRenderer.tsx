@@ -154,9 +154,15 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
       onSubmitSuccess?.();
 
       if (form.thank_you_redirect_url) {
-        setTimeout(() => {
-          window.location.href = form.thank_you_redirect_url!;
-        }, 1500);
+        // Validate redirect URL to prevent open redirect attacks
+        const redirectUrl = form.thank_you_redirect_url;
+        const isSafe = redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")
+          || redirectUrl.startsWith("https://");
+        if (isSafe) {
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, 1500);
+        }
       }
     } catch (err) {
       setSubmitError(

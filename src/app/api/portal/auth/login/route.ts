@@ -123,29 +123,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    // Verify password — support both bcrypt hashes and legacy plaintext
-    const isBcryptHash = /^\$2[aby]\$/.test(portalClient.password);
-    let isValidPassword = false;
-
-    if (isBcryptHash) {
-      isValidPassword = await bcrypt.compare(password, portalClient.password);
-    } else {
-      // Legacy plaintext comparison — rehash on success
-      isValidPassword = password === portalClient.password;
+    // Verify password — bcrypt only
+    if (!portalClient.password || !/^\$2[aby]\$/.test(portalClient.password)) {
+      // Password is not hashed — require password reset via magic link
+      return NextResponse.json(
+        { error: "Password reset required. Please use the magic link option to sign in and set a new password." },
+        { status: 401 }
+      );
     }
+
+    const isValidPassword = await bcrypt.compare(password, portalClient.password);
 
     if (!isValidPassword) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    // Rehash plaintext password to bcrypt and update last_login_at
-    const updateData: Record<string, string> = { last_login_at: new Date().toISOString() };
-    if (!isBcryptHash) {
-      updateData.password = await bcrypt.hash(password, 10);
-    }
+    // Update last_login_at
     await supabase
       .from("portal_clients")
-      .update(updateData)
+      .update({ last_login_at: new Date().toISOString() })
       .eq("id", portalClient.id);
 
     // Trigger workflow

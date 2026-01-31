@@ -138,11 +138,9 @@ export async function POST(
         );
       }
 
-      // Simple password comparison (in production, use bcrypt)
-      const crypto = await import("crypto");
-      const hashedInput = crypto.createHash("sha256").update(password).digest("hex");
+      const { verifyPassword } = await import("../../route");
 
-      if (hashedInput !== share.password_hash) {
+      if (!verifyPassword(password, share.password_hash)) {
         return NextResponse.json(
           { error: "Incorrect password" },
           { status: 401 }

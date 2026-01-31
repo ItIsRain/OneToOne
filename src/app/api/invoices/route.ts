@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { createInvoiceSchema, validateBody } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -98,7 +99,8 @@ export async function GET() {
         event:events(id, title)
       `)
       .eq("tenant_id", profile.tenant_id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -158,15 +160,22 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createInvoiceSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const v = validation.data;
+
     // Generate invoice number if not provided
-    const invoiceNumber = body.invoice_number || await generateInvoiceNumber(supabase, profile.tenant_id);
+    const invoiceNumber = v.invoice_number || await generateInvoiceNumber(supabase, profile.tenant_id);
 
     // Calculate totals
-    const subtotal = parseFloat(body.subtotal) || parseFloat(body.amount) || 0;
-    const taxRate = parseFloat(body.tax_rate) || 0;
+    const subtotal = v.subtotal ?? v.amount ?? 0;
+    const taxRate = v.tax_rate ?? 0;
     const taxAmount = subtotal * (taxRate / 100);
-    const discountValue = parseFloat(body.discount_value) || 0;
-    const discountAmount = body.discount_type === 'percentage'
+    const discountValue = v.discount_value ?? 0;
+    const discountAmount = v.discount_type === 'percentage'
       ? subtotal * (discountValue / 100)
       : discountValue;
     const total = subtotal + taxAmount - discountAmount;
@@ -174,25 +183,25 @@ export async function POST(request: Request) {
     const invoiceData = {
       tenant_id: profile.tenant_id,
       invoice_number: invoiceNumber,
-      client_id: body.client_id || null,
-      project_id: body.project_id || null,
+      client_id: v.client_id || null,
+      project_id: v.project_id || null,
       event_id: body.event_id || null,
       title: body.title || null,
       subtotal: subtotal,
       tax_rate: taxRate,
       tax_amount: taxAmount,
-      discount_type: body.discount_type || 'fixed',
+      discount_type: v.discount_type,
       discount_value: discountValue,
       discount_amount: discountAmount,
       total: total,
       amount: total, // For backward compatibility
-      amount_paid: parseFloat(body.amount_paid) || 0,
-      currency: body.currency || 'USD',
-      status: body.status || 'draft',
+      amount_paid: 0,
+      currency: v.currency,
+      status: v.status,
       issue_date: body.issue_date || new Date().toISOString().split('T')[0],
-      due_date: body.due_date || null,
+      due_date: v.due_date || null,
       payment_terms: body.payment_terms || 'net_30',
-      notes: body.notes || null,
+      notes: v.notes || null,
       terms_and_conditions: body.terms_and_conditions || null,
       footer_note: body.footer_note || null,
       billing_name: body.billing_name || null,

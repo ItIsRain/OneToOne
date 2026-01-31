@@ -45,10 +45,22 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: goal, error } = await supabase
       .from("goals")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -130,6 +142,7 @@ export async function PATCH(
         .from("goals")
         .select("updates, current_value")
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .single();
 
       const updates = current?.updates || [];
@@ -148,6 +161,7 @@ export async function PATCH(
       .from("goals")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 
@@ -181,11 +195,23 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Get goal for activity log
     const { data: goal } = await supabase
       .from("goals")
       .select("title, tenant_id")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (!goal) {
@@ -193,7 +219,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error } = await supabase.from("goals").delete().eq("id", id);
+    const { error } = await supabase.from("goals").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Delete goal error:", error);

@@ -18,6 +18,17 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const { data: project, error } = await supabase
       .from("projects")
       .select(`
@@ -30,6 +41,7 @@ export async function GET(
         parent_project:projects!projects_parent_project_id_fkey(id, name, project_code)
       `)
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (error) {
@@ -66,22 +78,48 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
+
+    // Allowlist fields to prevent mass assignment
+    const allowedFields = [
+      "name", "description", "project_code", "status", "priority",
+      "client_id", "primary_contact_id", "project_manager_id", "team_lead_id",
+      "start_date", "end_date", "deadline", "budget", "currency",
+      "color", "tags", "category", "notes", "is_template",
+      "billing_type", "hourly_rate", "estimated_hours",
+    ];
+    const filtered: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) filtered[key] = body[key];
+    }
 
     // Fetch old project for status change trigger
     const { data: oldProject } = await supabase
       .from("projects")
       .select("status, tenant_id, name")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     const { data: project, error } = await supabase
       .from("projects")
       .update({
-        ...body,
+        ...filtered,
         updated_by: user.id,
       })
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         client:clients(id, name, company),
@@ -142,7 +180,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    const { error } = await supabase.from("projects").delete().eq("id", id).eq("tenant_id", profile.tenant_id);
 
     if (error) {
       console.error("Error deleting project:", error);

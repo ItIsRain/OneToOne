@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { GroupIcon, CalenderIcon, TaskIcon, DollarLineIcon } from "@/icons";
 
 interface QuickAction {
@@ -8,8 +9,8 @@ interface QuickAction {
   description: string;
   href: string;
   icon: React.ReactNode;
-  color: string;
-  bgColor: string;
+  iconBg: string;
+  iconColor: string;
 }
 
 const quickActions: QuickAction[] = [
@@ -18,63 +19,73 @@ const quickActions: QuickAction[] = [
     description: "Add a new client",
     href: "/dashboard/crm/clients",
     icon: <GroupIcon className="size-5" />,
-    color: "text-brand-500",
-    bgColor: "bg-brand-500/10",
+    iconBg: "bg-brand-100 dark:bg-brand-500/15",
+    iconColor: "text-brand-600 dark:text-brand-400",
   },
   {
     title: "New Event",
     description: "Schedule an event",
     href: "/dashboard/events",
     icon: <CalenderIcon className="size-5" />,
-    color: "text-warning-500",
-    bgColor: "bg-warning-500/10",
+    iconBg: "bg-amber-100 dark:bg-amber-500/15",
+    iconColor: "text-amber-600 dark:text-amber-400",
   },
   {
     title: "New Task",
     description: "Create a task",
     href: "/dashboard/tasks",
     icon: <TaskIcon className="size-5" />,
-    color: "text-success-500",
-    bgColor: "bg-success-500/10",
+    iconBg: "bg-emerald-100 dark:bg-emerald-500/15",
+    iconColor: "text-emerald-600 dark:text-emerald-400",
   },
   {
     title: "New Invoice",
     description: "Create an invoice",
     href: "/dashboard/finance/invoices",
     icon: <DollarLineIcon className="size-5" />,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
+    iconBg: "bg-blue-100 dark:bg-blue-500/15",
+    iconColor: "text-blue-600 dark:text-blue-400",
   },
 ];
 
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 14, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: "easeOut" as const } },
+};
+
 export const DashboardQuickActions: React.FC = () => {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 shadow-sm hover:shadow-md transition-shadow">
-      <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
-        Quick Actions
-      </h3>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {quickActions.map((action) => (
+    <motion.div
+      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
+      {quickActions.map((action) => (
+        <motion.div key={action.title} variants={item}>
           <Link
-            key={action.title}
             href={action.href}
-            className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 transition-all hover:scale-[1.02] hover:bg-gray-100 hover:shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
+            className="group flex flex-col items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:border-gray-200 hover:scale-[1.02] dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 cursor-pointer"
           >
-            <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${action.bgColor}`}>
-              <span className={action.color}>{action.icon}</span>
+            <div className={`flex items-center justify-center w-11 h-11 rounded-xl ${action.iconBg} transition-transform duration-300 group-hover:scale-110`}>
+              <span className={action.iconColor}>{action.icon}</span>
             </div>
             <div className="text-center">
-              <p className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
+              <p className="font-semibold text-sm text-gray-900 dark:text-white">
                 {action.title}
               </p>
-              <p className="text-gray-500 text-theme-xs dark:text-gray-400 hidden sm:block">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 hidden sm:block">
                 {action.description}
               </p>
             </div>
           </Link>
-        ))}
-      </div>
-    </div>
+        </motion.div>
+      ))}
+    </motion.div>
   );
 };

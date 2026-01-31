@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useTheme } from "@/context/ThemeContext";
 import { DetailsSidebar, InfoRow, Section } from "@/components/ui/DetailsSidebar";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 
 interface CompanyData {
   id: string;
@@ -221,6 +223,8 @@ const InfoItem: React.FC<{
 
 export const CompanySettings = () => {
   const { theme, toggleTheme } = useTheme();
+  const { hasFeature, loading: planLoading } = usePlanLimits();
+  const canCustomBrand = hasFeature("custom_branding");
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -489,21 +493,29 @@ export const CompanySettings = () => {
             </div>
             <div>
               <label className={labelClasses}>Brand Color</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={formData.primary_color}
-                  onChange={(e) => handleInputChange("primary_color", e.target.value)}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600"
-                />
-                <input
-                  type="text"
-                  value={formData.primary_color}
-                  onChange={(e) => handleInputChange("primary_color", e.target.value)}
-                  className={inputClasses}
-                  placeholder="#465FFF"
-                />
-              </div>
+              {canCustomBrand ? (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={formData.primary_color}
+                    onChange={(e) => handleInputChange("primary_color", e.target.value)}
+                    className="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600"
+                  />
+                  <input
+                    type="text"
+                    value={formData.primary_color}
+                    onChange={(e) => handleInputChange("primary_color", e.target.value)}
+                    className={inputClasses}
+                    placeholder="#465FFF"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
+                  <p className="text-xs text-amber-800 dark:text-amber-300">
+                    Custom branding requires the Starter plan or above
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -804,30 +816,51 @@ export const CompanySettings = () => {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <label className="cursor-pointer rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600 text-center">
-                  Upload Logo
-                  <input
-                    type="file"
-                    accept="image/svg+xml,image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={handleLogoUpload}
-                    disabled={logoUploading}
-                  />
-                </label>
-                {company?.logo_url && (
-                  <button
-                    onClick={handleLogoRemove}
-                    disabled={logoUploading}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
-                  >
-                    Remove
-                  </button>
+                {canCustomBrand ? (
+                  <>
+                    <label className="cursor-pointer rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600 text-center">
+                      Upload Logo
+                      <input
+                        type="file"
+                        accept="image/svg+xml,image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={logoUploading}
+                      />
+                    </label>
+                    {company?.logo_url && (
+                      <button
+                        onClick={handleLogoRemove}
+                        disabled={logoUploading}
+                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <div className="space-y-1 text-xs text-gray-400 dark:text-gray-500">
+                      <p>Recommended: <span className="font-medium text-gray-500 dark:text-gray-400">400 x 80px</span></p>
+                      <p>Best format: <span className="font-medium text-gray-500 dark:text-gray-400">SVG</span> with transparent background</p>
+                      <p>SVG adapts to light &amp; dark themes automatically. Max 2MB.</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20">
+                      <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                        Custom logo requires the Starter plan or above
+                      </p>
+                      <Link
+                        href="/dashboard/settings/billing"
+                        className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-brand-500 hover:text-brand-600"
+                      >
+                        Upgrade to customize
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
                 )}
-                <div className="space-y-1 text-xs text-gray-400 dark:text-gray-500">
-                  <p>Recommended: <span className="font-medium text-gray-500 dark:text-gray-400">400 x 80px</span></p>
-                  <p>Best format: <span className="font-medium text-gray-500 dark:text-gray-400">SVG</span> with transparent background</p>
-                  <p>SVG adapts to light &amp; dark themes automatically. Max 2MB.</p>
-                </div>
               </div>
             </div>
           </div>
