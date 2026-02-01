@@ -32,11 +32,6 @@ export interface CallInitiateRequest {
       apiKey: string;
       voiceId?: string;
     };
-    deepgram?: {
-      apiKey: string;
-      model?: string;
-      language?: string;
-    };
     openai?: {
       apiKey: string;
       organizationId?: string;

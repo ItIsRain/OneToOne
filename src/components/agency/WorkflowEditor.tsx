@@ -193,7 +193,7 @@ const ACTION_PROVIDER_MAP: Record<string, string> = {
   stripe_payment_link: "stripe",
   google_calendar_event: "google_calendar",
   zapier_trigger: "zapier",
-  ai_voice_call: "twilio", // Primary provider (also requires elevenlabs, deepgram, and openai/anthropic)
+  ai_voice_call: "twilio", // Primary provider (also requires elevenlabs and openai/anthropic)
 };
 
 const NODE_W = 240;
@@ -1956,12 +1956,11 @@ function NodeConfigPanel({
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 dark:border-rose-800 dark:bg-rose-900/20">
               <p className="text-xs font-medium text-rose-700 dark:text-rose-300 mb-1">Required Integrations</p>
               <p className="text-xs text-rose-600 dark:text-rose-400">
-                This step requires <strong>4 integrations</strong> in <strong>Settings &rarr; Integrations</strong>:
+                This step requires <strong>3 integrations</strong> in <strong>Settings &rarr; Integrations</strong>:
               </p>
               <ul className="mt-1 text-xs text-rose-600 dark:text-rose-400 list-disc list-inside">
                 <li><strong>Twilio</strong> – For making phone calls</li>
-                <li><strong>Deepgram</strong> – For speech-to-text</li>
-                <li><strong>ElevenLabs</strong> – For text-to-speech</li>
+                <li><strong>ElevenLabs</strong> – For text-to-speech &amp; speech-to-text</li>
                 <li><strong>OpenAI or Anthropic</strong> – For AI conversation</li>
               </ul>
             </div>

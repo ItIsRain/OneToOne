@@ -336,14 +336,9 @@ export const COST_RATES = {
     perMinute: 0.013, // USD per minute for voice calls
     perMinuteRecording: 0.0025,
   },
-  deepgram: {
-    perMinuteNova2: 0.0043,
-    perMinuteNova: 0.0036,
-    perMinuteEnhanced: 0.0145,
-    perMinuteBase: 0.0125,
-  },
   elevenlabs: {
     per1000Chars: 0.30,
+    sttPerMinute: 0.008,
   },
   openai: {
     gpt4o: {

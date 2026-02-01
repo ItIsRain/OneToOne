@@ -95,13 +95,6 @@ app.post("/initiate", async (req, res) => {
       });
     }
 
-    if (!request.integrations?.deepgram) {
-      return res.status(400).json({
-        success: false,
-        error: "Deepgram integration not configured",
-      });
-    }
-
     const aiProvider = request.config.aiProvider || "openai";
     if (aiProvider === "openai" && !request.integrations?.openai) {
       return res.status(400).json({

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("workflow_runs")
-      .select("*, workflow:workflow_id(name)")
+      .select("*, workflow:workflow_id(name), step_executions:workflow_step_executions(id, step_id, status, error_message, output, started_at, completed_at)")
       .eq("tenant_id", tenantId)
       .order("started_at", { ascending: false });
 

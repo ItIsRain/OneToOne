@@ -5,7 +5,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { WebSocket } from "ws";
 import { ConversationState, CallInitiateRequest, TranscriptEntry } from "../types";
-import { DeepgramSTTService, STTTranscript } from "./deepgram-stt";
+import { ElevenLabsSTTService, STTTranscript } from "./elevenlabs-stt";
 import { ElevenLabsTTSService } from "./elevenlabs-tts";
 import { LLMService, LLMMessage } from "./llm-service";
 
@@ -13,7 +13,7 @@ interface ActiveCall {
   id: string;
   state: ConversationState;
   ws: WebSocket | null;
-  stt: DeepgramSTTService | null;
+  stt: ElevenLabsSTTService | null;
   tts: ElevenLabsTTSService | null;
   llm: LLMService | null;
   pendingTranscript: string;
@@ -64,15 +64,15 @@ export class CallManager {
     };
 
     // Initialize services
-    let stt: DeepgramSTTService | null = null;
+    let stt: ElevenLabsSTTService | null = null;
     let tts: ElevenLabsTTSService | null = null;
     let llm: LLMService | null = null;
 
-    if (request.integrations.deepgram) {
-      stt = new DeepgramSTTService({
-        apiKey: request.integrations.deepgram.apiKey,
-        model: request.integrations.deepgram.model || "nova-2",
-        language: request.integrations.deepgram.language || "en",
+    if (request.integrations.elevenlabs) {
+      stt = new ElevenLabsSTTService({
+        apiKey: request.integrations.elevenlabs.apiKey,
+        model: "scribe_v1",
+        language: "en",
       });
     }
 

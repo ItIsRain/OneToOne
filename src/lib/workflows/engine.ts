@@ -49,7 +49,7 @@ export async function executeWorkflow(
     .order("step_order", { ascending: true });
 
   if (stepsError || !steps || steps.length === 0) {
-    await markRunStatus(supabase, runId, steps ? "completed" : "failed");
+    await markRunStatus(supabase, runId, steps ? "completed" : "failed", stepsError ? `Failed to fetch steps: ${stepsError.message}` : "No steps found in workflow");
     return runId;
   }
 
@@ -72,7 +72,7 @@ export async function executeWorkflow(
       .single();
 
     if (stepExecError || !stepExec) {
-      await markRunStatus(supabase, runId, "failed");
+      await markRunStatus(supabase, runId, "failed", `Failed to create step execution: ${stepExecError?.message || "Unknown error"}`);
       return runId;
     }
 
@@ -121,7 +121,7 @@ export async function executeWorkflow(
         })
         .eq("id", stepExec.id);
 
-      await markRunStatus(supabase, runId, "failed");
+      await markRunStatus(supabase, runId, "failed", errorMessage);
       return runId;
     }
   }
@@ -1685,23 +1685,26 @@ async function executeStep(
         throw new Error("Missing system_prompt for AI voice call");
       }
 
-      // Check required integrations
-      const requiredProviders = ["twilio", "elevenlabs", "deepgram", aiProvider];
+      // Fetch all required integration credentials directly
+      const requiredProviders = ["twilio", "elevenlabs", aiProvider];
       const { data: integrations } = await supabase
         .from("tenant_integrations")
-        .select("provider")
+        .select("provider, config")
         .eq("tenant_id", tenantId)
         .eq("is_active", true)
         .in("provider", requiredProviders);
 
-      const configuredProviders = new Set((integrations || []).map((i: { provider: string }) => i.provider));
-      const missingProviders = requiredProviders.filter((p) => !configuredProviders.has(p));
+      const integrationMap: Record<string, Record<string, string>> = {};
+      for (const integration of integrations || []) {
+        integrationMap[integration.provider] = integration.config as Record<string, string>;
+      }
 
+      // Validate required integrations
+      const missingProviders = requiredProviders.filter((p) => !integrationMap[p]);
       if (missingProviders.length > 0) {
         const providerNames: Record<string, string> = {
           twilio: "Twilio",
           elevenlabs: "ElevenLabs",
-          deepgram: "Deepgram",
           openai: "OpenAI",
           anthropic: "Anthropic",
         };
@@ -1712,8 +1715,33 @@ async function executeStep(
       const voiceServerUrl = process.env.VOICE_SERVER_URL || "http://localhost:3001";
 
       try {
-        // Call the voice agent API to initiate the call
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/voice-agent/initiate`, {
+        // Create initial record in voice_agent_calls directly (bypasses auth-gated API)
+        const { data: callRecord, error: insertError } = await supabase
+          .from("voice_agent_calls")
+          .insert({
+            tenant_id: tenantId,
+            workflow_run_id: runId,
+            step_execution_id: stepExecId,
+            from_number: integrationMap.twilio.phone_number,
+            to_number: phoneNumber,
+            status: "initiated",
+            ai_provider: aiProvider,
+            ai_model: aiModel || (aiProvider === "openai" ? "gpt-4o-mini" : "claude-3-haiku-20240307"),
+            system_prompt: systemPrompt,
+            conversation_goal: conversationGoal,
+            max_duration_seconds: maxDuration,
+            voice_id: voiceId || integrationMap.elevenlabs.voice_id,
+            voice_provider: "elevenlabs",
+          })
+          .select("id")
+          .single();
+
+        if (insertError || !callRecord) {
+          throw new Error(`Failed to create call record: ${insertError?.message || "Unknown error"}`);
+        }
+
+        // Call the voice server directly
+        const voiceServerResponse = await fetch(`${voiceServerUrl}/initiate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1721,35 +1749,70 @@ async function executeStep(
             workflowRunId: runId,
             stepExecutionId: stepExecId,
             config: {
-              phone_number: phoneNumber,
-              system_prompt: systemPrompt,
-              conversation_goal: conversationGoal,
-              ai_provider: aiProvider,
-              ai_model: aiModel,
-              voice_id: voiceId,
-              max_duration: maxDuration,
-              initial_greeting: initialGreeting,
-              enable_recording: enableRecording,
+              phoneNumber,
+              fromNumber: integrationMap.twilio.phone_number,
+              systemPrompt,
+              conversationGoal,
+              maxDurationSeconds: maxDuration,
+              aiProvider,
+              aiModel: aiModel || (aiProvider === "openai" ? "gpt-4o-mini" : "claude-3-haiku-20240307"),
+              voiceId: voiceId || integrationMap.elevenlabs.voice_id,
+              enableRecording,
+              initialGreeting,
+            },
+            integrations: {
+              twilio: {
+                accountSid: integrationMap.twilio.account_sid,
+                authToken: integrationMap.twilio.auth_token,
+                phoneNumber: integrationMap.twilio.phone_number,
+              },
+              elevenlabs: {
+                apiKey: integrationMap.elevenlabs.api_key,
+                voiceId: integrationMap.elevenlabs.voice_id,
+              },
+              ...(integrationMap.openai && {
+                openai: {
+                  apiKey: integrationMap.openai.api_key,
+                  organizationId: integrationMap.openai.organization_id,
+                },
+              }),
+              ...(integrationMap.anthropic && {
+                anthropic: {
+                  apiKey: integrationMap.anthropic.api_key,
+                },
+              }),
             },
           }),
         });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Voice call initiation failed: ${response.status}`);
+        if (!voiceServerResponse.ok) {
+          const errorData = await voiceServerResponse.json().catch(() => ({}));
+
+          // Update call record with failure
+          await supabase
+            .from("voice_agent_calls")
+            .update({ status: "failed", error_message: errorData.error || "Voice server error" })
+            .eq("id", callRecord.id);
+
+          throw new Error(errorData.error || `Voice server returned ${voiceServerResponse.status}`);
         }
 
-        const result = await response.json();
+        const voiceServerData = await voiceServerResponse.json();
 
-        // The call is now in progress. The webhook will update the step execution
-        // when the call completes. For now, mark the step as waiting.
+        // Update call record with Twilio call SID
+        await supabase
+          .from("voice_agent_calls")
+          .update({ call_sid: voiceServerData.callSid, status: "ringing" })
+          .eq("id", callRecord.id);
+
+        // Mark the step as waiting for the call to complete
         await supabase
           .from("workflow_step_executions")
           .update({
             status: "waiting_delay",
             output: {
-              call_id: result.call_id,
-              call_sid: result.call_sid,
+              call_id: callRecord.id,
+              call_sid: voiceServerData.callSid,
               status: "in_progress",
               message: "AI voice call in progress. Results will be updated when the call completes.",
             },
@@ -1764,8 +1827,8 @@ async function executeStep(
         // Pause the workflow - the webhook will resume it
         return {
           __paused: true,
-          call_id: result.call_id,
-          call_sid: result.call_sid,
+          call_id: callRecord.id,
+          call_sid: voiceServerData.callSid,
         };
       } catch (err) {
         throw new Error(`AI voice call failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -1947,10 +2010,14 @@ function resolveTableName(entityType: string): string {
   return map[entityType] || "tasks";
 }
 
-async function markRunStatus(supabase: SupabaseClient, runId: string, status: string) {
+async function markRunStatus(supabase: SupabaseClient, runId: string, status: string, errorMessage?: string) {
+  const update: Record<string, unknown> = { status, completed_at: new Date().toISOString() };
+  if (errorMessage) {
+    update.error_message = errorMessage;
+  }
   await supabase
     .from("workflow_runs")
-    .update({ status, completed_at: new Date().toISOString() })
+    .update(update)
     .eq("id", runId);
 }
 

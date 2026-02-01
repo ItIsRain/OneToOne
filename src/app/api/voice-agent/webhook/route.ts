@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: "failed",
             completed_at: new Date().toISOString(),
+            error_message: body.errorMessage || `Voice call ${body.status || "failed"}`,
           })
           .eq("id", callRecord.workflow_run_id);
       }

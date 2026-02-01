@@ -82,7 +82,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',
-    description: 'AI voice generation and text-to-speech',
+    description: 'AI voice generation, text-to-speech, and speech-to-text',
     category: 'ai',
     fields: [
       {
@@ -164,45 +164,6 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       },
     ],
     docsUrl: 'https://docs.anthropic.com',
-  },
-  {
-    id: 'deepgram',
-    name: 'Deepgram',
-    description: 'Real-time speech-to-text transcription',
-    category: 'ai',
-    fields: [
-      {
-        name: 'api_key',
-        label: 'API Key',
-        type: 'password',
-        placeholder: 'Your Deepgram API key',
-        required: true,
-      },
-      {
-        name: 'model',
-        label: 'Model',
-        type: 'select',
-        options: [
-          { value: 'nova-2', label: 'Nova 2 (Best)' },
-          { value: 'nova', label: 'Nova' },
-          { value: 'enhanced', label: 'Enhanced' },
-          { value: 'base', label: 'Base' },
-        ],
-      },
-      {
-        name: 'language',
-        label: 'Language',
-        type: 'select',
-        options: [
-          { value: 'en', label: 'English' },
-          { value: 'es', label: 'Spanish' },
-          { value: 'fr', label: 'French' },
-          { value: 'de', label: 'German' },
-          { value: 'ar', label: 'Arabic' },
-        ],
-      },
-    ],
-    docsUrl: 'https://developers.deepgram.com/docs',
   },
   {
     id: 'stripe',

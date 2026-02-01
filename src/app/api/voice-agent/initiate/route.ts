@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       .select("provider, config")
       .eq("tenant_id", body.tenantId)
       .eq("is_active", true)
-      .in("provider", ["twilio", "elevenlabs", "deepgram", "openai", "anthropic"]);
+      .in("provider", ["twilio", "elevenlabs", "openai", "anthropic"]);
 
     if (integrationError) {
       return NextResponse.json(
@@ -66,13 +66,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!integrationMap.deepgram) {
-      return NextResponse.json(
-        { error: "Deepgram integration not configured. Go to Settings → Integrations to set it up." },
-        { status: 400 }
-      );
-    }
-
     const aiProvider = body.config.ai_provider || "openai";
     if (aiProvider === "openai" && !integrationMap.openai) {
       return NextResponse.json(
@@ -141,11 +134,6 @@ export async function POST(request: NextRequest) {
         elevenlabs: {
           apiKey: integrationMap.elevenlabs.api_key,
           voiceId: integrationMap.elevenlabs.voice_id,
-        },
-        deepgram: {
-          apiKey: integrationMap.deepgram.api_key,
-          model: integrationMap.deepgram.model,
-          language: integrationMap.deepgram.language,
         },
         ...(integrationMap.openai && {
           openai: {
