@@ -4,8 +4,8 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
-import React, { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import React, { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 export default function UpdatePasswordForm() {
   const [password, setPassword] = useState("");
@@ -15,27 +15,23 @@ export default function UpdatePasswordForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const accessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
+    // Check if we have a hash with access_token (from password reset link)
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      // Parse the hash to get tokens
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get("access_token");
 
-    // Supabase will automatically pick up the recovery token from the URL hash
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (accessToken) {
+        accessTokenRef.current = accessToken;
         setSessionReady(true);
+        // Clean up the URL
+        window.history.replaceState(null, "", window.location.pathname);
       }
-    });
-
-    // Also check if we already have a user (e.g., page refresh)
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setSessionReady(true);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,21 +48,36 @@ export default function UpdatePasswordForm() {
       return;
     }
 
+    if (!accessTokenRef.current) {
+      setError("Invalid reset link. Please request a new one.");
+      toast.error("Invalid reset link");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
+      const response = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password,
+          accessToken: accessTokenRef.current,
+        }),
       });
 
-      if (updateError) {
-        throw new Error(updateError.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong");
       }
 
+      toast.success("Password updated successfully!");
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
