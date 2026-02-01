@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   DotPattern,
@@ -19,6 +19,52 @@ import type {
   StatItem,
   PartnerItem,
 } from "@/types/portal";
+
+/* ------------------------------------------------------------------ */
+/*  ScrollReveal – fade-in on scroll using IntersectionObserver        */
+/* ------------------------------------------------------------------ */
+function ScrollReveal({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.unobserve(el);
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(32px)",
+        transition: `opacity 0.7s cubic-bezier(0.4,0,0.2,1) ${delay}ms, transform 0.7s cubic-bezier(0.4,0,0.2,1) ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 interface EventItem {
   id: string;
@@ -84,12 +130,26 @@ function shiftColor(hex: string, amount: number): string {
 
 export default function TenantPortalLanding({
   tenantName,
+  logoUrl,
   primaryColor,
   portalSettings,
   upcomingEvents,
   previewMode = false,
 }: TenantPortalLandingProps) {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    if (previewMode) return;
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [previewMode]);
+
+  const scrollToSection = useCallback((id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const headline = portalSettings?.hero_headline || `Welcome to ${tenantName}`;
   const subtitle =
@@ -139,6 +199,118 @@ export default function TenantPortalLanding({
   const footerText = portalSettings?.footer_text || "";
 
   /* ------------------------------------------------------------------ */
+  /*  Navbar – sticky glassmorphism                                      */
+  /* ------------------------------------------------------------------ */
+  const navSections = sectionOrder
+    .filter((s) => s !== "hero")
+    .filter((s) => {
+      if (s === "events" && !showEvents) return false;
+      if (s === "about" && (!showAbout || !aboutBody)) return false;
+      if (s === "testimonials" && (!showTestimonials || testimonials.length === 0)) return false;
+      if (s === "services" && (!showServices || services.length === 0)) return false;
+      if (s === "faq" && (!showFaq || faqItems.length === 0)) return false;
+      if (s === "cta_banner" && (!showCtaBanner || !ctaBannerHeading)) return false;
+      if (s === "stats" && (!showStats || statsItems.length === 0)) return false;
+      if (s === "partners" && (!showPartners || partners.length === 0)) return false;
+      return true;
+    });
+
+  const sectionLabels: Record<string, string> = {
+    events: "Events",
+    about: aboutHeading || "About",
+    testimonials: "Testimonials",
+    services: servicesHeading || "Services",
+    faq: "FAQ",
+    cta_banner: "Get Started",
+    stats: statsHeading || "Stats",
+    partners: partnersHeading || "Partners",
+  };
+
+  const renderNavbar = () => {
+    if (previewMode || navSections.length === 0) return null;
+
+    return (
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
+        style={{
+          backgroundColor: scrolled ? "rgba(255,255,255,0.72)" : "transparent",
+          backdropFilter: scrolled ? "blur(20px) saturate(180%)" : "none",
+          WebkitBackdropFilter: scrolled ? "blur(20px) saturate(180%)" : "none",
+          borderBottom: scrolled ? "1px solid rgba(0,0,0,0.06)" : "1px solid transparent",
+          boxShadow: scrolled ? "0 1px 24px rgba(0,0,0,0.04)" : "none",
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo / Tenant name */}
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="flex items-center gap-2.5 font-bold text-sm tracking-tight transition-colors duration-300"
+              style={{ color: scrolled ? color : "white" }}
+            >
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt={tenantName}
+                  className="h-8 w-auto object-contain"
+                />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-extrabold"
+                  style={{ backgroundColor: color }}
+                >
+                  {tenantName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden sm:inline">{tenantName}</span>
+            </button>
+
+            {/* Section links */}
+            <div className="hidden md:flex items-center gap-1">
+              {navSections.map((section) => (
+                <button
+                  key={section}
+                  onClick={() => scrollToSection(`section-${section}`)}
+                  className="px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-300 hover:scale-[1.04]"
+                  style={{
+                    color: scrolled ? "#374151" : "rgba(255,255,255,0.85)",
+                    backgroundColor: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = scrolled
+                      ? `${color}10`
+                      : "rgba(255,255,255,0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  {sectionLabels[section] || section}
+                </button>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <Link
+              href="/login"
+              className="px-5 py-2 text-[13px] font-semibold rounded-xl transition-all duration-300 hover:-translate-y-0.5"
+              style={{
+                backgroundColor: scrolled ? color : "rgba(255,255,255,0.15)",
+                color: scrolled ? "white" : "rgba(255,255,255,0.95)",
+                backdropFilter: scrolled ? "none" : "blur(12px)",
+                border: scrolled ? "none" : "1px solid rgba(255,255,255,0.2)",
+              }}
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
+  };
+
+  /* ------------------------------------------------------------------ */
   /*  Hero                                                               */
   /* ------------------------------------------------------------------ */
   const renderHero = () => {
@@ -149,6 +321,7 @@ export default function TenantPortalLanding({
     return (
       <section
         key="hero"
+        id="section-hero"
         className={`relative overflow-hidden min-h-[85vh] flex items-center ${heroLayout === "split" ? "flex-row" : ""}`}
       >
         {/* Background */}
@@ -331,7 +504,7 @@ export default function TenantPortalLanding({
 
     if (upcomingEvents.length === 0) {
       return (
-        <section key="events" className="py-24 lg:py-32">
+        <section key="events" id="section-events" className="py-24 lg:py-32">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <div className="max-w-md mx-auto">
               <div
@@ -365,7 +538,7 @@ export default function TenantPortalLanding({
     }
 
     return (
-      <section key="events" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
+      <section key="events" id="section-events" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
         {/* Subtle background gradient */}
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[160px] pointer-events-none opacity-[0.07]"
@@ -599,7 +772,7 @@ export default function TenantPortalLanding({
     if (!showAbout || !aboutBody) return null;
 
     return (
-      <section key="about" className="relative py-24 lg:py-32 overflow-hidden">
+      <section key="about" id="section-about" className="relative py-24 lg:py-32 overflow-hidden">
         {/* Background decoration */}
         <div
           className="absolute top-1/2 -translate-y-1/2 right-0 w-[500px] h-[500px] rounded-full blur-[180px] pointer-events-none opacity-[0.05]"
@@ -686,7 +859,7 @@ export default function TenantPortalLanding({
     // If only a few testimonials, use static grid
     if (testimonials.length <= 3) {
       return (
-        <section key="testimonials" className="py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50">
+        <section key="testimonials" id="section-testimonials" className="py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-14">
               <div className="flex items-center justify-center gap-2 mb-4">
@@ -760,7 +933,7 @@ export default function TenantPortalLanding({
     if (!showServices || services.length === 0) return null;
 
     return (
-      <section key="services" className="relative py-24 lg:py-32 overflow-hidden">
+      <section key="services" id="section-services" className="relative py-24 lg:py-32 overflow-hidden">
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[160px] pointer-events-none opacity-[0.05]"
           style={{ backgroundColor: color }}
@@ -817,7 +990,7 @@ export default function TenantPortalLanding({
     if (!showFaq || faqItems.length === 0) return null;
 
     return (
-      <section key="faq" className="relative py-24 lg:py-32 overflow-hidden">
+      <section key="faq" id="section-faq" className="relative py-24 lg:py-32 overflow-hidden">
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -898,7 +1071,7 @@ export default function TenantPortalLanding({
     if (!showCtaBanner || !ctaBannerHeading) return null;
 
     return (
-      <section key="cta_banner" className="relative py-24 lg:py-32 overflow-hidden">
+      <section key="cta_banner" id="section-cta_banner" className="relative py-24 lg:py-32 overflow-hidden">
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div
             className="relative rounded-3xl overflow-hidden px-8 py-16 sm:px-16 sm:py-24 text-center"
@@ -960,7 +1133,7 @@ export default function TenantPortalLanding({
       : "grid-cols-2 lg:grid-cols-4";
 
     return (
-      <section key="stats" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
+      <section key="stats" id="section-stats" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
         {/* Subtle background glow */}
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] rounded-full blur-[180px] pointer-events-none opacity-[0.06]"
@@ -1023,7 +1196,7 @@ export default function TenantPortalLanding({
     if (!showPartners || partners.length === 0) return null;
 
     return (
-      <section key="partners" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
+      <section key="partners" id="section-partners" className="relative py-24 lg:py-32 bg-gray-50/70 dark:bg-gray-950/50 overflow-hidden">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -1087,24 +1260,75 @@ export default function TenantPortalLanding({
     if (!showFooter) return null;
 
     return (
-      <footer className="relative border-t border-gray-200/80 dark:border-gray-800/80">
+      <footer className="relative border-t border-gray-200/80 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-950/80">
         {/* Accent top line */}
         <div
           className="absolute top-0 left-0 right-0 h-px"
           style={{
-            background: `linear-gradient(90deg, transparent, ${color}25, transparent)`,
+            background: `linear-gradient(90deg, transparent, ${color}40, transparent)`,
           }}
         />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            {footerText && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center sm:text-left">
-                {footerText}
-              </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          {/* Top row: branding + nav links */}
+          <div className="flex flex-col md:flex-row items-start justify-between gap-10 mb-12">
+            {/* Brand */}
+            <div className="max-w-xs">
+              <div className="flex items-center gap-2.5 mb-4">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt={tenantName} className="h-8 w-auto object-contain" />
+                ) : (
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-extrabold"
+                    style={{ backgroundColor: color }}
+                  >
+                    {tenantName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                  {tenantName}
+                </span>
+              </div>
+              {footerText && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                  {footerText}
+                </p>
+              )}
+            </div>
+
+            {/* Quick links */}
+            {navSections.length > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-4">
+                  Quick Links
+                </p>
+                <ul className="space-y-2.5">
+                  {navSections.map((section) => (
+                    <li key={section}>
+                      <button
+                        onClick={() => scrollToSection(`section-${section}`)}
+                        className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-200"
+                      >
+                        {sectionLabels[section] || section}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-gray-200/80 dark:bg-gray-800/80 mb-8" />
+
+          {/* Bottom row */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              &copy; {new Date().getFullYear()} All rights reserved.
+              &copy; {new Date().getFullYear()} {tenantName}. All rights reserved.
+            </p>
+            <p className="text-[11px] text-gray-300 dark:text-gray-700">
+              Powered by OneToOne
             </p>
           </div>
         </div>
@@ -1114,9 +1338,19 @@ export default function TenantPortalLanding({
 
   return (
     <div className="bg-white dark:bg-gray-950">
+      {renderNavbar()}
       {sectionOrder.map((section) => {
         const render = sectionRenderers[section];
-        return render ? render() : null;
+        if (!render) return null;
+        const content = render();
+        if (!content) return null;
+        // Hero renders its own animations; wrap other sections in ScrollReveal
+        if (section === "hero") return content;
+        return (
+          <ScrollReveal key={`reveal-${section}`}>
+            {content}
+          </ScrollReveal>
+        );
       })}
       {renderFooter()}
     </div>
