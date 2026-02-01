@@ -1666,6 +1666,112 @@ async function executeStep(
       }
     }
 
+    /* ---- AI Voice Call ---- */
+    case "ai_voice_call": {
+      const phoneNumber = resolved.phone_number as string;
+      const systemPrompt = resolved.system_prompt as string;
+      const conversationGoal = resolved.conversation_goal as string | undefined;
+      const aiProvider = (resolved.ai_provider as "openai" | "anthropic") || "openai";
+      const aiModel = resolved.ai_model as string | undefined;
+      const voiceId = resolved.voice_id as string | undefined;
+      const maxDuration = (resolved.max_duration as number) || 300;
+      const initialGreeting = resolved.initial_greeting as string | undefined;
+      const enableRecording = resolved.enable_recording !== false;
+
+      if (!phoneNumber) {
+        throw new Error("Missing phone_number for AI voice call");
+      }
+      if (!systemPrompt) {
+        throw new Error("Missing system_prompt for AI voice call");
+      }
+
+      // Check required integrations
+      const requiredProviders = ["twilio", "elevenlabs", "deepgram", aiProvider];
+      const { data: integrations } = await supabase
+        .from("tenant_integrations")
+        .select("provider")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .in("provider", requiredProviders);
+
+      const configuredProviders = new Set((integrations || []).map((i: { provider: string }) => i.provider));
+      const missingProviders = requiredProviders.filter((p) => !configuredProviders.has(p));
+
+      if (missingProviders.length > 0) {
+        const providerNames: Record<string, string> = {
+          twilio: "Twilio",
+          elevenlabs: "ElevenLabs",
+          deepgram: "Deepgram",
+          openai: "OpenAI",
+          anthropic: "Anthropic",
+        };
+        const missingNames = missingProviders.map((p) => providerNames[p] || p).join(", ");
+        throw new Error(`Missing required integrations for AI voice call: ${missingNames}. Go to Settings → Integrations to set them up.`);
+      }
+
+      const voiceServerUrl = process.env.VOICE_SERVER_URL || "http://localhost:3001";
+
+      try {
+        // Call the voice agent API to initiate the call
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/voice-agent/initiate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenantId,
+            workflowRunId: runId,
+            stepExecutionId: stepExecId,
+            config: {
+              phone_number: phoneNumber,
+              system_prompt: systemPrompt,
+              conversation_goal: conversationGoal,
+              ai_provider: aiProvider,
+              ai_model: aiModel,
+              voice_id: voiceId,
+              max_duration: maxDuration,
+              initial_greeting: initialGreeting,
+              enable_recording: enableRecording,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Voice call initiation failed: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        // The call is now in progress. The webhook will update the step execution
+        // when the call completes. For now, mark the step as waiting.
+        await supabase
+          .from("workflow_step_executions")
+          .update({
+            status: "waiting_delay",
+            output: {
+              call_id: result.call_id,
+              call_sid: result.call_sid,
+              status: "in_progress",
+              message: "AI voice call in progress. Results will be updated when the call completes.",
+            },
+          })
+          .eq("id", stepExecId);
+
+        await supabase
+          .from("workflow_runs")
+          .update({ status: "waiting_delay" })
+          .eq("id", runId);
+
+        // Pause the workflow - the webhook will resume it
+        return {
+          __paused: true,
+          call_id: result.call_id,
+          call_sid: result.call_sid,
+        };
+      } catch (err) {
+        throw new Error(`AI voice call failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     default:
       throw new Error(`Unknown step type: ${stepType}`);
   }

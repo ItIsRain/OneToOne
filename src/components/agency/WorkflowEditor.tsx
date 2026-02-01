@@ -150,6 +150,7 @@ const ACTION_CATEGORIES = [
       { value: "stripe_payment_link", label: "Stripe Payment Link", icon: "stripe", color: "bg-violet-600" },
       { value: "google_calendar_event", label: "Google Calendar Event", icon: "gcal", color: "bg-blue-600" },
       { value: "zapier_trigger", label: "Trigger Zapier Zap", icon: "zapier", color: "bg-orange-600" },
+      { value: "ai_voice_call", label: "AI Voice Call", icon: "voice_call", color: "bg-rose-600" },
     ],
   },
   {
@@ -192,6 +193,7 @@ const ACTION_PROVIDER_MAP: Record<string, string> = {
   stripe_payment_link: "stripe",
   google_calendar_event: "google_calendar",
   zapier_trigger: "zapier",
+  ai_voice_call: "twilio", // Primary provider (also requires elevenlabs, deepgram, and openai/anthropic)
 };
 
 const NODE_W = 240;
@@ -465,6 +467,15 @@ const STEP_OUTPUT_VARIABLES: Record<string, { var: string; label: string; desc?:
   create_lead: [{ var: "created_lead_id", label: "Created lead ID" }],
   openai_generate: [{ var: "ai_response", label: "AI response text" }],
   elevenlabs_tts: [{ var: "audio_url", label: "Audio file URL" }],
+  ai_voice_call: [
+    { var: "call_id", label: "Call ID" },
+    { var: "call_sid", label: "Twilio Call SID" },
+    { var: "transcript", label: "Conversation Transcript" },
+    { var: "summary", label: "Call Summary" },
+    { var: "goal_achieved", label: "Goal Achieved (true/false)" },
+    { var: "duration_seconds", label: "Call Duration (seconds)" },
+    { var: "recording_url", label: "Recording URL" },
+  ],
 };
 
 function getVariablesForTrigger(triggerType: string) {
@@ -697,6 +708,8 @@ function ActionIcon({ type, size = 16 }: { type: string; size?: number }) {
     case "stripe_payment_link": return <svg {...p}><path d="M2 7a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7z" /><path d="M2 10h20" /><path d="M6 14h4" /></svg>;
     case "google_calendar_event": return <svg {...p}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></svg>;
     case "zapier_trigger": return <svg {...p}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>;
+    case "voice_call":
+    case "ai_voice_call": return <svg {...p}><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><circle cx="18" cy="6" r="3" fill="currentColor" /><path d="M18 4v4M16 6h4" stroke="white" strokeWidth="1" /></svg>;
     case "create_invoice": return <svg {...p}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></svg>;
     case "create_client": return <svg {...p}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" /></svg>;
     case "create_lead": return <svg {...p}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>;
@@ -1868,6 +1881,89 @@ function NodeConfigPanel({
               <p className="text-xs text-blue-600 dark:text-blue-400">
                 Configure your Zapier Webhook URL in <strong>Settings &rarr; Integrations &rarr; Zapier</strong>. Create a &ldquo;Catch Hook&rdquo; trigger in Zapier to receive the data.
               </p>
+            </div>
+            <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
+          </>
+        );
+
+      /* ---- Integration: AI Voice Call ---- */
+      case "ai_voice_call":
+        return (
+          <>
+            <div>
+              <label className={labelClass}>Recipient Phone Number</label>
+              <input className={inputClass} value={(node.config.phone_number as string) ?? ""} onChange={(e) => update("phone_number", e.target.value)} onFocus={trackFocus("phone_number")} placeholder="+1234567890" />
+              <p className="mt-1 text-xs text-gray-400">International format with country code. Use <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">{"{{client_phone}}"}</code> for the trigger entity&apos;s phone.</p>
+            </div>
+            <div>
+              <label className={labelClass}>System Prompt</label>
+              <textarea className={inputClass} rows={4} value={(node.config.system_prompt as string) ?? ""} onChange={(e) => update("system_prompt", e.target.value)} onFocus={trackFocus("system_prompt")} placeholder="You are a friendly appointment scheduler for [Company Name]. Your goal is to confirm the client's appointment for tomorrow at 2 PM. Be professional yet warm..." />
+              <p className="mt-1 text-xs text-gray-400">Instructions that define the AI&apos;s persona, behavior, and how it should handle the conversation.</p>
+            </div>
+            <div>
+              <label className={labelClass}>Conversation Goal (optional)</label>
+              <textarea className={inputClass} rows={2} value={(node.config.conversation_goal as string) ?? ""} onChange={(e) => update("conversation_goal", e.target.value)} onFocus={trackFocus("conversation_goal")} placeholder="Confirm the appointment or reschedule to a time that works for the client" />
+              <p className="mt-1 text-xs text-gray-400">What should the AI try to achieve? This helps track whether the call was successful. The <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">{"{{goal_achieved}}"}</code> variable will be true/false.</p>
+            </div>
+            <div>
+              <label className={labelClass}>Initial Greeting (optional)</label>
+              <input className={inputClass} value={(node.config.initial_greeting as string) ?? ""} onChange={(e) => update("initial_greeting", e.target.value)} onFocus={trackFocus("initial_greeting")} placeholder="Hello! This is Sarah from ABC Company calling about your appointment..." />
+              <p className="mt-1 text-xs text-gray-400">The first thing the AI says when the call connects. If empty, the AI will wait for the user to speak first.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>AI Provider</label>
+                <select className={inputClass} value={(node.config.ai_provider as string) || "openai"} onChange={(e) => update("ai_provider", e.target.value)}>
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>AI Model</label>
+                {(node.config.ai_provider as string) === "anthropic" ? (
+                  <select className={inputClass} value={(node.config.ai_model as string) || ""} onChange={(e) => update("ai_model", e.target.value)}>
+                    <option value="">Default (Claude 3 Haiku)</option>
+                    <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  </select>
+                ) : (
+                  <select className={inputClass} value={(node.config.ai_model as string) || ""} onChange={(e) => update("ai_model", e.target.value)}>
+                    <option value="">Default (GPT-4o Mini)</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Max Duration (seconds)</label>
+                <input className={inputClass} type="number" min={30} max={600} value={(node.config.max_duration as number) ?? 300} onChange={(e) => update("max_duration", e.target.value ? Number(e.target.value) : null)} placeholder="300" />
+                <p className="mt-1 text-xs text-gray-400">Maximum call length. Default: 5 min</p>
+              </div>
+              <div>
+                <label className={labelClass}>Voice ID (optional)</label>
+                <input className={inputClass} value={(node.config.voice_id as string) ?? ""} onChange={(e) => update("voice_id", e.target.value)} placeholder="Use integration default" />
+                <p className="mt-1 text-xs text-gray-400">ElevenLabs voice ID</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="enable_recording" className="rounded border-gray-300 dark:border-gray-600" checked={(node.config.enable_recording as boolean) !== false} onChange={(e) => update("enable_recording", e.target.checked)} />
+              <label htmlFor="enable_recording" className="text-sm text-gray-700 dark:text-gray-300">Enable call recording</label>
+            </div>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 dark:border-rose-800 dark:bg-rose-900/20">
+              <p className="text-xs font-medium text-rose-700 dark:text-rose-300 mb-1">Required Integrations</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400">
+                This step requires <strong>4 integrations</strong> in <strong>Settings &rarr; Integrations</strong>:
+              </p>
+              <ul className="mt-1 text-xs text-rose-600 dark:text-rose-400 list-disc list-inside">
+                <li><strong>Twilio</strong> – For making phone calls</li>
+                <li><strong>Deepgram</strong> – For speech-to-text</li>
+                <li><strong>ElevenLabs</strong> – For text-to-speech</li>
+                <li><strong>OpenAI or Anthropic</strong> – For AI conversation</li>
+              </ul>
             </div>
             <VariablePalette triggerType={triggerType} triggerConfig={triggerConfig} forms={forms} nodes={nodes} connections={connections} currentNodeId={node.id} onInsert={handleInsertVariable} />
           </>

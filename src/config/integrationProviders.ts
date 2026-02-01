@@ -140,6 +140,71 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     docsUrl: 'https://platform.openai.com/docs',
   },
   {
+    id: 'anthropic',
+    name: 'Anthropic',
+    description: 'Claude AI for intelligent conversations',
+    category: 'ai',
+    fields: [
+      {
+        name: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: 'sk-ant-...',
+        required: true,
+      },
+      {
+        name: 'model',
+        label: 'Model',
+        type: 'select',
+        options: [
+          { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+          { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+          { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku (Fast)' },
+        ],
+      },
+    ],
+    docsUrl: 'https://docs.anthropic.com',
+  },
+  {
+    id: 'deepgram',
+    name: 'Deepgram',
+    description: 'Real-time speech-to-text transcription',
+    category: 'ai',
+    fields: [
+      {
+        name: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: 'Your Deepgram API key',
+        required: true,
+      },
+      {
+        name: 'model',
+        label: 'Model',
+        type: 'select',
+        options: [
+          { value: 'nova-2', label: 'Nova 2 (Best)' },
+          { value: 'nova', label: 'Nova' },
+          { value: 'enhanced', label: 'Enhanced' },
+          { value: 'base', label: 'Base' },
+        ],
+      },
+      {
+        name: 'language',
+        label: 'Language',
+        type: 'select',
+        options: [
+          { value: 'en', label: 'English' },
+          { value: 'es', label: 'Spanish' },
+          { value: 'fr', label: 'French' },
+          { value: 'de', label: 'German' },
+          { value: 'ar', label: 'Arabic' },
+        ],
+      },
+    ],
+    docsUrl: 'https://developers.deepgram.com/docs',
+  },
+  {
     id: 'stripe',
     name: 'Stripe',
     description: 'Payment processing and billing',
