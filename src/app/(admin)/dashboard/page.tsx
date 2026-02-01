@@ -11,7 +11,7 @@ import {
   DashboardQuickActions,
   MorningBriefing,
 } from "@/components/agency";
-import { WelcomeModal, DashboardOnboarding, DashboardGreeting, ScopeCreepWidget } from "@/components/agency/dashboard";
+import { WelcomeModal, DashboardOnboarding, DashboardGreeting, ScopeCreepWidget, AgencyCommandCenter, ClientHealthWidget, ResourceHeatmap, ClientJourneyMap, BusinessHealthScore } from "@/components/agency/dashboard";
 import type { Announcement, Goal } from "@/components/agency/dashboard";
 import {
   AddAnnouncementModal,
@@ -50,7 +50,11 @@ const defaultSettings: DashboardSettings = {
   show_goals: true,
   show_bookmarks: true,
   show_scope_creep: true,
-  widget_order: ["greeting", "briefing", "metrics", "quick_actions", "onboarding", "activity", "upcoming", "announcements", "goals", "bookmarks", "scope_creep"],
+  show_client_health: true,
+  show_resource_heatmap: true,
+  show_client_journey: true,
+  show_business_health: true,
+  widget_order: ["greeting", "briefing", "metrics", "quick_actions", "onboarding", "resource_heatmap", "client_journey", "business_health", "activity", "upcoming", "client_health", "announcements", "goals", "bookmarks", "scope_creep"],
   accent_color: null,
   banner_image_url: null,
   banner_message: null,
@@ -70,6 +74,7 @@ export default function Dashboard() {
   // Dashboard settings
   const [dashSettings, setDashSettings] = useState<DashboardSettings>(defaultSettings);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [commandCenterOpen, setCommandCenterOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
   // Announcement state
@@ -96,7 +101,17 @@ export default function Dashboard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.settings) {
-          setDashSettings(data.settings);
+          // Merge saved settings with defaults so new widgets are included
+          const saved = data.settings;
+          const merged = { ...defaultSettings, ...saved };
+          // Ensure any new widgets missing from saved widget_order are appended
+          const savedOrder: string[] = saved.widget_order || [];
+          const allKeys = defaultSettings.widget_order;
+          const missingKeys = allKeys.filter((k: string) => !savedOrder.includes(k));
+          if (missingKeys.length > 0) {
+            merged.widget_order = [...savedOrder, ...missingKeys];
+          }
+          setDashSettings(merged);
         }
       })
       .catch(() => {});
@@ -206,6 +221,10 @@ export default function Dashboard() {
       goals: dashSettings.show_goals,
       bookmarks: dashSettings.show_bookmarks,
       scope_creep: dashSettings.show_scope_creep,
+      client_health: dashSettings.show_client_health,
+      resource_heatmap: dashSettings.show_resource_heatmap,
+      client_journey: dashSettings.show_client_journey,
+      business_health: dashSettings.show_business_health,
     };
     return visMap[key] !== false;
   };
@@ -224,6 +243,12 @@ export default function Dashboard() {
         return <DashboardQuickActions key="quick_actions" />;
       case "onboarding":
         return <DashboardOnboarding key="onboarding" />;
+      case "resource_heatmap":
+        return <ResourceHeatmap key={`resource_heatmap-${refreshKey}`} />;
+      case "client_journey":
+        return <ClientJourneyMap key={`client_journey-${refreshKey}`} />;
+      case "business_health":
+        return <BusinessHealthScore key={`business_health-${refreshKey}`} />;
       default:
         return null;
     }
@@ -251,6 +276,8 @@ export default function Dashboard() {
         return <DashboardActivity key={`activity-${refreshKey}`} />;
       case "upcoming":
         return <DashboardUpcoming key={`upcoming-${refreshKey}`} />;
+      case "client_health":
+        return <ClientHealthWidget key={`client_health-${refreshKey}`} />;
       default:
         return null;
     }
@@ -297,7 +324,16 @@ export default function Dashboard() {
         animate="show"
       >
         {/* Customize Button */}
-        <motion.div className="flex justify-end" variants={sectionVariants}>
+        <motion.div className="flex justify-end gap-2" variants={sectionVariants}>
+          <button
+            onClick={() => setCommandCenterOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Command Center
+          </button>
           <button
             onClick={() => setCustomizeOpen(true)}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-all"
@@ -408,6 +444,12 @@ export default function Dashboard() {
       <Suspense fallback={null}>
         <WelcomeModal />
       </Suspense>
+
+      {/* Command Center Overlay */}
+      <AgencyCommandCenter
+        isOpen={commandCenterOpen}
+        onClose={() => setCommandCenterOpen(false)}
+      />
     </>
   );
 }

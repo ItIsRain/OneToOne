@@ -15,6 +15,10 @@ export interface DashboardSettings {
   show_goals: boolean;
   show_bookmarks: boolean;
   show_scope_creep: boolean;
+  show_client_health: boolean;
+  show_resource_heatmap: boolean;
+  show_client_journey: boolean;
+  show_business_health: boolean;
   widget_order: string[];
   accent_color: string | null;
   banner_image_url: string | null;
@@ -41,6 +45,10 @@ const visibilityKeys: Record<string, keyof DashboardSettings> = {
   goals: "show_goals",
   bookmarks: "show_bookmarks",
   scope_creep: "show_scope_creep",
+  client_health: "show_client_health",
+  resource_heatmap: "show_resource_heatmap",
+  client_journey: "show_client_journey",
+  business_health: "show_business_health",
 };
 
 export function DashboardCustomizePanel({

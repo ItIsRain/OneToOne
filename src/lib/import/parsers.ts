@@ -1,5 +1,4 @@
 import Papa from 'papaparse';
-import ExcelJS from 'exceljs';
 import { ParsedFile } from './types';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -79,6 +78,7 @@ async function parseCSV(file: File): Promise<ParsedFile> {
 
 async function parseExcel(file: File): Promise<ParsedFile> {
   try {
+    const ExcelJS = (await import('exceljs')).default;
     const arrayBuffer = await file.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
@@ -117,7 +117,7 @@ async function parseExcel(file: File): Promise<ParsedFile> {
           stringValue = String(value.result ?? '');
         } else if (typeof value === 'object' && 'richText' in value) {
           // Rich text — concatenate text fragments
-          stringValue = (value as ExcelJS.CellRichTextValue).richText
+          stringValue = (value as { richText: { text: string }[] }).richText
             .map((rt) => rt.text)
             .join('');
         } else {
@@ -158,6 +158,7 @@ export async function generateExcelTemplate(
   fields: { name: string; label: string }[],
   entityType: string
 ): Promise<Blob> {
+  const ExcelJS = (await import('exceljs')).default;
   const headers = fields.map((f) => f.label);
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(entityType);
