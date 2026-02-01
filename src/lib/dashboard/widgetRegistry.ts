@@ -19,6 +19,7 @@ export const widgetRegistry: WidgetDefinition[] = [
   { key: "scope_creep", label: "Scope Creep Alerts", column: "right" },
   { key: "resource_heatmap", label: "Team Capacity", column: "full" },
   { key: "client_journey", label: "Client Journey", column: "full" },
+  { key: "business_health", label: "Business Health Score", column: "full" },
 ];
 
 export const defaultWidgetOrder = [
@@ -36,6 +37,7 @@ export const defaultWidgetOrder = [
   "goals",
   "bookmarks",
   "scope_creep",
+  "business_health",
 ];
 
 export const defaultVisibility: Record<string, boolean> = {
@@ -53,4 +55,5 @@ export const defaultVisibility: Record<string, boolean> = {
   scope_creep: true,
   resource_heatmap: true,
   client_journey: true,
+  business_health: true,
 };

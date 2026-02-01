@@ -11,7 +11,7 @@ import {
   DashboardQuickActions,
   MorningBriefing,
 } from "@/components/agency";
-import { WelcomeModal, DashboardOnboarding, DashboardGreeting, ScopeCreepWidget, AgencyCommandCenter, ClientHealthWidget, ResourceHeatmap, ClientJourneyMap } from "@/components/agency/dashboard";
+import { WelcomeModal, DashboardOnboarding, DashboardGreeting, ScopeCreepWidget, AgencyCommandCenter, ClientHealthWidget, ResourceHeatmap, ClientJourneyMap, BusinessHealthScore } from "@/components/agency/dashboard";
 import type { Announcement, Goal } from "@/components/agency/dashboard";
 import {
   AddAnnouncementModal,
@@ -53,7 +53,8 @@ const defaultSettings: DashboardSettings = {
   show_client_health: true,
   show_resource_heatmap: true,
   show_client_journey: true,
-  widget_order: ["greeting", "briefing", "metrics", "quick_actions", "onboarding", "resource_heatmap", "client_journey", "activity", "upcoming", "client_health", "announcements", "goals", "bookmarks", "scope_creep"],
+  show_business_health: true,
+  widget_order: ["greeting", "briefing", "metrics", "quick_actions", "onboarding", "resource_heatmap", "client_journey", "business_health", "activity", "upcoming", "client_health", "announcements", "goals", "bookmarks", "scope_creep"],
   accent_color: null,
   banner_image_url: null,
   banner_message: null,
@@ -100,7 +101,17 @@ export default function Dashboard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.settings) {
-          setDashSettings(data.settings);
+          // Merge saved settings with defaults so new widgets are included
+          const saved = data.settings;
+          const merged = { ...defaultSettings, ...saved };
+          // Ensure any new widgets missing from saved widget_order are appended
+          const savedOrder: string[] = saved.widget_order || [];
+          const allKeys = defaultSettings.widget_order;
+          const missingKeys = allKeys.filter((k: string) => !savedOrder.includes(k));
+          if (missingKeys.length > 0) {
+            merged.widget_order = [...savedOrder, ...missingKeys];
+          }
+          setDashSettings(merged);
         }
       })
       .catch(() => {});
@@ -213,6 +224,7 @@ export default function Dashboard() {
       client_health: dashSettings.show_client_health,
       resource_heatmap: dashSettings.show_resource_heatmap,
       client_journey: dashSettings.show_client_journey,
+      business_health: dashSettings.show_business_health,
     };
     return visMap[key] !== false;
   };
@@ -235,6 +247,8 @@ export default function Dashboard() {
         return <ResourceHeatmap key={`resource_heatmap-${refreshKey}`} />;
       case "client_journey":
         return <ClientJourneyMap key={`client_journey-${refreshKey}`} />;
+      case "business_health":
+        return <BusinessHealthScore key={`business_health-${refreshKey}`} />;
       default:
         return null;
     }

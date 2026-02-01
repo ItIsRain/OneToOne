@@ -15,6 +15,7 @@ export { ClientHealthWidget } from "./ClientHealthWidget";
 export { AgencyCommandCenter } from "./AgencyCommandCenter";
 export { ResourceHeatmap } from "./ResourceHeatmap";
 export { ClientJourneyMap } from "./ClientJourneyMap";
+export { BusinessHealthScore } from "./BusinessHealthScore";
 
 // Types
 export type { Announcement } from "./DashboardAnnouncements";
