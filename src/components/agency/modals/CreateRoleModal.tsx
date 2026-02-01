@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import type { Role } from "../RolesTable";
@@ -109,7 +110,8 @@ export function CreateRoleModal({ isOpen, onClose, onSave, role }: CreateRoleMod
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save role");
+        toast.error(data.error || "Failed to save role");
+        return;
       }
 
       if (onSave) {
@@ -117,7 +119,7 @@ export function CreateRoleModal({ isOpen, onClose, onSave, role }: CreateRoleMod
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }

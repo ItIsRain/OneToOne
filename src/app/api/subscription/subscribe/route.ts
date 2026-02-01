@@ -153,12 +153,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       subscription,
       applied_discount: appliedDiscount,
       message: `Successfully subscribed to ${plan_type.charAt(0).toUpperCase() + plan_type.slice(1)} plan!`,
     });
+    // Clear the middleware subscription cache so it re-validates on next dashboard visit
+    res.cookies.set("1i1_sub_ok", "", { path: "/", maxAge: 0 });
+    return res;
   } catch (error) {
     console.error("Error subscribing:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

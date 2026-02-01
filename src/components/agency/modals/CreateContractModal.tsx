@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface CreateContractModalProps {
   isOpen: boolean;
@@ -29,6 +31,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 }) => {
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
+
   const [templateId, setTemplateId] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
@@ -82,7 +85,8 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to create contract");
+        toast.error(data.error || "Failed to create contract");
+        return;
       }
 
       const data = await res.json();
@@ -91,7 +95,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
       setTemplateId("");
       onCreated(data.contract.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create contract");
+      toast.error(err instanceof Error ? err.message : "Failed to create contract");
     } finally {
       setIsCreating(false);
     }
@@ -99,7 +103,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-lg p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           New Contract
         </h3>
@@ -110,7 +114,16 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 
       <div className="space-y-5">
         <div>
-          <Label htmlFor="contract-title">Contract Title</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="contract-title">Contract Title</Label>
+            <AIFieldButton
+              module="contracts"
+              field="title"
+              currentValue={title}
+              context={{ clientId }}
+              onGenerate={(value) => setTitle(value)}
+            />
+          </div>
           <input
             id="contract-title"
             type="text"

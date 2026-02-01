@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
@@ -9,6 +10,7 @@ import { DynamicField } from "@/components/form/DynamicField";
 import { eventTypeConfigs, getEventTypeConfig } from "@/config/eventTypeSchema";
 import type { FormField } from "@/config/eventTypeSchema";
 import CoverImageUpload from "@/components/events/CoverImageUpload";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface Event {
   id: string;
@@ -367,12 +369,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to save event");
+        toast.error(data.error || "Failed to save event");
+        return;
       }
 
       onSuccess();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to save event");
+      toast.error(error instanceof Error ? error.message : "Failed to save event");
     } finally {
       setLoading(false);
     }
@@ -450,7 +453,16 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                 {/* Title & Event Type Row */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-2">
-                    <Label htmlFor="title">Event Title *</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="title">Event Title *</Label>
+                      <AIFieldButton
+                        module="events"
+                        field="title"
+                        currentValue={formData.title}
+                        context={{ event_type: formData.event_type, category: formData.category, date: formData.date, location: formData.location }}
+                        onGenerate={(value) => setFormData({ ...formData, title: value })}
+                      />
+                    </div>
                     <Input
                       id="title"
                       type="text"
@@ -552,7 +564,16 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 {/* Description */}
                 <div>
-                  <Label htmlFor="description">Description</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="description">Description</Label>
+                    <AIFieldButton
+                      module="events"
+                      field="description"
+                      currentValue={formData.description}
+                      context={{ title: formData.title, event_type: formData.event_type, category: formData.category, date: formData.date, location: formData.location, is_virtual: formData.is_virtual }}
+                      onGenerate={(value) => setFormData({ ...formData, description: value })}
+                    />
+                  </div>
                   <TextArea
                     placeholder="Describe your event..."
                     value={formData.description}
@@ -784,7 +805,16 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
                 {/* Notes */}
                 <div>
-                  <Label htmlFor="notes">Internal Notes</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notes">Internal Notes</Label>
+                    <AIFieldButton
+                      module="events"
+                      field="notes"
+                      currentValue={formData.notes}
+                      context={{ title: formData.title, description: formData.description, date: formData.date }}
+                      onGenerate={(value) => setFormData({ ...formData, notes: value })}
+                    />
+                  </div>
                   <TextArea
                     placeholder="Add internal notes (not visible to attendees)..."
                     value={formData.notes}

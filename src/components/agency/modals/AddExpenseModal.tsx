@@ -1,10 +1,12 @@
 "use client";
 import React, { useState } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
 import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -55,7 +57,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           Add Expense
         </h3>
@@ -66,7 +68,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <Label htmlFor="description">Description</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="description">Description</Label>
+            <AIFieldButton
+              module="expenses"
+              field="description"
+              currentValue={formData.description}
+              context={{ category: formData.category, vendor: formData.vendor, amount: formData.amount }}
+              onGenerate={(value) => setFormData({ ...formData, description: value })}
+            />
+          </div>
           <Input
             id="description"
             type="text"
@@ -140,7 +151,16 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         </div>
 
         <div>
-          <Label htmlFor="notes">Notes (Optional)</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <AIFieldButton
+              module="expenses"
+              field="notes"
+              currentValue={formData.notes}
+              context={{ description: formData.description, category: formData.category, vendor: formData.vendor, amount: formData.amount }}
+              onGenerate={(value) => setFormData({ ...formData, notes: value })}
+            />
+          </div>
           <TextArea
             placeholder="Any additional details..."
             onChange={(value) => setFormData({ ...formData, notes: value })}

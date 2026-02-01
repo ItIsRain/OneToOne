@@ -37,6 +37,8 @@ const PUBLIC_PREFIXES = [
 
 function isPublicRoute(pathname: string): boolean {
   if (pathname === "/") return true;
+  // Public invoice view: /api/invoices/{id}/public
+  if (/^\/api\/invoices\/[^/]+\/public$/.test(pathname)) return true;
   return PUBLIC_PREFIXES.some(
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
@@ -280,29 +282,70 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Step 5: Subscription check (only for dashboard pages, not every API call) ──
+  // Uses a short-lived cookie cache to avoid querying the DB on every request
+  // (including RSC data fetches), which can cause a redirect/refresh loop when
+  // the auth token refresh sets new cookies and invalidates the Router Cache.
   if (pathname.startsWith("/dashboard") && !isBypassSubscription(pathname)) {
-    try {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .single();
+    const subCacheCookie = request.cookies.get("1i1_sub_ok");
+    const subCacheValid = subCacheCookie?.value === "1";
 
-      if (profile?.tenant_id) {
-        const { data: subscription } = await supabase
-          .from("tenant_subscriptions")
-          .select("plan_type, status")
-          .eq("tenant_id", profile.tenant_id)
+    if (!subCacheValid) {
+      try {
+        // Use service role client for subscription check to bypass RLS
+        const serviceClient = isSupabaseConfigured
+          ? createClient(supabaseUrl!, supabaseServiceKey!)
+          : null;
+        const queryClient = serviceClient || supabase;
+
+        const { data: profile } = await queryClient
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", user.id)
           .single();
 
-        if (!subscription || subscription.status !== "active") {
-          return NextResponse.redirect(new URL("/subscribe", request.url));
+        if (profile?.tenant_id) {
+          const { data: subscription } = await queryClient
+            .from("tenant_subscriptions")
+            .select("plan_type, status")
+            .eq("tenant_id", profile.tenant_id)
+            .single();
+
+          if (!subscription || subscription.status !== "active") {
+            const subscribeUrl = new URL("/subscribe", request.url);
+            const redirectResponse = NextResponse.redirect(subscribeUrl);
+            response.cookies.getAll().forEach((c) =>
+              redirectResponse.cookies.set(c.name, c.value, {
+                domain: cookieDomain ?? undefined,
+                path: "/",
+              })
+            );
+            return applySecurityHeaders(redirectResponse);
+          }
+        } else {
+          const subscribeUrl = new URL("/subscribe", request.url);
+          const redirectResponse = NextResponse.redirect(subscribeUrl);
+          response.cookies.getAll().forEach((c) =>
+            redirectResponse.cookies.set(c.name, c.value, {
+              domain: cookieDomain ?? undefined,
+              path: "/",
+            })
+          );
+          return applySecurityHeaders(redirectResponse);
         }
-      } else {
-        return NextResponse.redirect(new URL("/subscribe", request.url));
+
+        // Subscription is valid — cache for 5 minutes to prevent re-querying
+        response.cookies.set("1i1_sub_ok", "1", {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: !isLocalDev(),
+          maxAge: 300, // 5 minutes
+          ...(cookieDomain ? { domain: cookieDomain } : {}),
+        });
+      } catch (error) {
+        console.error("Middleware subscription check error:", error);
+        // On error, allow through but don't cache — will retry next request
       }
-    } catch (error) {
-      console.error("Middleware subscription check error:", error);
     }
   }
 

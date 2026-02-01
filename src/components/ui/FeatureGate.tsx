@@ -141,6 +141,16 @@ const FEATURE_INFO: Record<FeatureKey, { title: string; description: string; ico
     description: "Create public booking pages, manage team availability, and let clients self-schedule appointments. Automate reminders and integrate with your workflow.",
     icon: "calendar",
   },
+  resource_utilization: {
+    title: "Resource Utilization",
+    description: "Visualize team workload with a heatmap showing capacity vs. commitments. Identify overloaded and underutilized team members across weeks.",
+    icon: "chart",
+  },
+  sow_pipeline: {
+    title: "SOW Pipeline",
+    description: "Automatically convert proposals to contracts, projects, and milestone invoices. Streamline your entire sales-to-delivery workflow.",
+    icon: "automation",
+  },
 };
 
 const PLAN_NAMES: Record<PlanType, string> = {

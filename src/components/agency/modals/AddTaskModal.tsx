@@ -1,10 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
 import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface AddTaskModalProps {
   isOpen: boolean;
@@ -220,7 +222,8 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to create task");
+        toast.error(error.error || "Failed to create task");
+        return;
       }
 
       // Reset form
@@ -255,7 +258,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
       }
     } catch (error) {
       console.error("Error creating task:", error);
-      alert(error instanceof Error ? error.message : "Failed to create task");
+      toast.error(error instanceof Error ? error.message : "Failed to create task");
     } finally {
       setLoading(false);
     }
@@ -263,7 +266,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           Add New Task
         </h3>
@@ -275,7 +278,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
       <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-5 overflow-y-auto pr-2">
         {/* Required: Title */}
         <div>
-          <Label htmlFor="title">Task Title *</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="title">Task Title *</Label>
+            <AIFieldButton
+              module="tasks"
+              field="title"
+              currentValue={formData.title}
+              context={{ task_type: formData.task_type, priority: formData.priority, category: formData.category }}
+              onGenerate={(value) => setFormData({ ...formData, title: value })}
+            />
+          </div>
           <Input
             id="title"
             type="text"
@@ -367,7 +379,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
         {/* Description */}
         <div>
-          <Label htmlFor="description">Description</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="description">Description</Label>
+            <AIFieldButton
+              module="tasks"
+              field="description"
+              currentValue={formData.description}
+              context={{ title: formData.title, task_type: formData.task_type, priority: formData.priority, category: formData.category, due_date: formData.due_date }}
+              onGenerate={(value) => setFormData({ ...formData, description: value })}
+            />
+          </div>
           <TextArea
             placeholder="Enter task details..."
             value={formData.description}
@@ -479,7 +500,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
             {/* Acceptance Criteria */}
             <div>
-              <Label htmlFor="acceptance_criteria">Acceptance Criteria</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="acceptance_criteria">Acceptance Criteria</Label>
+                <AIFieldButton
+                  module="tasks"
+                  field="acceptance_criteria"
+                  currentValue={formData.acceptance_criteria}
+                  context={{ title: formData.title, description: formData.description, task_type: formData.task_type }}
+                  onGenerate={(value) => setFormData({ ...formData, acceptance_criteria: value })}
+                />
+              </div>
               <TextArea
                 placeholder="Define what done looks like..."
                 value={formData.acceptance_criteria}
@@ -514,7 +544,16 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
 
             {/* Internal Notes */}
             <div>
-              <Label htmlFor="internal_notes">Internal Notes</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="internal_notes">Internal Notes</Label>
+                <AIFieldButton
+                  module="tasks"
+                  field="internal_notes"
+                  currentValue={formData.internal_notes}
+                  context={{ title: formData.title, description: formData.description, priority: formData.priority }}
+                  onGenerate={(value) => setFormData({ ...formData, internal_notes: value })}
+                />
+              </div>
               <TextArea
                 placeholder="Notes not visible to clients..."
                 value={formData.internal_notes}

@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface CreateFormModalProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ export const CreateFormModal: React.FC<CreateFormModalProps> = ({
 }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,13 +77,14 @@ export const CreateFormModal: React.FC<CreateFormModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create form");
+        toast.error(data.error || "Failed to create form");
+        return;
       }
 
       onCreated(data.form);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create form");
+      toast.error(err instanceof Error ? err.message : "Failed to create form");
     } finally {
       setIsSaving(false);
     }
@@ -91,7 +95,7 @@ export const CreateFormModal: React.FC<CreateFormModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-md p-6 sm:p-8">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90 mb-3">
         Create New Form
       </h2>
 
@@ -103,9 +107,18 @@ export const CreateFormModal: React.FC<CreateFormModalProps> = ({
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Form Title <span className="text-error-500">*</span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Form Title <span className="text-error-500">*</span>
+            </label>
+            <AIFieldButton
+              module="forms"
+              field="title"
+              currentValue={title}
+              context={{}}
+              onGenerate={(value) => setTitle(value)}
+            />
+          </div>
           <input
             type="text"
             value={title}
@@ -117,9 +130,18 @@ export const CreateFormModal: React.FC<CreateFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Description
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description
+            </label>
+            <AIFieldButton
+              module="forms"
+              field="description"
+              currentValue={description}
+              context={{ title }}
+              onGenerate={(value) => setDescription(value)}
+            />
+          </div>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}

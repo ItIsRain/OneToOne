@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import type { Payment } from "../PaymentsTable";
@@ -214,12 +215,13 @@ export const CreatePaymentModal: React.FC<CreatePaymentModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save payment");
+        toast.error(data.error || "Failed to save payment");
+        return;
       }
 
       onSave(data.payment);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save payment");
+      toast.error(err instanceof Error ? err.message : "Failed to save payment");
     } finally {
       setIsSaving(false);
     }

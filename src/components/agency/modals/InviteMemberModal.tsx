@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { toast } from "sonner";
 import type { TeamMember } from "../MembersTable";
 
 interface Role {
@@ -172,12 +173,13 @@ export function InviteMemberModal({ isOpen, onClose, onSave, member }: InviteMem
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save member");
+        toast.error(data.error || "Failed to save member");
+        return;
       }
 
       onSave(data.member);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }

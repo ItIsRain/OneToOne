@@ -5,6 +5,7 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { GetCountries } from "react-country-state-city";
+import { toast } from "sonner";
 import type { Vendor } from "../VendorsTable";
 
 type Country = {
@@ -180,12 +181,13 @@ export const AddVendorModal: React.FC<AddVendorModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save vendor");
+        toast.error(data.error || "Failed to save vendor");
+        return;
       }
 
       onSave(data.vendor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save vendor");
+      toast.error(err instanceof Error ? err.message : "Failed to save vendor");
     } finally {
       setIsSaving(false);
     }

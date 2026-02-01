@@ -185,13 +185,13 @@ export default function BannerDisplay() {
       if (!res.ok) return;
       const data = await res.json();
       const modals: ModalNotification[] = data.notifications || [];
-      if (modals.length > 0 && !activeModal) {
-        setActiveModal(modals[0]);
+      if (modals.length > 0) {
+        setActiveModal((prev) => prev ?? modals[0]);
       }
     } catch {
       // Silently fail
     }
-  }, [activeModal]);
+  }, []);
 
   useEffect(() => {
     fetchBanners();

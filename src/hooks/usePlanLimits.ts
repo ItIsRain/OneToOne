@@ -42,6 +42,8 @@ export const PLAN_LIMITS = {
       vendors: false, // vendor management requires Starter+
       contracts: false, // contracts builder requires Starter+
       booking: false, // booking/scheduling requires Starter+
+      resource_utilization: false, // resource utilization requires Professional+
+      sow_pipeline: false, // SOW pipeline requires Professional+
     },
   },
   starter: {
@@ -78,6 +80,8 @@ export const PLAN_LIMITS = {
       vendors: true, // vendor management enabled
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
+      resource_utilization: false, // resource utilization requires Professional+
+      sow_pipeline: false, // SOW pipeline requires Professional+
     },
   },
   professional: {
@@ -115,6 +119,8 @@ export const PLAN_LIMITS = {
       vendors: true, // vendor management enabled
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
+      resource_utilization: true, // resource utilization enabled
+      sow_pipeline: true, // SOW pipeline enabled
     },
   },
   business: {
@@ -152,6 +158,8 @@ export const PLAN_LIMITS = {
       vendors: true, // vendor management enabled
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
+      resource_utilization: true, // resource utilization enabled
+      sow_pipeline: true, // SOW pipeline enabled
     },
   },
 } as const;

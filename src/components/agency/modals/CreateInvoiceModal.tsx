@@ -3,7 +3,9 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { toast } from "sonner";
 import type { Invoice, InvoiceItem } from "../InvoicesTable";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface Client {
   id: string;
@@ -82,6 +84,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: "1", description: "", quantity: 1, unit_price: 0, unit: "unit" },
   ]);
+
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -312,12 +315,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save invoice");
+        toast.error(data.error || "Failed to save invoice");
+        return;
       }
 
       onSave(data.invoice);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save invoice");
+      toast.error(err instanceof Error ? err.message : "Failed to save invoice");
     } finally {
       setIsSaving(false);
     }
@@ -333,7 +337,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-3xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           {invoice ? "Edit Invoice" : "Create Invoice"}
         </h3>
@@ -382,7 +386,16 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div>
-            <Label htmlFor="title">Invoice Title (Optional)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="title">Invoice Title (Optional)</Label>
+              <AIFieldButton
+                module="invoices"
+                field="title"
+                currentValue={formData.title}
+                context={{ client_id: formData.client_id, currency: formData.currency, payment_terms: formData.payment_terms }}
+                onGenerate={(value) => setFormData({ ...formData, title: value })}
+              />
+            </div>
             <Input
               id="title"
               type="text"
@@ -593,7 +606,16 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
         {/* Notes */}
         <div>
-          <Label htmlFor="notes">Notes (Visible on Invoice)</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="notes">Notes (Visible on Invoice)</Label>
+            <AIFieldButton
+              module="invoices"
+              field="notes"
+              currentValue={formData.notes}
+              context={{ title: formData.title, currency: formData.currency, payment_terms: formData.payment_terms }}
+              onGenerate={(value) => setFormData({ ...formData, notes: value })}
+            />
+          </div>
           <textarea
             id="notes"
             placeholder="Thank you for your business!"
@@ -671,7 +693,16 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="terms_and_conditions">Terms & Conditions</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="terms_and_conditions">Terms & Conditions</Label>
+                <AIFieldButton
+                  module="invoices"
+                  field="terms_and_conditions"
+                  currentValue={formData.terms_and_conditions}
+                  context={{ title: formData.title, currency: formData.currency, payment_terms: formData.payment_terms }}
+                  onGenerate={(value) => setFormData({ ...formData, terms_and_conditions: value })}
+                />
+              </div>
               <textarea
                 id="terms_and_conditions"
                 placeholder="Payment terms, late fees, etc."

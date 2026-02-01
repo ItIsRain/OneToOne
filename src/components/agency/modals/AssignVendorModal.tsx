@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { toast } from "sonner";
 
 interface Vendor {
   id: string;
@@ -114,13 +115,14 @@ export const AssignVendorModal: React.FC<AssignVendorModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to assign vendor");
+        toast.error(data.error || "Failed to assign vendor");
+        return;
       }
 
       onSave();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign vendor");
+      toast.error(err instanceof Error ? err.message : "Failed to assign vendor");
     } finally {
       setIsSaving(false);
     }

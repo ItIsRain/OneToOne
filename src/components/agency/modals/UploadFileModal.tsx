@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -200,11 +201,13 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
         if (!res.ok) {
           // Check if this is a malware detection error
           if (data.scanResult) {
-            throw new Error(
+            toast.error(
               `⚠️ Security Alert: "${file.name}" was blocked. Detected as malicious by ${data.scanResult.malicious} security vendor(s).`
             );
+            return;
           }
-          throw new Error(data.error || `Failed to upload ${file.name}`);
+          toast.error(data.error || `Failed to upload ${file.name}`);
+          return;
         }
 
         uploadedFiles.push(data.file);
@@ -216,7 +219,7 @@ export const UploadFileModal: React.FC<UploadFileModalProps> = ({
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }

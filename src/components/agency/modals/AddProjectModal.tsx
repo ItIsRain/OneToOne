@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
@@ -270,7 +271,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to create project");
+        toast.error(error.error || "Failed to create project");
+        return;
       }
 
       // Reset form
@@ -319,7 +321,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       }
     } catch (error) {
       console.error("Error creating project:", error);
-      alert(error instanceof Error ? error.message : "Failed to create project");
+      toast.error(error instanceof Error ? error.message : "Failed to create project");
     } finally {
       setLoading(false);
     }

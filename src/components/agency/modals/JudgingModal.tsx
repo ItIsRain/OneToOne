@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
 interface JudgeScore {
@@ -103,11 +104,11 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
         await fetchJudgingData();
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to start judging");
+        toast.error(data.error || "Failed to start judging");
       }
     } catch (err) {
       console.error("Error starting judging:", err);
-      alert("Failed to start judging");
+      toast.error("Failed to start judging");
     }
   };
 
@@ -122,11 +123,11 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
         await fetchJudgingData();
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to end judging");
+        toast.error(data.error || "Failed to end judging");
       }
     } catch (err) {
       console.error("Error ending judging:", err);
-      alert("Failed to end judging");
+      toast.error("Failed to end judging");
     }
   };
 
@@ -163,15 +164,15 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
           );
           if (copyLink) {
             navigator.clipboard.writeText(data.judgingUrl);
-            alert("Link copied to clipboard!");
+            toast.success("Link copied to clipboard!");
           }
         }
       } else {
-        alert(data.error || "Failed to add judge");
+        toast.error(data.error || "Failed to add judge");
       }
     } catch (err) {
       console.error("Error adding judge:", err);
-      alert("Failed to add judge");
+      toast.error("Failed to add judge");
     } finally {
       setAddingJudge(false);
     }
@@ -188,7 +189,7 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
         await fetchJudgingData();
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to remove judge");
+        toast.error(data.error || "Failed to remove judge");
       }
     } catch (err) {
       console.error("Error removing judge:", err);
@@ -201,10 +202,10 @@ export const JudgingModal: React.FC<JudgingModalProps> = ({
         method: "POST",
       });
       if (response.ok) {
-        alert("Invitation resent!");
+        toast.success("Invitation resent!");
       } else {
         const data = await response.json();
-        alert(data.error || "Failed to resend invitation");
+        toast.error(data.error || "Failed to resend invitation");
       }
     } catch (err) {
       console.error("Error resending invite:", err);

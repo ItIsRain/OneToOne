@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -212,13 +213,14 @@ export const AddGoalModal: React.FC<AddGoalModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save goal");
+        toast.error(data.error || "Failed to save goal");
+        return;
       }
 
       onSave(data.goal);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setIsSaving(false);
     }

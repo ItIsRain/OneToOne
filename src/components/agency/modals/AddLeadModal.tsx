@@ -1,11 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { GetCountries } from "react-country-state-city";
 import type { Lead } from "../LeadsTable";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 type Country = {
   id: number;
@@ -67,6 +69,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
   lead,
 }) => {
   const [formData, setFormData] = useState(initialFormData);
+
   const [countries, setCountries] = useState<Country[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -190,12 +193,13 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save lead");
+        toast.error(data.error || "Failed to save lead");
+        return;
       }
 
       onSave(data.lead);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save lead");
+      toast.error(err instanceof Error ? err.message : "Failed to save lead");
     } finally {
       setIsSaving(false);
     }
@@ -261,7 +265,7 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-3xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           {lead ? "Edit Lead" : "Add New Lead"}
         </h3>
@@ -407,7 +411,16 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
 
         {/* Notes field - visible by default */}
         <div>
-          <Label htmlFor="notes">Notes</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="notes">Notes</Label>
+            <AIFieldButton
+              module="leads"
+              field="notes"
+              currentValue={formData.notes}
+              context={{ name: formData.name, company: formData.company, source: formData.source, status: formData.status, estimated_value: formData.estimated_value }}
+              onGenerate={(value) => setFormData({ ...formData, notes: value })}
+            />
+          </div>
           <textarea
             id="notes"
             placeholder="Additional notes about this lead..."
@@ -604,7 +617,16 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 pt-4">Requirements & Insights</h4>
             <div className="space-y-5">
               <div>
-                <Label htmlFor="requirements">Requirements</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="requirements">Requirements</Label>
+                  <AIFieldButton
+                    module="leads"
+                    field="requirements"
+                    currentValue={formData.requirements}
+                    context={{ name: formData.name, company: formData.company, industry: formData.industry, budget_range: formData.budget_range }}
+                    onGenerate={(value) => setFormData({ ...formData, requirements: value })}
+                  />
+                </div>
                 <textarea
                   id="requirements"
                   placeholder="What are they looking for?"
@@ -616,7 +638,16 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="pain_points">Pain Points</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="pain_points">Pain Points</Label>
+                  <AIFieldButton
+                    module="leads"
+                    field="pain_points"
+                    currentValue={formData.pain_points}
+                    context={{ name: formData.name, company: formData.company, industry: formData.industry, requirements: formData.requirements }}
+                    onGenerate={(value) => setFormData({ ...formData, pain_points: value })}
+                  />
+                </div>
                 <textarea
                   id="pain_points"
                   placeholder="What challenges are they facing?"

@@ -103,6 +103,7 @@ export const ProposalDetailsSidebar: React.FC<ProposalDetailsSidebarProps> = ({
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isPipelineLoading, setIsPipelineLoading] = useState(false);
 
   const status = statusConfig[proposal.status] || statusConfig.draft;
 
@@ -130,6 +131,27 @@ export const ProposalDetailsSidebar: React.FC<ProposalDetailsSidebarProps> = ({
       }
     } catch (err) {
       console.error("Error duplicating proposal:", err);
+    }
+  };
+
+  const handleGenerateContract = async () => {
+    setIsPipelineLoading(true);
+    try {
+      const res = await fetch("/api/pipeline/proposal-to-contract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposal_id: proposal.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.contract) {
+        window.location.href = `/dashboard/contracts/${data.contract.id}`;
+      } else {
+        alert(data.error || "Failed to generate contract");
+      }
+    } catch (err) {
+      console.error("Error generating contract:", err);
+    } finally {
+      setIsPipelineLoading(false);
     }
   };
 
@@ -238,12 +260,21 @@ export const ProposalDetailsSidebar: React.FC<ProposalDetailsSidebarProps> = ({
               </button>
             )}
             {proposal.status === "accepted" && !proposal.project_id && (
-              <button
-                onClick={handleConvertToProject}
-                className="rounded-lg bg-success-500 px-4 py-2 text-sm font-medium text-white hover:bg-success-600 transition-colors"
-              >
-                Convert to Project
-              </button>
+              <>
+                <button
+                  onClick={handleGenerateContract}
+                  disabled={isPipelineLoading}
+                  className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                >
+                  {isPipelineLoading ? "Generating..." : "Generate Contract"}
+                </button>
+                <button
+                  onClick={handleConvertToProject}
+                  className="rounded-lg bg-success-500 px-4 py-2 text-sm font-medium text-white hover:bg-success-600 transition-colors"
+                >
+                  Convert to Project
+                </button>
+              </>
             )}
           </div>
         </div>

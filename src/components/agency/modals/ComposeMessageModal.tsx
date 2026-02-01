@@ -3,6 +3,8 @@ import React, { useState, useRef } from "react";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
+import { toast } from "sonner";
 
 interface Attachment {
   url: string;
@@ -70,6 +72,7 @@ const categoryOptions = [
 
 export function ComposeMessageModal({ isOpen, onClose, type = "message" }: ComposeMessageModalProps) {
   const recipients = useRecipients();
+
   const [formData, setFormData] = useState({
     to: "",
     cc: "",
@@ -121,7 +124,7 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
         } else {
           const errorData = await response.json().catch(() => ({}));
           console.error("Failed to upload:", file.name, errorData.error || response.statusText);
-          alert(`Failed to upload ${file.name}: ${errorData.error || "Unknown error"}`);
+          toast.error(`Failed to upload ${file.name}: ${errorData.error || "Unknown error"}`);
         }
 
         setUploadingFiles((prev) => prev.filter((name) => name !== file.name));
@@ -172,7 +175,7 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
 
       if (!convRes.ok) {
         const errorData = await convRes.json().catch(() => ({}));
-        alert(errorData.error || "Failed to create conversation");
+        toast.error(errorData.error || "Failed to create conversation");
         setIsSending(false);
         return;
       }
@@ -190,7 +193,7 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
 
       if (!msgRes.ok) {
         const errorData = await msgRes.json().catch(() => ({}));
-        alert(errorData.error || "Failed to send message");
+        toast.error(errorData.error || "Failed to send message");
         setIsSending(false);
         return;
       }
@@ -208,7 +211,7 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
         });
       }
     } catch {
-      alert("Failed to send message. Please try again.");
+      toast.error("Failed to send message. Please try again.");
       setIsSending(false);
       return;
     }
@@ -232,7 +235,7 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           {isEmail ? "Compose Email" : "New Message"}
         </h3>
@@ -271,7 +274,16 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
           </div>
 
           <div className="sm:col-span-2">
-            <Label htmlFor="subject">Subject *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="subject">Subject *</Label>
+              <AIFieldButton
+                module="email"
+                field="subject"
+                currentValue={formData.subject}
+                context={{ to: formData.to, priority: formData.priority, category: formData.category }}
+                onGenerate={(value) => setFormData({ ...formData, subject: value })}
+              />
+            </div>
             <Input
               id="subject"
               placeholder="Enter subject"
@@ -353,7 +365,16 @@ export function ComposeMessageModal({ isOpen, onClose, type = "message" }: Compo
         )}
 
         <div>
-          <Label htmlFor="message">Message *</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="message">Message *</Label>
+            <AIFieldButton
+              module="email"
+              field="message"
+              currentValue={formData.message}
+              context={{ subject: formData.subject, to: formData.to, priority: formData.priority, category: formData.category }}
+              onGenerate={(value) => setFormData({ ...formData, message: value })}
+            />
+          </div>
           <textarea
             id="message"
             rows={6}

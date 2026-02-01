@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import Label from "@/components/form/Label";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 interface Client {
   id: string;
@@ -37,6 +39,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [leadId, setLeadId] = useState("");
+
   const [templateId, setTemplateId] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -108,12 +111,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create proposal");
+        toast.error(data.error || "Failed to create proposal");
+        return;
       }
 
       onCreated(data.proposal);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create proposal");
+      toast.error(err instanceof Error ? err.message : "Failed to create proposal");
     } finally {
       setIsSaving(false);
     }
@@ -124,7 +128,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-lg p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           Create Proposal
         </h3>
@@ -136,7 +140,16 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div>
-          <Label htmlFor="proposal-title">Proposal Title</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="proposal-title">Proposal Title</Label>
+            <AIFieldButton
+              module="proposals"
+              field="title"
+              currentValue={title}
+              context={{ clientId, leadId }}
+              onGenerate={(value) => setTitle(value)}
+            />
+          </div>
           <input
             id="proposal-title"
             type="text"

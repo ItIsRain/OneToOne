@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -168,7 +169,8 @@ export function ShareFileModal({ isOpen, onClose, onSuccess, preselectedFileId }
       const failedResponses = responses.filter((r) => !r.ok);
 
       if (failedResponses.length > 0) {
-        throw new Error(`Failed to create ${failedResponses.length} share(s)`);
+        toast.error(`Failed to create ${failedResponses.length} share(s)`);
+        return;
       }
 
       // Get the first share to return
@@ -183,7 +185,7 @@ export function ShareFileModal({ isOpen, onClose, onSuccess, preselectedFileId }
       handleClose();
     } catch (err) {
       console.error("Share creation error:", err);
-      setError(err instanceof Error ? err.message : "Failed to create share");
+      toast.error(err instanceof Error ? err.message : "Failed to create share");
     } finally {
       setIsSubmitting(false);
     }

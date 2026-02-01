@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
       { name: "Leads", path: "/dashboard/crm/leads", new: true },
       { name: "Contacts", path: "/dashboard/crm/contacts" },
       { name: "Pipeline", path: "/dashboard/crm/pipeline" },
+      { name: "Onboarding", path: "/dashboard/crm/onboarding", new: true },
     ],
   },
   {
@@ -56,6 +57,8 @@ const navItems: NavItem[] = [
       { name: "Tasks", path: "/dashboard/projects/tasks" },
       { name: "Kanban Board", path: "/dashboard/projects/kanban", new: true },
       { name: "Timeline", path: "/dashboard/projects/timeline" },
+      { name: "Scope Creep", path: "/dashboard/projects/scope-creep", new: true },
+      { name: "Pipeline", path: "/dashboard/projects/pipeline", new: true, pro: true },
     ],
   },
   {
@@ -93,6 +96,8 @@ const navItems: NavItem[] = [
       { name: "Expenses", path: "/dashboard/finance/expenses" },
       { name: "Payments", path: "/dashboard/finance/payments" },
       { name: "Budgets", path: "/dashboard/finance/budgets" },
+      { name: "Forecast", path: "/dashboard/finance/forecast", new: true },
+      { name: "Profitability", path: "/dashboard/finance/profitability", new: true },
     ],
   },
   {
@@ -102,6 +107,7 @@ const navItems: NavItem[] = [
       { name: "Members", path: "/dashboard/team" },
       { name: "Roles & Permissions", path: "/dashboard/team/roles" },
       { name: "Time Tracking", path: "/dashboard/team/time-tracking" },
+      { name: "Utilization", path: "/dashboard/team/utilization", new: true },
       { name: "Payroll", path: "/dashboard/team/payroll", pro: true },
     ],
   },
@@ -274,7 +280,7 @@ const AppSidebar: React.FC = () => {
     items: NavItem[],
     menuType: "main" | "secondary" | "settings"
   ) => (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col gap-0.5">
       {items.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
@@ -308,10 +314,15 @@ const AppSidebar: React.FC = () => {
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200 ${
                     openSubmenu?.type === menuType && openSubmenu?.index === index
-                      ? "rotate-180 text-brand-500"
+                      ? "rotate-180 text-white"
                       : ""
                   }`}
                 />
+              )}
+              {!isExpanded && !isHovered && !isMobileOpen && (
+                <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-[60]">
+                  {nav.name}
+                </span>
               )}
             </button>
           ) : (
@@ -334,6 +345,11 @@ const AppSidebar: React.FC = () => {
                 {(isExpanded || isHovered || isMobileOpen) && (
                   <span className="menu-item-text">{nav.name}</span>
                 )}
+                {!isExpanded && !isHovered && !isMobileOpen && (
+                  <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-[60]">
+                    {nav.name}
+                  </span>
+                )}
               </Link>
             )
           )}
@@ -350,7 +366,7 @@ const AppSidebar: React.FC = () => {
                     : "0px",
               }}
             >
-              <ul className="mt-2 space-y-1 ml-9">
+              <ul className="mt-2 space-y-1 ml-[22px] pl-4 border-l border-gray-200/60 dark:border-gray-700/40">
                 {nav.subItems.map((subItem) => (
                   <li key={subItem.name}>
                     <Link
@@ -361,6 +377,9 @@ const AppSidebar: React.FC = () => {
                           : "menu-dropdown-item-inactive"
                       }`}
                     >
+                      {isActive(subItem.path, true) && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-500 dark:bg-brand-400 shrink-0" />
+                      )}
                       {subItem.name}
                       <span className="flex items-center gap-1 ml-auto">
                         {subItem.new && (
@@ -399,7 +418,7 @@ const AppSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-r dark:border-gray-800/50 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.06)] dark:shadow-[2px_0_12px_-2px_rgba(0,0,0,0.3)]
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"
@@ -413,7 +432,7 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className="flex items-center justify-center py-8"
+        className="flex items-center justify-center py-6"
       >
         <Link href="/dashboard" className="flex items-center justify-center">
           {tenantInfoLoading && !customLogoUrl ? (
@@ -460,6 +479,7 @@ const AppSidebar: React.FC = () => {
           )}
         </Link>
       </div>
+      <div className="border-b border-gray-100 dark:border-gray-800/50 mx-2 mb-4" />
 
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar flex-1">
         <nav className="mb-6">
@@ -467,7 +487,7 @@ const AppSidebar: React.FC = () => {
             {/* Main Navigation */}
             <div>
               <h2
-                className={`mb-3 text-xs font-semibold uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
                   !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
                 }`}
               >
@@ -479,7 +499,7 @@ const AppSidebar: React.FC = () => {
             {/* Secondary Navigation */}
             <div>
               <h2
-                className={`mb-3 text-xs font-semibold uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
                   !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
                 }`}
               >
@@ -495,7 +515,7 @@ const AppSidebar: React.FC = () => {
             {/* Settings Navigation */}
             <div>
               <h2
-                className={`mb-3 text-xs font-semibold uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
                   !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
                 }`}
               >

@@ -5,6 +5,7 @@ import { widgetRegistry } from "@/lib/dashboard/widgetRegistry";
 
 export interface DashboardSettings {
   show_greeting: boolean;
+  show_briefing: boolean;
   show_metrics: boolean;
   show_quick_actions: boolean;
   show_onboarding: boolean;
@@ -13,6 +14,7 @@ export interface DashboardSettings {
   show_announcements: boolean;
   show_goals: boolean;
   show_bookmarks: boolean;
+  show_scope_creep: boolean;
   widget_order: string[];
   accent_color: string | null;
   banner_image_url: string | null;
@@ -29,6 +31,7 @@ interface DashboardCustomizePanelProps {
 
 const visibilityKeys: Record<string, keyof DashboardSettings> = {
   greeting: "show_greeting",
+  briefing: "show_briefing",
   metrics: "show_metrics",
   quick_actions: "show_quick_actions",
   onboarding: "show_onboarding",
@@ -37,6 +40,7 @@ const visibilityKeys: Record<string, keyof DashboardSettings> = {
   announcements: "show_announcements",
   goals: "show_goals",
   bookmarks: "show_bookmarks",
+  scope_creep: "show_scope_creep",
 };
 
 export function DashboardCustomizePanel({

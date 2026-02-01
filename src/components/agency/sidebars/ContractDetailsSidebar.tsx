@@ -96,6 +96,7 @@ export const ContractDetailsSidebar: React.FC<ContractDetailsSidebarProps> = ({
   const [activities, setActivities] = useState<ContractActivity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPipelineLoading, setIsPipelineLoading] = useState(false);
 
   // Fetch contract details and activities
   useEffect(() => {
@@ -130,6 +131,28 @@ export const ContractDetailsSidebar: React.FC<ContractDetailsSidebarProps> = ({
 
   const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
   const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+
+  const handleCreateProject = async () => {
+    if (!contract) return;
+    setIsPipelineLoading(true);
+    try {
+      const res = await fetch("/api/pipeline/contract-to-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contract_id: contract.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.project) {
+        window.location.href = `/dashboard/projects/${data.project.id}`;
+      } else {
+        alert(data.error || "Failed to create project");
+      }
+    } catch (err) {
+      console.error("Error creating project from contract:", err);
+    } finally {
+      setIsPipelineLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this contract?")) return;
@@ -220,6 +243,15 @@ export const ContractDetailsSidebar: React.FC<ContractDetailsSidebarProps> = ({
                 className="rounded-lg bg-success-500 px-4 py-2 text-sm font-medium text-white hover:bg-success-600 transition-colors"
               >
                 Sign Contract
+              </button>
+            )}
+            {(contract.is_signed || contract.status === "active") && !contract.project_id && (
+              <button
+                onClick={handleCreateProject}
+                disabled={isPipelineLoading}
+                className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+              >
+                {isPipelineLoading ? "Creating..." : "Create Project"}
               </button>
             )}
             <button

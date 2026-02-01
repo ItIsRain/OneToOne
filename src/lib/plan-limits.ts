@@ -41,6 +41,8 @@ export const PLAN_LIMITS = {
       contracts: false, // contracts builder requires Starter+
       booking: false, // booking/scheduling requires Starter+
       client_portal: false, // client portal requires Professional+
+      resource_utilization: false, // resource utilization requires Professional+
+      sow_pipeline: false, // SOW pipeline requires Professional+
     },
   },
   starter: {
@@ -77,6 +79,8 @@ export const PLAN_LIMITS = {
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
       client_portal: false, // client portal requires Professional+
+      resource_utilization: false, // resource utilization requires Professional+
+      sow_pipeline: false, // SOW pipeline requires Professional+
     },
   },
   professional: {
@@ -114,6 +118,8 @@ export const PLAN_LIMITS = {
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
       client_portal: true, // client portal enabled
+      resource_utilization: true, // resource utilization enabled
+      sow_pipeline: true, // SOW pipeline enabled
     },
   },
   business: {
@@ -151,6 +157,8 @@ export const PLAN_LIMITS = {
       contracts: true, // contracts builder enabled
       booking: true, // booking/scheduling enabled
       client_portal: true, // client portal enabled
+      resource_utilization: true, // resource utilization enabled
+      sow_pipeline: true, // SOW pipeline enabled
     },
   },
 };

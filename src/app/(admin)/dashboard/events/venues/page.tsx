@@ -535,6 +535,22 @@ export default function VenuesPage() {
         <EnquiryModal venue={selectedVenue} onClose={() => setSelectedVenue(null)} />
       )}
 
+      {/* Disclaimer Banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-500/30 dark:bg-orange-500/10">
+        <span className="mt-0.5 text-orange-500 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+            <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+          </svg>
+        </span>
+        <p className="text-sm text-orange-800 dark:text-orange-200">
+          All venues listed on this page are sourced from{" "}
+          <a href="https://www.findmyvenue.com/" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:no-underline">
+            FindMyVenue
+          </a>{" "}
+          and are not owned by, operated by, or affiliated with us. For enquiries, you will be redirected to FindMyVenue directly.
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

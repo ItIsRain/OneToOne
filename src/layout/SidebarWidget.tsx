@@ -54,7 +54,7 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
           {used}/{limit}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
         <div
           className={`h-full rounded-full transition-all duration-300 ${barColor}`}
           style={{ width: `${percent}%` }}
@@ -85,7 +85,7 @@ export default function SidebarWidget() {
   const isBusiness = planInfo.planType === "business";
 
   return (
-    <div className="mx-3 mb-6 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="mx-3 mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4 shadow-sm dark:border-gray-800/60 dark:bg-white/[0.03]">
       {/* Plan badge */}
       <div className="mb-3 flex items-center gap-2">
         <span
@@ -124,7 +124,7 @@ export default function SidebarWidget() {
       {config.showUpgrade && (
         <Link
           href="/dashboard/settings?tab=billing"
-          className="flex w-full items-center justify-center rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-600"
+          className="flex w-full items-center justify-center rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-600 shadow-sm shadow-brand-500/20"
         >
           Upgrade
         </Link>

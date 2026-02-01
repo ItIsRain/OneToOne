@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -170,7 +171,8 @@ export function UploadTemplateModal({ isOpen, onClose, onSuccess, editTemplate }
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to save template");
+        toast.error(data.error || "Failed to save template");
+        return;
       }
 
       const { template } = await res.json();
@@ -182,7 +184,7 @@ export function UploadTemplateModal({ isOpen, onClose, onSuccess, editTemplate }
       handleClose();
     } catch (err) {
       console.error("Template save error:", err);
-      setError(err instanceof Error ? err.message : "Failed to save template");
+      toast.error(err instanceof Error ? err.message : "Failed to save template");
     } finally {
       setIsUploading(false);
     }

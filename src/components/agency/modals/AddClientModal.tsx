@@ -1,11 +1,13 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import { GetCountries } from "react-country-state-city";
 import type { Client } from "../ClientsTable";
+import { AIFieldButton } from "@/components/ai/AIFieldButton";
 
 type Country = {
   id: number;
@@ -44,6 +46,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({
   client,
 }) => {
   const [formData, setFormData] = useState(initialFormData);
+
   const [countries, setCountries] = useState<Country[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -137,12 +140,13 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save client");
+        toast.error(data.error || "Failed to save client");
+        return;
       }
 
       onSave(data.client);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save client");
+      toast.error(err instanceof Error ? err.message : "Failed to save client");
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +183,7 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl p-6 lg:p-8">
-      <div className="mb-6">
+      <div className="mb-4">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
           {client ? "Edit Client" : "Add New Client"}
         </h3>
@@ -363,7 +367,16 @@ export const AddClientModal: React.FC<AddClientModalProps> = ({
             </div>
 
             <div>
-              <Label htmlFor="notes">Notes</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="notes">Notes</Label>
+                <AIFieldButton
+                  module="clients"
+                  field="notes"
+                  currentValue={formData.notes}
+                  context={{ name: formData.name, company: formData.company, industry: formData.industry, source: formData.source }}
+                  onGenerate={(value) => setFormData({ ...formData, notes: value })}
+                />
+              </div>
               <textarea
                 id="notes"
                 placeholder="Additional notes about this client..."

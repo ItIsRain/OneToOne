@@ -9,8 +9,9 @@ import {
   DashboardUpcoming,
   DashboardBookmarks,
   DashboardQuickActions,
+  MorningBriefing,
 } from "@/components/agency";
-import { WelcomeModal, DashboardOnboarding, DashboardGreeting } from "@/components/agency/dashboard";
+import { WelcomeModal, DashboardOnboarding, DashboardGreeting, ScopeCreepWidget } from "@/components/agency/dashboard";
 import type { Announcement, Goal } from "@/components/agency/dashboard";
 import {
   AddAnnouncementModal,
@@ -39,6 +40,7 @@ interface Bookmark {
 
 const defaultSettings: DashboardSettings = {
   show_greeting: true,
+  show_briefing: true,
   show_metrics: true,
   show_quick_actions: true,
   show_onboarding: true,
@@ -47,7 +49,8 @@ const defaultSettings: DashboardSettings = {
   show_announcements: true,
   show_goals: true,
   show_bookmarks: true,
-  widget_order: ["greeting", "metrics", "quick_actions", "onboarding", "activity", "upcoming", "announcements", "goals", "bookmarks"],
+  show_scope_creep: true,
+  widget_order: ["greeting", "briefing", "metrics", "quick_actions", "onboarding", "activity", "upcoming", "announcements", "goals", "bookmarks", "scope_creep"],
   accent_color: null,
   banner_image_url: null,
   banner_message: null,
@@ -193,6 +196,7 @@ export default function Dashboard() {
   const isVisible = (key: string) => {
     const visMap: Record<string, boolean> = {
       greeting: dashSettings.show_greeting,
+      briefing: dashSettings.show_briefing,
       metrics: dashSettings.show_metrics,
       quick_actions: dashSettings.show_quick_actions,
       onboarding: dashSettings.show_onboarding,
@@ -201,6 +205,7 @@ export default function Dashboard() {
       announcements: dashSettings.show_announcements,
       goals: dashSettings.show_goals,
       bookmarks: dashSettings.show_bookmarks,
+      scope_creep: dashSettings.show_scope_creep,
     };
     return visMap[key] !== false;
   };
@@ -211,6 +216,8 @@ export default function Dashboard() {
     switch (key) {
       case "greeting":
         return <DashboardGreeting key="greeting" />;
+      case "briefing":
+        return <MorningBriefing key={`briefing-${refreshKey}`} />;
       case "metrics":
         return <DashboardMetrics key={`metrics-${refreshKey}`} />;
       case "quick_actions":
@@ -274,6 +281,8 @@ export default function Dashboard() {
             onAdd={handleAddBookmark}
           />
         );
+      case "scope_creep":
+        return <ScopeCreepWidget key={`scope_creep-${refreshKey}`} />;
       default:
         return null;
     }

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
+import { toast } from "sonner";
 
 interface SendProposalModalProps {
   isOpen: boolean;
@@ -60,12 +61,13 @@ export const SendProposalModal: React.FC<SendProposalModalProps> = ({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to send proposal");
+        toast.error(data.error || "Failed to send proposal");
+        return;
       }
 
       onSent();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send proposal");
+      toast.error(err instanceof Error ? err.message : "Failed to send proposal");
     } finally {
       setIsSending(false);
     }

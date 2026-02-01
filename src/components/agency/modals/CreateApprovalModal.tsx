@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 
 interface DropdownOption {
   id: string;
@@ -152,13 +153,14 @@ export const CreateApprovalModal: React.FC<CreateApprovalModalProps> = ({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to create approval");
+        toast.error(data.error || "Failed to create approval");
+        return;
       }
 
       const data = await res.json();
       onCreated(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }

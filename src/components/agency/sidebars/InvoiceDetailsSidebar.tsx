@@ -11,6 +11,7 @@ interface InvoiceDetailsSidebarProps {
   onEdit: (invoice: Invoice) => void;
   onDelete?: (id: string) => void;
   onStatusChange?: (invoice: Invoice, newStatus: string) => void;
+  onInvoiceSent?: (invoice: Invoice) => void;
 }
 
 function formatDate(dateString: string | null): string {
@@ -49,8 +50,13 @@ export const InvoiceDetailsSidebar: React.FC<InvoiceDetailsSidebarProps> = ({
   onEdit,
   onDelete,
   onStatusChange,
+  onInvoiceSent,
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendCooldown, setSendCooldown] = useState(false);
+  const [sendResult, setSendResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   if (!invoice) return null;
 
@@ -69,6 +75,38 @@ export const InvoiceDetailsSidebar: React.FC<InvoiceDetailsSidebarProps> = ({
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleSendInvoice = async () => {
+    setIsSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSendResult({ type: "success", message: `Email sent to ${data.sentTo}` });
+      setSendCooldown(true);
+      setTimeout(() => setSendCooldown(false), 60000);
+      if (data.invoice && onInvoiceSent) {
+        onInvoiceSent(data.invoice);
+      }
+    } catch (err) {
+      setSendResult({ type: "error", message: err instanceof Error ? err.message : "Failed to send" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    const appUrl = window.location.origin;
+    const link = `${appUrl}/invoice/${invoice.id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
   };
 
   const headerActions = (
@@ -149,6 +187,63 @@ export const InvoiceDetailsSidebar: React.FC<InvoiceDetailsSidebarProps> = ({
             />
           </StatsGrid>
         </div>
+
+        {/* Send & Share */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleSendInvoice}
+            disabled={isSending || sendCooldown || (!invoice.client?.email && !invoice.billing_email)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              !invoice.client?.email && !invoice.billing_email
+                ? "No client email address"
+                : sendCooldown
+                ? "Email already sent"
+                : "Send invoice via email"
+            }
+          >
+            {isSending ? (
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : sendCooldown ? (
+              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+              </svg>
+            )}
+            {isSending ? "Sending..." : sendCooldown ? "Email Sent" : "Send via Email"}
+          </button>
+          <button
+            onClick={handleCopyLink}
+            className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 transition-colors"
+            title="Copy invoice link"
+          >
+            {linkCopied ? (
+              <svg className="h-4 w-4 text-success-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+              </svg>
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+              </svg>
+            )}
+            {linkCopied ? "Copied!" : "Copy Link"}
+          </button>
+        </div>
+        {sendResult && (
+          <div className={`rounded-lg px-3 py-2 text-sm ${
+            sendResult.type === "success"
+              ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
+              : "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"
+          }`}>
+            {sendResult.type === "success" ? "✓ " : ""}{sendResult.message}
+          </div>
+        )}
 
         {/* Invoice Details */}
         <Section title="Invoice Details">

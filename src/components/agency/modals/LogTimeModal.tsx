@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
+import { toast } from "sonner";
 import type { TimeEntry } from "../TimeEntriesTable";
 
 interface Project {
@@ -232,7 +233,8 @@ export function LogTimeModal({ isOpen, onClose, onSave, entry }: LogTimeModalPro
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save time entry");
+        toast.error(data.error || "Failed to save time entry");
+        return;
       }
 
       if (onSave) {
@@ -240,7 +242,7 @@ export function LogTimeModal({ isOpen, onClose, onSave, entry }: LogTimeModalPro
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSaving(false);
     }

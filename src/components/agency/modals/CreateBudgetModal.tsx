@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import type { Budget } from "../BudgetsTable";
@@ -248,12 +249,13 @@ export const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save budget");
+        toast.error(data.error || "Failed to save budget");
+        return;
       }
 
       onSave(data.budget);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save budget");
+      toast.error(err instanceof Error ? err.message : "Failed to save budget");
     } finally {
       setIsSaving(false);
     }

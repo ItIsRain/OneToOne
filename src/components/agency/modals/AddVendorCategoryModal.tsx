@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { toast } from "sonner";
 
 interface VendorCategory {
   id: string;
@@ -85,12 +86,13 @@ export const AddVendorCategoryModal: React.FC<AddVendorCategoryModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save category");
+        toast.error(data.error || "Failed to save category");
+        return;
       }
 
       onSave(data.category);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save category");
+      toast.error(err instanceof Error ? err.message : "Failed to save category");
     } finally {
       setIsSaving(false);
     }

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 
 interface FormEmbedModalProps {
@@ -26,7 +27,7 @@ export const FormEmbedModal: React.FC<FormEmbedModalProps> = ({
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
-      alert("Failed to copy to clipboard");
+      toast.error("Failed to copy to clipboard");
     }
   };
 

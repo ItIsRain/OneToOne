@@ -101,6 +101,8 @@ export const InvoicesTable = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -170,6 +172,43 @@ export const InvoicesTable = () => {
       alert(err instanceof Error ? err.message : "Failed to delete invoice");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSendInvoice = async (invoice: Invoice) => {
+    setSendingId(invoice.id);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.invoice) {
+        setInvoices(prev => prev.map(i => i.id === invoice.id ? data.invoice : i));
+        if (viewingInvoice?.id === invoice.id) {
+          setViewingInvoice(data.invoice);
+        }
+      }
+      setSentIds(prev => new Set(prev).add(invoice.id));
+      setTimeout(() => {
+        setSentIds(prev => {
+          const next = new Set(prev);
+          next.delete(invoice.id);
+          return next;
+        });
+      }, 60000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to send invoice");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const handleInvoiceSent = (updatedInvoice: Invoice) => {
+    setInvoices(prev => prev.map(i => i.id === updatedInvoice.id ? updatedInvoice : i));
+    if (viewingInvoice?.id === updatedInvoice.id) {
+      setViewingInvoice(updatedInvoice);
     }
   };
 
@@ -498,6 +537,24 @@ export const InvoicesTable = () => {
                           >
                             View
                           </button>
+                          {(invoice.client?.email || invoice.billing_email) && (
+                            <button
+                              onClick={() => handleSendInvoice(invoice)}
+                              disabled={sendingId === invoice.id || sentIds.has(invoice.id)}
+                              className={`text-theme-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                                sentIds.has(invoice.id)
+                                  ? "text-success-500"
+                                  : "text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                              }`}
+                              title={
+                                sentIds.has(invoice.id)
+                                  ? "Email sent"
+                                  : `Send to ${invoice.client?.email || invoice.billing_email}`
+                              }
+                            >
+                              {sendingId === invoice.id ? "..." : sentIds.has(invoice.id) ? "Sent" : "Send"}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEditInvoice(invoice)}
                             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-theme-sm font-medium"
@@ -539,6 +596,7 @@ export const InvoicesTable = () => {
         }}
         onDelete={handleDeleteInvoice}
         onStatusChange={handleStatusChange}
+        onInvoiceSent={handleInvoiceSent}
       />
     </>
   );

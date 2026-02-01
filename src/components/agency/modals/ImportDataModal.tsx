@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import {
@@ -186,7 +187,8 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Validation failed");
+        toast.error(result.error || "Validation failed");
+        return;
       }
 
       setValidCount(result.valid);
@@ -194,7 +196,7 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
       setDuplicateCount(result.duplicates);
       setValidationErrors(result.errors || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Validation failed");
+      toast.error(err instanceof Error ? err.message : "Validation failed");
     } finally {
       setIsProcessing(false);
     }
@@ -235,12 +237,13 @@ export const ImportDataModal: React.FC<ImportDataModalProps> = ({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Import failed");
+        toast.error(result.error || "Import failed");
+        return;
       }
 
       setImportResult(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
       setIsProcessing(false);
     }

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
+import { toast } from "sonner";
 
 interface SendContractModalProps {
   isOpen: boolean;
@@ -59,12 +60,13 @@ export const SendContractModal: React.FC<SendContractModalProps> = ({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to send contract");
+        toast.error(data.error || "Failed to send contract");
+        return;
       }
 
       onSent();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send contract");
+      toast.error(err instanceof Error ? err.message : "Failed to send contract");
     } finally {
       setIsSending(false);
     }

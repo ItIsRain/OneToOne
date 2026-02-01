@@ -5,10 +5,12 @@ export { DashboardGoals } from "./DashboardGoals";
 export { DashboardUpcoming } from "./DashboardUpcoming";
 export { DashboardBookmarks } from "./DashboardBookmarks";
 export { DashboardQuickActions } from "./DashboardQuickActions";
+export { MorningBriefing } from "./MorningBriefing";
 
 export { WelcomeModal } from "./WelcomeModal";
 export { DashboardOnboarding } from "./DashboardOnboarding";
 export { DashboardGreeting } from "./DashboardGreeting";
+export { ScopeCreepWidget } from "./ScopeCreepWidget";
 
 // Types
 export type { Announcement } from "./DashboardAnnouncements";

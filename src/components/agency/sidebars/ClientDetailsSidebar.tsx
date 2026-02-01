@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { DetailsSidebar, InfoRow, Section, StatsGrid, StatItem } from "@/components/ui/DetailsSidebar";
 import Badge from "@/components/ui/badge/Badge";
+import { ClientOnboardingPanel } from "../ClientOnboardingPanel";
 import type { Client } from "../ClientsTable";
 
 interface ClientDetailsSidebarProps {
@@ -213,6 +214,9 @@ export const ClientDetailsSidebar: React.FC<ClientDetailsSidebarProps> = ({
             </p>
           </Section>
         )}
+
+        {/* Onboarding */}
+        <ClientOnboardingPanel clientId={client.id} />
 
         {/* Metadata */}
         <div className="text-xs text-gray-400 space-y-1">

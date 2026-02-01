@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -209,7 +210,8 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save contact");
+        toast.error(data.error || "Failed to save contact");
+        return;
       }
 
       if (onSave) {
@@ -218,7 +220,7 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
         onClose();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save contact");
+      toast.error(err instanceof Error ? err.message : "Failed to save contact");
     } finally {
       setIsSaving(false);
     }

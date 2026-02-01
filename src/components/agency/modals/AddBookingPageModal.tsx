@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { toast } from "sonner";
 import type { BookingPage } from "../BookingPagesTable";
 
 interface AddBookingPageModalProps {
@@ -146,12 +147,13 @@ export const AddBookingPageModal: React.FC<AddBookingPageModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save booking page");
+        toast.error(data.error || "Failed to save booking page");
+        return;
       }
 
       onSave(data.bookingPage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save booking page");
+      toast.error(err instanceof Error ? err.message : "Failed to save booking page");
     } finally {
       setIsSaving(false);
     }

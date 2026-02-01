@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -317,13 +318,14 @@ export function NewContractModal({ isOpen, onClose, onSuccess, editContract }: N
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save contract");
+        toast.error(data.error || "Failed to save contract");
+        return;
       }
 
       onSuccess?.();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }

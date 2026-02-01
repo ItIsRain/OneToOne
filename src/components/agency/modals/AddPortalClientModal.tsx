@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { toast } from "sonner";
 
 interface ClientOption {
   id: string;
@@ -102,13 +103,14 @@ export const AddPortalClientModal: React.FC<AddPortalClientModalProps> = ({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to save portal client");
+        toast.error(data.error || "Failed to save portal client");
+        return;
       }
 
       const data = await res.json();
       onCreated(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }

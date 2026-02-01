@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -149,13 +150,14 @@ export const AddAnnouncementModal: React.FC<AddAnnouncementModalProps> = ({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save announcement");
+        toast.error(data.error || "Failed to save announcement");
+        return;
       }
 
       onSave(data.announcement);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setIsSaving(false);
     }
