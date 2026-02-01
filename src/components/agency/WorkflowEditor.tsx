@@ -1707,9 +1707,9 @@ function NodeConfigPanel({
             </div>
             {((node.config.delivery_method as string) || "call") === "call" && (
               <div>
-                <label className={labelClass}>Recipient Phone Number</label>
-                <input className={inputClass} value={(node.config.phone_number as string) ?? ""} onChange={(e) => update("phone_number", e.target.value)} placeholder="+1234567890" />
-                <p className="mt-1 text-xs text-gray-400">The phone number to call. International format with country code. Use <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">{"{{phone}}"}</code> for the trigger entity&apos;s phone.</p>
+                <label className={labelClass}>Recipient Phone Number <span className="text-red-500">*</span></label>
+                <input className={inputClass} value={(node.config.phone_number as string) ?? ""} onChange={(e) => update("phone_number", e.target.value)} onFocus={trackFocus("phone_number")} placeholder="+1234567890" />
+                <p className="mt-1 text-xs text-gray-400">The phone number to call. International format with country code. Use <code className="rounded bg-gray-100 px-1 dark:bg-gray-700">{"{{client_phone}}"}</code> for the client&apos;s phone.</p>
               </div>
             )}
             <div>
