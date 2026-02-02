@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const TEMPLATES = [
   {
@@ -526,6 +527,7 @@ export const WorkflowTemplates = () => {
       router.push(`/dashboard/automation/workflows/${wf.id}`);
     } catch (error) {
       console.error("Error creating workflow from template:", error);
+      toast.error("Failed to create workflow from template");
       setLoadingIndex(null);
     }
   };

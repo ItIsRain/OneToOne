@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createProjectSchema } from "@/lib/validations";
 
 export async function GET() {
   try {
@@ -77,6 +78,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createProjectSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Allowlist fields to prevent mass assignment
     const allowedFields = [
       "name", "description", "project_code", "status", "priority",
@@ -88,6 +95,36 @@ export async function POST(request: NextRequest) {
     const filtered: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (key in body) filtered[key] = body[key];
+    }
+
+    // Validate FK references belong to the same tenant
+    if (filtered.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", filtered.client_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (filtered.project_manager_id) {
+      const { data: pm } = await supabase
+        .from("profiles").select("id").eq("id", filtered.project_manager_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!pm) {
+        return NextResponse.json({ error: "Project manager not found in your organization" }, { status: 404 });
+      }
+    }
+    if (filtered.team_lead_id) {
+      const { data: tl } = await supabase
+        .from("profiles").select("id").eq("id", filtered.team_lead_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!tl) {
+        return NextResponse.json({ error: "Team lead not found in your organization" }, { status: 404 });
+      }
+    }
+    if (filtered.primary_contact_id) {
+      const { data: contact } = await supabase
+        .from("contacts").select("id").eq("id", filtered.primary_contact_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!contact) {
+        return NextResponse.json({ error: "Primary contact not found" }, { status: 404 });
+      }
     }
 
     // Create the project with tenant_id and created_by

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkTeamMemberLimit } from "@/lib/plan-limits";
 import { sendTeamInviteEmail } from "@/lib/email";
+import { validateBody, createTeamMemberSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -211,6 +212,12 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createTeamMemberSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Generate invite token
     const inviteToken = crypto.randomUUID();
     const inviteExpiresAt = new Date();
@@ -245,6 +252,15 @@ export async function POST(request: Request) {
         { error: "An invitation has already been sent to this email" },
         { status: 400 }
       );
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.manager_id) {
+      const { data: manager } = await supabase
+        .from("profiles").select("id").eq("id", body.manager_id).eq("tenant_id", currentProfile.tenant_id).single();
+      if (!manager) {
+        return NextResponse.json({ error: "Manager not found in your organization" }, { status: 404 });
+      }
     }
 
     // Prepare invite data

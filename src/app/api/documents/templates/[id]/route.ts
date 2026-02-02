@@ -186,7 +186,7 @@ export async function PATCH(
         const uploadResult = await cloudinary.uploader.upload(body.file, {
           folder: `templates/${profile.tenant_id}`,
           resource_type: "raw",
-          public_id: `${Date.now()}_${(body.name || existing.name).replace(/[^a-zA-Z0-9]/g, "_")}_v${existing.version + 1}`,
+          public_id: `${crypto.randomUUID().substring(0, 12)}_${(body.name || existing.name).replace(/[^a-zA-Z0-9]/g, "_")}_v${existing.version + 1}`,
         });
 
         // Extract file info

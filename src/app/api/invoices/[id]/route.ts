@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateInvoiceSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -122,6 +123,12 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateInvoiceSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Fields that should be null when empty (UUIDs and optional fields)
     const nullableUuidFields = ["client_id", "project_id", "event_id"];
     const nullableDateFields = ["issue_date", "due_date", "sent_date", "paid_at"];
@@ -142,12 +149,13 @@ export async function PATCH(
     const allowedFields = [
       "client_id", "project_id", "event_id", "title", "invoice_number",
       "subtotal", "tax_rate", "tax_amount", "discount_type", "discount_value",
-      "discount_amount", "total", "amount", "amount_paid", "currency", "status",
+      "discount_amount", "total", "amount", "currency", "status",
       "issue_date", "due_date", "sent_date", "paid_at", "payment_terms",
       "notes", "terms_and_conditions", "footer_note",
       "billing_name", "billing_email", "billing_address", "billing_city", "billing_country",
       "po_number", "reference_number", "tags"
     ];
+    // amount_paid is excluded — it should only be updated by the payments system
 
     const updates: Record<string, unknown> = {};
     allowedFields.forEach((field) => {
@@ -156,17 +164,24 @@ export async function PATCH(
       }
     });
 
+    // Auto-compute subtotal from items if items provided but subtotal is not
+    if (body.items && Array.isArray(body.items) && body.items.length > 0 && body.subtotal === undefined) {
+      body.subtotal = body.items.reduce((sum: number, item: Record<string, unknown>) => {
+        return sum + (parseFloat(item.quantity as string) || 1) * (parseFloat(item.unit_price as string) || 0);
+      }, 0);
+    }
+
     // Recalculate totals if financial fields changed
     if (body.subtotal !== undefined || body.tax_rate !== undefined || body.discount_value !== undefined) {
       const subtotal = parseFloat(body.subtotal) || 0;
       const taxRate = parseFloat(body.tax_rate) || 0;
-      const taxAmount = subtotal * (taxRate / 100);
+      const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
       const discountValue = parseFloat(body.discount_value) || 0;
       const discountType = body.discount_type || 'fixed';
       const discountAmount = discountType === 'percentage'
-        ? subtotal * (discountValue / 100)
+        ? Math.round(subtotal * (discountValue / 100) * 100) / 100
         : discountValue;
-      const total = subtotal + taxAmount - discountAmount;
+      const total = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
 
       updates.tax_amount = taxAmount;
       updates.discount_amount = discountAmount;
@@ -181,6 +196,24 @@ export async function PATCH(
       updates.total = updates.amount;
     }
 
+    // Validate invoice_number uniqueness within tenant
+    if (updates.invoice_number) {
+      const { data: existingInvoice } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("tenant_id", profile.tenant_id)
+        .eq("invoice_number", updates.invoice_number as string)
+        .neq("id", id)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        return NextResponse.json(
+          { error: "An invoice with this number already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     // Validate status transitions
     if (updates.status) {
       const { data: currentInvoice } = await supabase
@@ -193,8 +226,9 @@ export async function PATCH(
       if (currentInvoice) {
         const validTransitions: Record<string, string[]> = {
           draft: ["sent", "cancelled", "void"],
-          sent: ["paid", "overdue", "cancelled", "void", "draft"],
-          overdue: ["paid", "cancelled", "void", "sent"],
+          sent: ["paid", "partially_paid", "overdue", "cancelled", "void", "draft"],
+          overdue: ["paid", "partially_paid", "cancelled", "void", "sent"],
+          partially_paid: ["paid", "overdue", "cancelled", "void"],
           paid: ["void", "refunded"],
           cancelled: ["draft"],
           void: [],

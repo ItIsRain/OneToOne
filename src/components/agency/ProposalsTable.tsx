@@ -11,6 +11,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { CreateProposalModal } from "@/components/agency/modals/CreateProposalModal";
 import { ProposalDetailsSidebar } from "@/components/agency/sidebars/ProposalDetailsSidebar";
+import { toast } from "sonner";
 
 interface Proposal {
   id: string;
@@ -124,10 +125,14 @@ export const ProposalsTable: React.FC = () => {
         method: "POST",
       });
       if (res.ok) {
+        toast.success("Proposal duplicated");
         fetchProposals();
+      } else {
+        toast.error("Failed to duplicate proposal");
       }
     } catch (err) {
       console.error("Error duplicating proposal:", err);
+      toast.error("Failed to duplicate proposal");
     }
   };
 
@@ -140,9 +145,12 @@ export const ProposalsTable: React.FC = () => {
           setViewingProposal(null);
         }
         setProposals((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        toast.error("Failed to delete proposal");
       }
     } catch (err) {
       console.error("Error deleting proposal:", err);
+      toast.error("Failed to delete proposal");
     }
   };
 
@@ -150,10 +158,14 @@ export const ProposalsTable: React.FC = () => {
     try {
       const res = await fetch(`/api/proposals/${id}/send`, { method: "POST" });
       if (res.ok) {
+        toast.success("Proposal sent");
         fetchProposals();
+      } else {
+        toast.error("Failed to send proposal");
       }
     } catch (err) {
       console.error("Error sending proposal:", err);
+      toast.error("Failed to send proposal");
     }
   };
 
@@ -161,9 +173,9 @@ export const ProposalsTable: React.FC = () => {
     try {
       const url = `${window.location.origin}/proposal/${slug}`;
       await navigator.clipboard.writeText(url);
-      alert("Proposal link copied to clipboard!");
+      toast.success("Proposal link copied to clipboard!");
     } catch {
-      alert("Failed to copy link");
+      toast.error("Failed to copy link");
     }
   };
 

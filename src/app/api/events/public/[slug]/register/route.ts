@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantSubscription, checkAttendeeLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { validateBody, publicRegistrationSchema } from "@/lib/validations";
 
 export async function POST(
   request: NextRequest,
@@ -27,14 +28,14 @@ export async function POST(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { name, email, phone, company, notes } = body;
-
-    if (!name?.trim() || !email?.trim()) {
-      return NextResponse.json(
-        { error: "Name and email are required" },
-        { status: 400 }
-      );
+    // Validate input
+    const validation = validateBody(publicRegistrationSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+
+    const { name, email, phone, company } = validation.data;
+    const { notes } = body;
 
     // Get event by slug
     const { data: event, error: eventError } = await supabase

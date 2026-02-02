@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, eventAuthSchema } from "@/lib/validations";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.ATTENDEE_JWT_SECRET || "fallback-secret-for-build-only"
@@ -37,7 +38,14 @@ export async function POST(
     const { slug } = await params;
     const supabase = await createClient();
     const body = await request.json();
-    const { action, email, password, name, phone, company, skills, bio } = body;
+
+    // Validate input
+    const validation = validateBody(eventAuthSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { action, email, password, name, phone, company, skills, bio } = validation.data;
 
     // Get event by slug
     const { data: event, error: eventError } = await supabase

@@ -8,6 +8,7 @@ interface PortalLoginProps {
   logoUrl?: string;
   welcomeMessage?: string;
   primaryColor?: string;
+  initialError?: string | null;
 }
 
 export const PortalLogin: React.FC<PortalLoginProps> = ({
@@ -16,12 +17,13 @@ export const PortalLogin: React.FC<PortalLoginProps> = ({
   logoUrl,
   welcomeMessage,
   primaryColor = "#84cc16",
+  initialError = null,
 }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [useMagicLink, setUseMagicLink] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,19 +56,26 @@ export const PortalLogin: React.FC<PortalLoginProps> = ({
       }
 
       // Store auth info
-      localStorage.setItem("portal_client_id", data.portal_client_id);
+      localStorage.setItem("portal_client_id", data.portal_client.id);
+      localStorage.setItem("portal_session_token", data.session_token);
+      localStorage.setItem("portal_tenant_slug", tenantSlug);
+      localStorage.setItem("portal_tenant_name", data.tenant?.name || tenantName);
+      if (data.tenant?.logo_url) {
+        localStorage.setItem("portal_logo_url", data.tenant.logo_url);
+      }
+      localStorage.setItem("portal_primary_color", primaryColor || "#84cc16");
       localStorage.setItem(
         "portal_tenant",
         JSON.stringify({
           slug: tenantSlug,
-          name: tenantName,
-          logoUrl,
+          name: data.tenant?.name || tenantName,
+          logoUrl: data.tenant?.logo_url || logoUrl,
           primaryColor,
         })
       );
 
       // Redirect to dashboard
-      window.location.href = `/portal/${tenantSlug}`;
+      window.location.href = `/portal/${tenantSlug}/dashboard`;
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";

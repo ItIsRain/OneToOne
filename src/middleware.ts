@@ -109,27 +109,41 @@ export async function middleware(request: NextRequest) {
 
   const { isMainDomain, subdomain, isCustomDomain } = parseHostname(hostname);
 
-  // ── CSRF: Origin check for state-changing requests ──
-  const CSRF_EXEMPT = ["/api/stripe/webhook", "/api/cron"];
+  // ── CSRF: Origin/Referer check for state-changing requests ──
+  const CSRF_EXEMPT = ["/api/stripe/webhook", "/api/cron", "/api/portal/auth"];
   if (
     ["POST", "PUT", "PATCH", "DELETE"].includes(request.method) &&
     pathname.startsWith("/api/") &&
     !CSRF_EXEMPT.some((p) => pathname.startsWith(p))
   ) {
     const origin = request.headers.get("origin");
-    if (origin) {
-      const originHost = new URL(origin).hostname;
+    const referer = request.headers.get("referer");
+    const sourceUrl = origin || referer;
+
+    if (!sourceUrl) {
+      // No Origin or Referer — block the request (browsers always send at least one)
+      return applySecurityHeaders(
+        NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      );
+    }
+
+    try {
+      const sourceHost = new URL(sourceUrl).hostname;
       const host = hostname.split(":")[0];
       const baseDomain = isLocalDev() ? "localhost" : "1i1.ae";
       const isValidOrigin =
-        originHost === host ||
-        originHost === baseDomain ||
-        originHost.endsWith(`.${baseDomain}`);
+        sourceHost === host ||
+        sourceHost === baseDomain ||
+        sourceHost.endsWith(`.${baseDomain}`);
       if (!isValidOrigin) {
         return applySecurityHeaders(
           NextResponse.json({ error: "Forbidden" }, { status: 403 })
         );
       }
+    } catch {
+      return applySecurityHeaders(
+        NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      );
     }
   }
 

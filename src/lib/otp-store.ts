@@ -44,10 +44,12 @@ export async function storeOtp(email: string, otp: string, ttlMs: number = 10 * 
 export async function verifyOtp(email: string, otp: string): Promise<boolean> {
   const supabase = getServiceClient();
 
+  // Atomically delete and return the OTP record to prevent reuse
   const { data, error } = await supabase
     .from("otp_codes")
-    .select("otp_hash, expires_at")
+    .delete()
     .eq("email", email.toLowerCase())
+    .select("otp_hash, expires_at")
     .single();
 
   if (error || !data) {
@@ -56,18 +58,11 @@ export async function verifyOtp(email: string, otp: string): Promise<boolean> {
 
   // Check expiry
   if (new Date(data.expires_at) < new Date()) {
-    // Clean up expired OTP
-    await supabase.from("otp_codes").delete().eq("email", email.toLowerCase());
     return false;
   }
 
   // Compare hash
   const isValid = await bcrypt.compare(otp, data.otp_hash);
-
-  if (isValid) {
-    // Delete OTP after successful verification
-    await supabase.from("otp_codes").delete().eq("email", email.toLowerCase());
-  }
 
   return isValid;
 }

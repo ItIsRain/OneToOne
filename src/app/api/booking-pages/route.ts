@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createBookingPageSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -141,15 +142,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
-    }
-    if (!body.slug) {
-      return NextResponse.json({ error: "Slug is required" }, { status: 400 });
-    }
-    if (!body.duration_minutes) {
-      return NextResponse.json({ error: "Duration is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createBookingPageSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const bookingPageData = {

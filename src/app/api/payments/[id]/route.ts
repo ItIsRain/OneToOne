@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updatePaymentSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -113,6 +114,24 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updatePaymentSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Fetch existing payment to detect amount/status changes
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("invoice_id, amount, status")
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!existingPayment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    }
+
     // Fields that should be null when empty
     const nullableUuidFields = ["client_id", "invoice_id"];
     const nullableDateFields = ["payment_date"];
@@ -162,6 +181,53 @@ export async function PATCH(
         return NextResponse.json({ error: "Payment not found" }, { status: 404 });
       }
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Recalculate invoice amount_paid if payment amount or status changed
+    const amountChanged = body.amount !== undefined && body.amount !== existingPayment.amount;
+    const statusChanged = body.status !== undefined && body.status !== existingPayment.status;
+    const invoiceId = existingPayment.invoice_id;
+
+    if (invoiceId && (amountChanged || statusChanged)) {
+      // Sum all completed payments for this invoice
+      const { data: allPayments } = await supabase
+        .from("payments")
+        .select("amount, status")
+        .eq("invoice_id", invoiceId)
+        .eq("tenant_id", profile.tenant_id)
+        .eq("status", "completed");
+
+      const totalPaid = (allPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("total, amount, status")
+        .eq("id", invoiceId)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (invoice) {
+        const invoiceTotal = invoice.total || invoice.amount || 0;
+        let newStatus = invoice.status;
+        if (totalPaid >= invoiceTotal && invoiceTotal > 0) {
+          newStatus = "paid";
+        } else if (totalPaid > 0) {
+          newStatus = "partially_paid";
+        } else if (invoice.status === "paid" || invoice.status === "partially_paid") {
+          newStatus = "sent";
+        }
+
+        await supabase
+          .from("invoices")
+          .update({
+            amount_paid: totalPaid,
+            status: newStatus,
+            paid_at: newStatus === "paid" ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", invoiceId)
+          .eq("tenant_id", profile.tenant_id);
+      }
     }
 
     return NextResponse.json({ payment });
@@ -218,23 +284,36 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If payment was linked to an invoice and was completed, update the invoice amount_paid
+    // If payment was linked to an invoice and was completed, recalculate invoice amount_paid
     if (existingPayment?.invoice_id && existingPayment.status === "completed") {
+      // Sum all remaining completed payments for this invoice
+      const { data: remainingPayments } = await supabase
+        .from("payments")
+        .select("amount")
+        .eq("invoice_id", existingPayment.invoice_id)
+        .eq("tenant_id", profile.tenant_id)
+        .eq("status", "completed");
+
+      const newAmountPaid = (remainingPayments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+
       const { data: invoice } = await supabase
         .from("invoices")
-        .select("amount_paid, total, amount")
+        .select("total, amount, status")
         .eq("id", existingPayment.invoice_id)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
       if (invoice) {
-        const newAmountPaid = Math.max(0, (invoice.amount_paid || 0) - existingPayment.amount);
         const invoiceTotal = invoice.total || invoice.amount || 0;
-        let newStatus = "sent";
-        if (newAmountPaid > 0 && newAmountPaid < invoiceTotal) {
-          newStatus = "partially_paid";
-        } else if (newAmountPaid >= invoiceTotal) {
+        let newStatus = invoice.status;
+        if (newAmountPaid >= invoiceTotal && invoiceTotal > 0) {
           newStatus = "paid";
+        } else if (newAmountPaid > 0) {
+          newStatus = "partially_paid";
+        } else {
+          // No payments left — restore to previous non-payment status
+          // Keep "overdue" if it was overdue, otherwise revert to "sent"
+          newStatus = invoice.status === "overdue" ? "overdue" : "sent";
         }
 
         await supabase

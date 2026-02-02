@@ -300,7 +300,7 @@ export async function POST(request: Request) {
     const uploadResult = await cloudinary.uploader.upload(file, {
       folder: `documents/${profile.tenant_id}`,
       resource_type: resourceType,
-      public_id: `${Date.now()}_${name.replace(/\.[^/.]+$/, "")}`,
+      public_id: `${crypto.randomUUID().substring(0, 12)}_${name.replace(/\.[^/.]+$/, "")}`,
       use_filename: true,
       unique_filename: true,
     });

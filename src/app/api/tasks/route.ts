@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { NextRequest, NextResponse } from "next/server";
+import { validateBody, createTaskSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -124,6 +125,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createTaskSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Allowlist fields to prevent mass assignment
     const allowedFields = [
       "title", "description", "status", "priority", "assigned_to",
@@ -136,6 +143,34 @@ export async function POST(request: NextRequest) {
     const filtered: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (key in body) filtered[key] = body[key];
+    }
+
+    // Validate assigned_to belongs to same tenant
+    if (filtered.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", filtered.assigned_to as string)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 400 });
+      }
+    }
+
+    // Validate parent_task_id belongs to same tenant and prevent self-reference
+    if (filtered.parent_task_id) {
+      const { data: parentTask } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("id", filtered.parent_task_id as string)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!parentTask) {
+        return NextResponse.json({ error: "Parent task not found" }, { status: 400 });
+      }
     }
 
     // Create the task with tenant_id and created_by

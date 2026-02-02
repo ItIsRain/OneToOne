@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createVendorEventSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -76,6 +77,18 @@ export async function GET(
       );
     }
 
+    // Verify vendor belongs to this tenant
+    const { data: vendor } = await supabase
+      .from("vendors")
+      .select("id")
+      .eq("id", vendorId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!vendor) {
+      return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+    }
+
     const { data: events, error } = await supabase
       .from("event_vendors")
       .select("*, event:events(*)")
@@ -141,10 +154,24 @@ export async function POST(
       );
     }
 
+    // Verify vendor belongs to this tenant
+    const { data: vendor } = await supabase
+      .from("vendors")
+      .select("id")
+      .eq("id", vendorId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!vendor) {
+      return NextResponse.json({ error: "Vendor not found" }, { status: 404 });
+    }
+
     const body = await request.json();
 
-    if (!body.event_id) {
-      return NextResponse.json({ error: "event_id is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createVendorEventSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const { data: eventVendor, error } = await supabase

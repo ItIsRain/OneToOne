@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateProfileSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -71,6 +72,12 @@ export async function PATCH(request: Request) {
     }
 
     const updates = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateProfileSchema, updates);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
 
     // Only allow updating specific fields
     const allowedFields = [

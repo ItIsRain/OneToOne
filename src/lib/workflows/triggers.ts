@@ -1,6 +1,9 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { executeWorkflow } from "./engine";
 
+const MAX_TRIGGER_DEPTH = 5;
+let currentTriggerDepth = 0;
+
 export async function checkTriggers(
   triggerType: string,
   triggerData: Record<string, unknown>,
@@ -8,6 +11,11 @@ export async function checkTriggers(
   tenantId: string,
   userId: string
 ): Promise<void> {
+  // Prevent infinite workflow loops
+  if (currentTriggerDepth >= MAX_TRIGGER_DEPTH) {
+    console.warn(`[TRIGGER] Max trigger depth (${MAX_TRIGGER_DEPTH}) reached for ${triggerType}, skipping to prevent infinite loop`);
+    return;
+  }
   // Query active workflows matching the trigger type and tenant
   const { data: workflows, error } = await supabase
     .from("workflows")
@@ -21,6 +29,8 @@ export async function checkTriggers(
     return;
   }
 
+  currentTriggerDepth++;
+  try {
   for (const workflow of workflows) {
     try {
       const triggerConfig = workflow.trigger_config as Record<string, unknown> | null;
@@ -185,5 +195,8 @@ export async function checkTriggers(
         err instanceof Error ? err.message : String(err)
       );
     }
+  }
+  } finally {
+    currentTriggerDepth--;
   }
 }

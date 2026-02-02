@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateProjectSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -91,6 +92,12 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateProjectSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Allowlist fields to prevent mass assignment
     const allowedFields = [
       "name", "description", "project_code", "status", "priority",
@@ -102,6 +109,36 @@ export async function PATCH(
     const filtered: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (key in body) filtered[key] = body[key];
+    }
+
+    // Validate FK references belong to the same tenant
+    if (filtered.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", filtered.client_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (filtered.project_manager_id) {
+      const { data: pm } = await supabase
+        .from("profiles").select("id").eq("id", filtered.project_manager_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!pm) {
+        return NextResponse.json({ error: "Project manager not found in your organization" }, { status: 404 });
+      }
+    }
+    if (filtered.team_lead_id) {
+      const { data: tl } = await supabase
+        .from("profiles").select("id").eq("id", filtered.team_lead_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!tl) {
+        return NextResponse.json({ error: "Team lead not found in your organization" }, { status: 404 });
+      }
+    }
+    if (filtered.primary_contact_id) {
+      const { data: contact } = await supabase
+        .from("contacts").select("id").eq("id", filtered.primary_contact_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!contact) {
+        return NextResponse.json({ error: "Primary contact not found" }, { status: 404 });
+      }
     }
 
     // Fetch old project for status change trigger
@@ -189,6 +226,37 @@ export async function DELETE(
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check for dependent records before deleting
+    const [
+      tasksCheck, invoicesCheck, expensesCheck,
+      budgetsCheck, timeEntriesCheck, contractsCheck,
+      subProjectsCheck,
+    ] = await Promise.all([
+      supabase.from("tasks").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("invoices").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("expenses").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("budgets").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("time_entries").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("project_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("parent_project_id", id).eq("tenant_id", profile.tenant_id),
+    ]);
+
+    const deps: string[] = [];
+    if (tasksCheck.count && tasksCheck.count > 0) deps.push(`${tasksCheck.count} task(s)`);
+    if (invoicesCheck.count && invoicesCheck.count > 0) deps.push(`${invoicesCheck.count} invoice(s)`);
+    if (expensesCheck.count && expensesCheck.count > 0) deps.push(`${expensesCheck.count} expense(s)`);
+    if (budgetsCheck.count && budgetsCheck.count > 0) deps.push(`${budgetsCheck.count} budget(s)`);
+    if (timeEntriesCheck.count && timeEntriesCheck.count > 0) deps.push(`${timeEntriesCheck.count} time entry(ies)`);
+    if (contractsCheck.count && contractsCheck.count > 0) deps.push(`${contractsCheck.count} contract(s)`);
+    if (subProjectsCheck.count && subProjectsCheck.count > 0) deps.push(`${subProjectsCheck.count} sub-project(s)`);
+
+    if (deps.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete project with existing ${deps.join(", ")}. Please remove or reassign them first.` },
+        { status: 409 }
+      );
     }
 
     const { error } = await supabase.from("projects").delete().eq("id", id).eq("tenant_id", profile.tenant_id);

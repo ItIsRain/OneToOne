@@ -82,15 +82,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's profile to find tenant_id
+    // Get user's profile to find tenant_id and role
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    if (!["owner", "admin"].includes(profile.role)) {
+      return NextResponse.json({ error: "Only admins can update company settings" }, { status: 403 });
     }
 
     const body = await request.json();

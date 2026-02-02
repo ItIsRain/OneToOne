@@ -1,35 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
-
-function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
-async function validatePortalClient(supabase: ReturnType<typeof getServiceClient>, portalClientId: string) {
-  const { data, error } = await supabase
-    .from("portal_clients")
-    .select("id, client_id, tenant_id, name, email, is_active")
-    .eq("id", portalClientId)
-    .eq("is_active", true)
-    .single();
-
-  if (error || !data) return null;
-  return data;
-}
+import { getPortalServiceClient, validatePortalClient, getPortalAuthHeaders } from "@/lib/portal-auth";
 
 // GET - Fetch portal client's projects
 export async function GET(request: Request) {
   try {
-    const portalClientId = request.headers.get("x-portal-client-id");
+    const { portalClientId, sessionToken } = getPortalAuthHeaders(request);
     if (!portalClientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceClient();
-    const portalClient = await validatePortalClient(supabase, portalClientId);
+    const supabase = getPortalServiceClient();
+    const portalClient = await validatePortalClient(supabase, portalClientId, sessionToken);
     if (!portalClient) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -50,11 +31,12 @@ export async function GET(request: Request) {
     // Fetch task counts per project
     const projectIds = (projects || []).map((p) => p.id);
     let taskCounts: Record<string, number> = {};
+    let completedTaskCounts: Record<string, number> = {};
 
     if (projectIds.length > 0) {
       const { data: tasks, error: tasksError } = await supabase
         .from("tasks")
-        .select("project_id")
+        .select("project_id, status")
         .in("project_id", projectIds);
 
       if (!tasksError && tasks) {
@@ -62,13 +44,24 @@ export async function GET(request: Request) {
           acc[task.project_id] = (acc[task.project_id] || 0) + 1;
           return acc;
         }, {});
+        completedTaskCounts = tasks
+          .filter((t) => t.status === "completed" || t.status === "done")
+          .reduce((acc: Record<string, number>, task) => {
+            acc[task.project_id] = (acc[task.project_id] || 0) + 1;
+            return acc;
+          }, {});
       }
     }
 
-    const projectsWithCounts = (projects || []).map((project) => ({
-      ...project,
-      tasks_count: taskCounts[project.id] || 0,
-    }));
+    const projectsWithCounts = (projects || []).map((project) => {
+      const total = taskCounts[project.id] || 0;
+      const completed = completedTaskCounts[project.id] || 0;
+      return {
+        ...project,
+        tasks_count: total,
+        progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+      };
+    });
 
     return NextResponse.json({ projects: projectsWithCounts });
   } catch (error) {

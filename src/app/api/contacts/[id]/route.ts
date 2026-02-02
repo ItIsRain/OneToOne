@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateContactSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -114,17 +115,39 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Validate email format if provided
-    if (body.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(body.email)) {
-        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(updateContactSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
       }
     }
-    if (body.secondary_email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(body.secondary_email)) {
-        return NextResponse.json({ error: "Invalid secondary email address" }, { status: 400 });
+    if (body.lead_id) {
+      const { data: lead } = await supabase
+        .from("leads").select("id").eq("id", body.lead_id).eq("tenant_id", profile.tenant_id).single();
+      if (!lead) {
+        return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+      }
+    }
+    if (body.reports_to) {
+      const { data: reportsToContact } = await supabase
+        .from("contacts").select("id").eq("id", body.reports_to).eq("tenant_id", profile.tenant_id).single();
+      if (!reportsToContact) {
+        return NextResponse.json({ error: "Reports-to contact not found" }, { status: 404 });
+      }
+    }
+    if (body.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
       }
     }
 

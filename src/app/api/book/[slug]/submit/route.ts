@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { validateBody, publicBookingSubmitSchema } from "@/lib/validations";
 
 // PUBLIC route - no auth required, uses service role client
 // POST - Submit a booking
@@ -43,18 +44,10 @@ export async function POST(
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.client_name) {
-      return NextResponse.json({ error: "Client name is required" }, { status: 400 });
-    }
-    if (!body.client_email) {
-      return NextResponse.json({ error: "Client email is required" }, { status: 400 });
-    }
-    if (!body.start_time) {
-      return NextResponse.json({ error: "Start time is required" }, { status: 400 });
-    }
-    if (!body.end_time) {
-      return NextResponse.json({ error: "End time is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(publicBookingSubmitSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const requestedStart = new Date(body.start_time);

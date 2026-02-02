@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createContractSchema } from "@/lib/validations";
 import { checkTriggers } from "@/lib/workflows/triggers";
 
 async function getSupabaseClient() {
@@ -137,13 +138,38 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    if (!body.title) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createContractSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (body.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", body.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (body.proposal_id) {
+      const { data: proposal } = await supabase
+        .from("proposals").select("id").eq("id", body.proposal_id).eq("tenant_id", profile.tenant_id).single();
+      if (!proposal) {
+        return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+      }
     }
 
     // Auto-generate slug from title
     const baseSlug = body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const randomSuffix = crypto.randomUUID().substring(0, 8);
     const slug = `${baseSlug}-${randomSuffix}`;
 
     const contractData = {

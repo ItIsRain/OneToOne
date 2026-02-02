@@ -29,9 +29,19 @@ const createDefaultField = (type: string): FormField => {
     signature: "Signature",
     section_heading: "Section Heading",
     paragraph: "Paragraph Text",
+    nps: "Net Promoter Score",
+    scale: "Scale Rating",
+    testimonial: "Testimonial",
   };
 
   const needsOptions = ["select", "multi_select", "radio", "checkbox"];
+
+  const defaultValidation: Record<string, Record<string, unknown>> = {
+    rating: { maxStars: 5 },
+    scale: { scale_min: 1, scale_max: 5, low_label: "", high_label: "" },
+    nps: {},
+    testimonial: {},
+  };
 
   return {
     id,
@@ -42,8 +52,7 @@ const createDefaultField = (type: string): FormField => {
     options: needsOptions.includes(type)
       ? ["Option 1", "Option 2", "Option 3"]
       : [],
-    validation:
-      type === "rating" ? { maxStars: 5 } : {},
+    validation: defaultValidation[type] || {},
     description: "",
     width: "full",
   };

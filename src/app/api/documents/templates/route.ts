@@ -236,7 +236,7 @@ export async function POST(request: Request) {
     const uploadResult = await cloudinary.uploader.upload(body.file, {
       folder: `templates/${profile.tenant_id}`,
       resource_type: "raw",
-      public_id: `${Date.now()}_${body.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
+      public_id: `${crypto.randomUUID().substring(0, 12)}_${body.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
     });
 
     const templateData = {

@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateAppointmentSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -152,6 +153,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateAppointmentSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
 
     // Fetch current appointment to detect status changes
     const { data: currentAppointment } = await supabase

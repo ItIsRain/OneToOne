@@ -112,6 +112,59 @@ export async function POST(request: Request) {
     }
     const v = validation.data;
 
+    // If payment is linked to an invoice and completed, validate before insert
+    if (v.invoice_id && v.status === "completed") {
+      const { data: invoice } = await supabase
+        .from("invoices")
+        .select("amount_paid, total, amount, status, currency")
+        .eq("id", v.invoice_id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!invoice) {
+        return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+      }
+
+      // Validate currency matches invoice
+      if (invoice.currency && v.currency && invoice.currency !== v.currency) {
+        return NextResponse.json(
+          { error: `Currency mismatch: payment is ${v.currency} but invoice is ${invoice.currency}` },
+          { status: 400 }
+        );
+      }
+
+      // Don't allow payments on cancelled/void/refunded invoices
+      const nonPayableStatuses = ["cancelled", "void", "refunded"];
+      if (nonPayableStatuses.includes(invoice.status)) {
+        return NextResponse.json(
+          { error: `Cannot add payment to ${invoice.status} invoice` },
+          { status: 400 }
+        );
+      }
+
+      // Validate: prevent overpayment
+      const paymentAmount = parseFloat(String(v.amount));
+      const currentPaid = invoice.amount_paid || 0;
+      const invoiceTotal = invoice.total || invoice.amount || 0;
+
+      if (currentPaid + paymentAmount > invoiceTotal) {
+        const remaining = Math.max(0, invoiceTotal - currentPaid);
+        return NextResponse.json(
+          { error: `Payment would exceed invoice total. Remaining balance: ${remaining.toFixed(2)} ${invoice.currency || v.currency}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate client_id belongs to the same tenant
+    if (v.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", v.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+
     const paymentData = {
       tenant_id: profile.tenant_id,
       invoice_id: v.invoice_id || null,
@@ -144,57 +197,31 @@ export async function POST(request: Request) {
     }
 
     // If payment is linked to an invoice and completed, update the invoice
-    if (body.invoice_id && body.status === "completed") {
-      // Get current invoice (scoped to tenant)
+    if (v.invoice_id && v.status === "completed") {
       const { data: invoice } = await supabase
         .from("invoices")
         .select("amount_paid, total, amount, status, currency")
-        .eq("id", body.invoice_id)
+        .eq("id", v.invoice_id)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
       if (invoice) {
-        // Validate currency matches invoice
-        if (invoice.currency && v.currency && invoice.currency !== v.currency) {
-          await supabase.from("payments").delete().eq("id", payment.id);
-          return NextResponse.json(
-            { error: `Currency mismatch: payment is ${v.currency} but invoice is ${invoice.currency}` },
-            { status: 400 }
-          );
-        }
+        const paymentAmount = parseFloat(String(v.amount));
+        const currentPaid = invoice.amount_paid || 0;
+        const invoiceTotal = invoice.total || invoice.amount || 0;
+        const newAmountPaid = currentPaid + paymentAmount;
+        const newStatus = newAmountPaid >= invoiceTotal ? "paid" : "partially_paid";
 
-        // Don't update cancelled/void/refunded invoices
-        const nonPayableStatuses = ["cancelled", "void", "refunded"];
-        if (!nonPayableStatuses.includes(invoice.status)) {
-          const paymentAmount = parseFloat(body.amount);
-          const currentPaid = invoice.amount_paid || 0;
-          const invoiceTotal = invoice.total || invoice.amount || 0;
-
-          // Validate: prevent overpayment
-          if (currentPaid + paymentAmount > invoiceTotal) {
-            // Delete the payment we just created since it would cause overpayment
-            await supabase.from("payments").delete().eq("id", payment.id);
-            const remaining = Math.max(0, invoiceTotal - currentPaid);
-            return NextResponse.json(
-              { error: `Payment would exceed invoice total. Remaining balance: ${remaining.toFixed(2)} ${invoice.currency || v.currency}` },
-              { status: 400 }
-            );
-          }
-
-          const newAmountPaid = currentPaid + paymentAmount;
-          const newStatus = newAmountPaid >= invoiceTotal ? "paid" : "partially_paid";
-
-          await supabase
-            .from("invoices")
-            .update({
-              amount_paid: newAmountPaid,
-              status: newStatus,
-              paid_at: newAmountPaid >= invoiceTotal ? new Date().toISOString() : null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", body.invoice_id)
-            .eq("tenant_id", profile.tenant_id);
-        }
+        await supabase
+          .from("invoices")
+          .update({
+            amount_paid: newAmountPaid,
+            status: newStatus,
+            paid_at: newAmountPaid >= invoiceTotal ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", v.invoice_id)
+          .eq("tenant_id", profile.tenant_id);
       }
     }
 

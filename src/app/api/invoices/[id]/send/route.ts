@@ -56,6 +56,19 @@ export async function POST(
       // No body is fine — we'll use the client email
     }
 
+    // Validate custom email format if provided
+    if (customEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (typeof customEmail !== "string" || !emailRegex.test(customEmail) || customEmail.length > 254) {
+        return NextResponse.json({ error: "Invalid email address format" }, { status: 400 });
+      }
+    }
+
+    // Sanitize custom message to prevent header injection
+    if (customMessage) {
+      customMessage = customMessage.replace(/[\r\n]/g, " ").substring(0, 200);
+    }
+
     // Determine recipient
     const client = invoice.client as { id: string; name: string; email: string | null; company: string | null } | null;
     const recipientEmail = customEmail || client?.email || invoice.billing_email;

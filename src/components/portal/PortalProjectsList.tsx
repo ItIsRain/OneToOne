@@ -53,12 +53,16 @@ export const PortalProjectsList: React.FC<PortalProjectsListProps> = ({
   useEffect(() => {
     const fetchProjects = async () => {
       try {
+        const sessionToken = localStorage.getItem("portal_session_token") || "";
         const res = await fetch("/api/portal/projects", {
-          headers: { "x-portal-client-id": portalClientId },
+          headers: {
+            "x-portal-client-id": portalClientId,
+            "x-portal-session-token": sessionToken,
+          },
         });
         if (!res.ok) throw new Error("Failed to load projects");
         const json = await res.json();
-        setProjects(json);
+        setProjects(json.projects || json || []);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {

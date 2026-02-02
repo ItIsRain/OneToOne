@@ -43,7 +43,7 @@ export interface Invoice {
   amount: number;
   amount_paid: number;
   currency: string;
-  status: "draft" | "sent" | "viewed" | "paid" | "partially_paid" | "overdue" | "cancelled" | "refunded";
+  status: "draft" | "sent" | "viewed" | "paid" | "partially_paid" | "overdue" | "cancelled" | "refunded" | "void";
   issue_date: string;
   due_date: string | null;
   sent_date: string | null;
@@ -90,6 +90,7 @@ const statusConfig: Record<string, { label: string; color: "success" | "warning"
   overdue: { label: "Overdue", color: "error" },
   cancelled: { label: "Cancelled", color: "light" },
   refunded: { label: "Refunded", color: "light" },
+  void: { label: "Void", color: "light" },
 };
 
 export const InvoicesTable = () => {

@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Button from "@/components/ui/button/Button";
+import { toast } from "sonner";
 
 interface ContractTemplate {
   id: string;
@@ -64,9 +65,12 @@ export const ContractTemplatesTable: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         window.location.href = `/dashboard/contracts/${data.contract.id}`;
+      } else {
+        toast.error("Failed to create contract from template");
       }
     } catch (err) {
       console.error("Error creating contract from template:", err);
+      toast.error("Failed to create contract from template");
     }
   };
 
@@ -82,9 +86,12 @@ export const ContractTemplatesTable: React.FC = () => {
       });
       if (res.ok) {
         setTemplates((prev) => prev.filter((t) => t.id !== id));
+      } else {
+        toast.error("Failed to delete template");
       }
     } catch (err) {
       console.error("Error deleting template:", err);
+      toast.error("Failed to delete template");
     }
   };
 

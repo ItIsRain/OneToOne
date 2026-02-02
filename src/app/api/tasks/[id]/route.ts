@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateTaskSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -111,6 +112,12 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateTaskSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Allowlist fields to prevent mass assignment
     const allowedFields = [
       "title", "description", "status", "priority", "assigned_to",
@@ -123,6 +130,43 @@ export async function PATCH(
     const updates: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (key in body) updates[key] = body[key];
+    }
+
+    // Validate assigned_to belongs to same tenant
+    if (updates.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", updates.assigned_to as string)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 400 });
+      }
+    }
+
+    // Validate parent_task_id and prevent circular references
+    if (updates.parent_task_id) {
+      if (updates.parent_task_id === id) {
+        return NextResponse.json({ error: "Task cannot be its own parent" }, { status: 400 });
+      }
+
+      const { data: parentTask } = await supabase
+        .from("tasks")
+        .select("id, parent_task_id")
+        .eq("id", updates.parent_task_id as string)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!parentTask) {
+        return NextResponse.json({ error: "Parent task not found" }, { status: 400 });
+      }
+
+      // Check one level up to prevent simple circular chains
+      if (parentTask.parent_task_id === id) {
+        return NextResponse.json({ error: "Circular task dependency detected" }, { status: 400 });
+      }
     }
 
     // Fetch old task for status change trigger

@@ -110,15 +110,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate invoice number
+    // Generate invoice number with uniqueness check
     const year = new Date().getFullYear().toString().slice(-2);
     const { count } = await supabase
       .from("invoices")
       .select("*", { count: "exact", head: true })
       .eq("tenant_id", profile.tenant_id);
 
-    const nextNumber = (count || 0) + 1;
-    const invoiceNumber = `INV-${year}-${nextNumber.toString().padStart(4, "0")}`;
+    let nextNumber = (count || 0) + 1;
+    let invoiceNumber = `INV-${year}-${nextNumber.toString().padStart(4, "0")}`;
+
+    // Check uniqueness and increment if collision
+    const { data: existingInvNum } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("tenant_id", profile.tenant_id)
+      .eq("invoice_number", invoiceNumber)
+      .maybeSingle();
+
+    if (existingInvNum) {
+      nextNumber++;
+      invoiceNumber = `INV-${year}-${nextNumber.toString().padStart(4, "0")}`;
+    }
 
     const currency = task.project?.currency || "USD";
     const milestoneName = task.title.replace(/^Milestone:\s*/, "");
@@ -164,7 +177,7 @@ export async function POST(request: Request) {
     }
 
     // Insert single line item
-    await supabase.from("invoice_items").insert({
+    const { error: itemError } = await supabase.from("invoice_items").insert({
       invoice_id: invoice.id,
       description: `Milestone payment: ${milestoneName}`,
       quantity: 1,
@@ -173,6 +186,16 @@ export async function POST(request: Request) {
       amount: amount,
       sort_order: 0,
     });
+
+    if (itemError) {
+      console.error("Pipeline invoice item creation error:", itemError);
+      // Clean up the orphaned invoice
+      await supabase.from("invoices").delete().eq("id", invoice.id);
+      return NextResponse.json(
+        { error: itemError.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ invoice });
   } catch (error) {

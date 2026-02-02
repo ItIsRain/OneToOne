@@ -32,7 +32,12 @@ export async function POST(
 
     const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await request.json();
+    let body: { reason?: string } = {};
+    try {
+      body = await request.json();
+    } catch {
+      // Body is optional for decline
+    }
 
     const now = new Date().toISOString();
 
@@ -41,7 +46,7 @@ export async function POST(
       .update({
         status: "declined",
         declined_at: now,
-        decline_reason: body.reason || null,
+        decline_reason: body?.reason || null,
         updated_at: now,
       })
       .eq("slug", slug)

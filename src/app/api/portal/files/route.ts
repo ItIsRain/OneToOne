@@ -1,36 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
-
-function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
-async function validatePortalClient(supabase: ReturnType<typeof getServiceClient>, portalClientId: string) {
-  const { data, error } = await supabase
-    .from("portal_clients")
-    .select("id, client_id, tenant_id, name, email, is_active")
-    .eq("id", portalClientId)
-    .eq("is_active", true)
-    .single();
-
-  if (error || !data) return null;
-  return data;
-}
+import { getPortalServiceClient, validatePortalClient, getPortalAuthHeaders } from "@/lib/portal-auth";
 
 // GET - List files for portal client
 export async function GET(request: Request) {
   try {
-    const portalClientId = request.headers.get("x-portal-client-id");
+    const { portalClientId, sessionToken } = getPortalAuthHeaders(request);
     if (!portalClientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceClient();
-    const portalClient = await validatePortalClient(supabase, portalClientId);
+    const supabase = getPortalServiceClient();
+    const portalClient = await validatePortalClient(supabase, portalClientId, sessionToken);
     if (!portalClient) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -56,13 +37,13 @@ export async function GET(request: Request) {
 // POST - Upload file metadata
 export async function POST(request: Request) {
   try {
-    const portalClientId = request.headers.get("x-portal-client-id");
+    const { portalClientId, sessionToken } = getPortalAuthHeaders(request);
     if (!portalClientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceClient();
-    const portalClient = await validatePortalClient(supabase, portalClientId);
+    const supabase = getPortalServiceClient();
+    const portalClient = await validatePortalClient(supabase, portalClientId, sessionToken);
     if (!portalClient) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -72,6 +53,44 @@ export async function POST(request: Request) {
 
     if (!file_name || !file_url) {
       return NextResponse.json({ error: "File name and URL are required" }, { status: 400 });
+    }
+
+    // Validate file_url is a legitimate URL (must be HTTPS and from known storage domains)
+    try {
+      const parsedUrl = new URL(file_url);
+      if (parsedUrl.protocol !== "https:") {
+        return NextResponse.json({ error: "File URL must use HTTPS" }, { status: 400 });
+      }
+      const allowedHosts = [
+        "res.cloudinary.com",
+        "cloudinary.com",
+        process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : "",
+      ].filter(Boolean);
+      const isAllowed = allowedHosts.some((host) => parsedUrl.hostname === host || parsedUrl.hostname.endsWith(`.${host}`));
+      if (!isAllowed) {
+        return NextResponse.json({ error: "File URL must point to an allowed storage provider" }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid file URL" }, { status: 400 });
+    }
+
+    // Validate file_name length
+    if (typeof file_name !== "string" || file_name.length > 500) {
+      return NextResponse.json({ error: "File name must be under 500 characters" }, { status: 400 });
+    }
+
+    // Validate project_id belongs to the portal client's tenant
+    if (project_id) {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", project_id)
+        .eq("tenant_id", portalClient.tenant_id)
+        .single();
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
     }
 
     const { data: file, error: insertError } = await supabase

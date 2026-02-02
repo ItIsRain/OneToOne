@@ -275,6 +275,12 @@ async function executeStep(
         throw new Error("Missing entity_id, entity_type, or field_name for update_field");
       }
 
+      // Block updating protected fields
+      const protectedFields = ["id", "tenant_id", "created_by", "created_at"];
+      if (protectedFields.includes(fieldName)) {
+        throw new Error(`Cannot update protected field: ${fieldName}`);
+      }
+
       const tableName = resolveTableName(entityType);
 
       const { error } = await supabase
@@ -2006,8 +2012,14 @@ function resolveTableName(entityType: string): string {
     payment: "payments",
     contact: "contacts",
     vendor: "vendors",
+    form: "forms",
+    appointment: "appointments",
+    survey: "surveys",
   };
-  return map[entityType] || "tasks";
+  if (!map[entityType]) {
+    throw new Error(`Unknown entity type: ${entityType}`);
+  }
+  return map[entityType];
 }
 
 async function markRunStatus(supabase: SupabaseClient, runId: string, status: string, errorMessage?: string) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateTimeEntrySchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -127,6 +128,13 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateTimeEntrySchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     const isAdmin = ["owner", "admin"].includes(currentProfile.role);
     const isOwner = existingEntry.user_id === user.id;
 
@@ -138,6 +146,11 @@ export async function PATCH(
     // Can't edit invoiced entries
     if (existingEntry.status === "invoiced" && !isAdmin) {
       return NextResponse.json({ error: "Cannot edit invoiced entries" }, { status: 400 });
+    }
+
+    // Non-admins can't edit submitted or approved entries (prevent post-approval tampering)
+    if (["submitted", "approved"].includes(existingEntry.status) && !isAdmin) {
+      return NextResponse.json({ error: "Cannot edit entries that have been submitted for review" }, { status: 400 });
     }
 
     // Calculate duration if start and end time provided

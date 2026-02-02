@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
+import { validateBody, createJudgeSchema } from "@/lib/validations";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -124,11 +125,14 @@ export async function POST(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const { email, name } = await request.json();
+    const body = await request.json();
 
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createJudgeSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { email, name } = validation.data;
 
     // Check if judge already exists
     const { data: existingJudge } = await supabase

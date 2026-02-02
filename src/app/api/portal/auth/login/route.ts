@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { hashSessionToken } from "@/lib/portal-auth";
 
 function getServiceClient() {
   return createServiceClient(
@@ -65,13 +66,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Magic link has expired" }, { status: 401 });
       }
 
+      // Generate session token for secure subsequent requests
+      const sessionToken = crypto.randomUUID();
+      const sessionTokenHash = hashSessionToken(sessionToken);
+
       // Clear the magic link token after use and update last_login_at
+      const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       await supabase
         .from("portal_clients")
         .update({
           magic_link_token: null,
           magic_link_expires_at: null,
           last_login_at: new Date().toISOString(),
+          session_token: sessionTokenHash,
+          session_token_expires_at: sessionExpiresAt,
         })
         .eq("id", portalClient.id);
 
@@ -96,6 +104,7 @@ export async function POST(request: Request) {
           avatar_url: portalClient.avatar_url,
           client_id: portalClient.client_id,
         },
+        session_token: sessionToken,
         tenant: {
           id: tenant.id,
           name: tenant.name,
@@ -138,10 +147,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    // Update last_login_at
+    // Generate session token for secure subsequent requests
+    const sessionToken = crypto.randomUUID();
+    const sessionTokenHash = hashSessionToken(sessionToken);
+
+    // Update last_login_at and store session token with 24h expiry
+    const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await supabase
       .from("portal_clients")
-      .update({ last_login_at: new Date().toISOString() })
+      .update({
+        last_login_at: new Date().toISOString(),
+        session_token: sessionTokenHash,
+        session_token_expires_at: sessionExpiresAt,
+      })
       .eq("id", portalClient.id);
 
     // Trigger workflow
@@ -165,6 +183,7 @@ export async function POST(request: Request) {
         avatar_url: portalClient.avatar_url,
         client_id: portalClient.client_id,
       },
+      session_token: sessionToken,
       tenant: {
         id: tenant.id,
         name: tenant.name,

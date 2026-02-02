@@ -47,12 +47,16 @@ export const PortalFilesList: React.FC<PortalFilesListProps> = ({
 
   const fetchFiles = async () => {
     try {
+      const sessionToken = localStorage.getItem("portal_session_token") || "";
       const res = await fetch("/api/portal/files", {
-        headers: { "x-portal-client-id": portalClientId },
+        headers: {
+          "x-portal-client-id": portalClientId,
+          "x-portal-session-token": sessionToken,
+        },
       });
       if (!res.ok) throw new Error("Failed to load files");
       const json = await res.json();
-      setFiles(json);
+      setFiles(json.files || json || []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -93,11 +97,13 @@ export const PortalFilesList: React.FC<PortalFilesListProps> = ({
 
     setUploading(true);
     try {
+      const uploadSessionToken = localStorage.getItem("portal_session_token") || "";
       const res = await fetch("/api/portal/files", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-portal-client-id": portalClientId,
+          "x-portal-session-token": uploadSessionToken,
         },
         body: JSON.stringify({
           file_name: newFileName || newFileUrl.split("/").pop() || "file",

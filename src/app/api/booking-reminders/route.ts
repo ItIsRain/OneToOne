@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createBookingReminderSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -147,15 +148,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.booking_page_id) {
-      return NextResponse.json({ error: "Booking page ID is required" }, { status: 400 });
-    }
-    if (!body.type) {
-      return NextResponse.json({ error: "Reminder type is required" }, { status: 400 });
-    }
-    if (body.minutes_before === undefined || body.minutes_before === null) {
-      return NextResponse.json({ error: "Minutes before is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createBookingReminderSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const reminderData = {

@@ -196,6 +196,7 @@ export const ProposalBuilder: React.FC<ProposalBuilderProps> = ({
     ];
     newSections.forEach((s, i) => (s.order = i));
     setSections(newSections);
+    setHasUnsavedChanges(true);
   };
 
   const handleMoveDown = (index: number) => {
@@ -207,6 +208,7 @@ export const ProposalBuilder: React.FC<ProposalBuilderProps> = ({
     ];
     newSections.forEach((s, i) => (s.order = i));
     setSections(newSections);
+    setHasUnsavedChanges(true);
   };
 
   const handleAddSection = (type: string) => {
@@ -276,14 +278,14 @@ export const ProposalBuilder: React.FC<ProposalBuilderProps> = ({
             <Button variant="outline" size="sm" onClick={handlePreview}>
               Preview
             </Button>
-            <span title={proposal.status !== "draft" ? `Cannot send: proposal is ${proposal.status}` : ""}>
+            <span title={!["draft", "sent"].includes(proposal.status) ? `Cannot send: proposal is ${proposal.status}` : ""}>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSendModal(true)}
-                disabled={proposal.status !== "draft"}
+                disabled={!["draft", "sent"].includes(proposal.status)}
               >
-                Send
+                {proposal.status === "sent" ? "Resend" : "Send"}
               </Button>
             </span>
             <Button size="sm" onClick={handleSave} disabled={saving}>

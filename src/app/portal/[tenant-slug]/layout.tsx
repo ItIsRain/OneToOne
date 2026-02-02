@@ -36,10 +36,11 @@ export default function PortalLayoutPage({
 
     // Check for portal session
     const storedClientId = localStorage.getItem("portal_client_id");
+    const storedSessionToken = localStorage.getItem("portal_session_token");
     const storedTenantSlug = localStorage.getItem("portal_tenant_slug");
 
-    if (!storedClientId || storedTenantSlug !== tenantSlug) {
-      // Not logged in or wrong tenant
+    if (!storedClientId || !storedSessionToken || storedTenantSlug !== tenantSlug) {
+      // Not logged in, missing session token, or wrong tenant
       router.push(`/portal/${tenantSlug}`);
       return;
     }

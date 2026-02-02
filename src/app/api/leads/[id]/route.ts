@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateLeadSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -114,11 +115,25 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Validate email format if provided
-    if (body.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(body.email)) {
-        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(updateLeadSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
+      }
+    }
+    if (body.converted_to_client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.converted_to_client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
       }
     }
 

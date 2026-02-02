@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Button from "@/components/ui/button/Button";
+import { toast } from "sonner";
 
 interface ProposalTemplate {
   id: string;
@@ -66,9 +67,12 @@ export const ProposalTemplatesTable: React.FC = () => {
       });
       if (res.ok) {
         setTemplates((prev) => prev.filter((t) => t.id !== id));
+      } else {
+        toast.error("Failed to delete template");
       }
     } catch (err) {
       console.error("Error deleting template:", err);
+      toast.error("Failed to delete template");
     }
   };
 

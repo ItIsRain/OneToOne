@@ -68,11 +68,13 @@ export const PortalApprovalCard: React.FC<PortalApprovalCardProps> = ({
     setError(null);
 
     try {
+      const sessionToken = localStorage.getItem("portal_session_token") || "";
       const res = await fetch("/api/portal/approvals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-portal-client-id": portalClientId,
+          "x-portal-session-token": sessionToken,
         },
         body: JSON.stringify({
           approval_id: approval.id,

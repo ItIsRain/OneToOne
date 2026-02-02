@@ -146,6 +146,46 @@ export async function POST(
       return NextResponse.json({ contract }, { status: 201 });
     }
 
+    // Standard mode: duplicate check — prevent converting the same proposal twice
+    const { data: existingProject } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("name", proposal.title)
+      .eq("tenant_id", proposal.tenant_id)
+      .eq("client_id", proposal.client_id || "")
+      .maybeSingle();
+
+    if (existingProject) {
+      // Also check if an invoice already exists linked to that project
+      const { data: existingInvoice } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("project_id", existingProject.id)
+        .eq("tenant_id", proposal.tenant_id)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        return NextResponse.json(
+          { error: "This proposal has already been converted to a project and invoice", project_id: existingProject.id, invoice_id: existingInvoice.id },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Validate client still exists if proposal references one
+    if (proposal.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("id", proposal.client_id)
+        .eq("tenant_id", proposal.tenant_id)
+        .single();
+
+      if (!client) {
+        return NextResponse.json({ error: "The client associated with this proposal no longer exists" }, { status: 400 });
+      }
+    }
+
     // Create project from proposal
     const { data: project, error: projectError } = await supabase
       .from("projects")
@@ -165,6 +205,14 @@ export async function POST(
       return NextResponse.json({ error: projectError.message }, { status: 500 });
     }
 
+    // Generate invoice number
+    const year = new Date().getFullYear().toString().slice(-2);
+    const { count: invoiceCount } = await supabase
+      .from("invoices")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", proposal.tenant_id);
+    const invoiceNumber = `INV-${year}-${((invoiceCount || 0) + 1).toString().padStart(4, "0")}`;
+
     // Build invoice items from pricing_items
     const pricingItems = proposal.pricing_items || [];
     const invoiceItems = pricingItems.map((item: Record<string, unknown>, index: number) => ({
@@ -180,6 +228,7 @@ export async function POST(
       .from("invoices")
       .insert({
         tenant_id: proposal.tenant_id,
+        invoice_number: invoiceNumber,
         client_id: proposal.client_id,
         project_id: project.id,
         title: `Invoice for ${proposal.title}`,
@@ -195,6 +244,8 @@ export async function POST(
 
     if (invoiceError) {
       console.error("Create invoice error:", invoiceError);
+      // Clean up project if invoice creation fails
+      await supabase.from("projects").delete().eq("id", project.id);
       return NextResponse.json({ error: invoiceError.message }, { status: 500 });
     }
 

@@ -42,7 +42,7 @@ export async function POST(
       );
     }
 
-    if (typeof signature_data !== "string" || signature_data.length > 500000) {
+    if (typeof signature_data !== "string" || signature_data.length > 200000) {
       return NextResponse.json(
         { error: "Signature data is too large" },
         { status: 400 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { sendTeamInviteEmail } from "@/lib/email";
+import { validateBody, updateTeamMemberSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -240,6 +241,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateTeamMemberSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
 
     // Fields that should be null when empty
     const nullableUuidFields = ["manager_id", "custom_role_id"];
@@ -518,6 +525,7 @@ export async function POST(
       teamName,
       role: invite.role,
       inviteToken: newInviteToken,
+      tenantId: currentProfile.tenant_id,
     });
 
     if (!emailSent) {

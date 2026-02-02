@@ -27,12 +27,16 @@ export async function GET(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    if (!["owner", "admin"].includes(profile.role)) {
+      return NextResponse.json({ error: "Only admins can manage API keys" }, { status: 403 });
     }
 
     // Check plan feature access for API access
@@ -101,12 +105,16 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    if (!["owner", "admin"].includes(profile.role)) {
+      return NextResponse.json({ error: "Only admins can manage API keys" }, { status: 403 });
     }
 
     // Check plan feature access for API access

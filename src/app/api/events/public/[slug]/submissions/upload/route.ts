@@ -47,9 +47,22 @@ export async function POST(
       return NextResponse.json({ error: "File size must be less than 10MB" }, { status: 400 });
     }
 
+    // Validate MIME type - block executable and script files
+    const blockedTypes = [
+      "application/x-executable", "application/x-msdos-program", "application/x-msdownload",
+      "application/x-sh", "application/x-csh", "application/x-httpd-php",
+      "text/html", "application/javascript", "text/javascript",
+      "application/x-bat", "application/x-msi",
+    ];
+    const blockedExtensions = [".exe", ".bat", ".cmd", ".sh", ".ps1", ".msi", ".dll", ".com", ".scr", ".php", ".js", ".html", ".htm", ".hta", ".vbs", ".wsf"];
+    const fileExt = "." + file.name.split(".").pop()?.toLowerCase();
+    if (blockedTypes.includes(file.type) || blockedExtensions.includes(fileExt)) {
+      return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+    }
+
     // Create a unique filename
     const timestamp = Date.now();
-    const randomStr = Math.random().toString(36).substring(2, 8);
+    const randomStr = crypto.randomUUID().substring(0, 8);
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
     const fileName = `${payload.attendeeId}/${timestamp}_${randomStr}_${sanitizedName}`;
 

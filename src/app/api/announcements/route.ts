@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
+import { validateBody, createAnnouncementSchema } from "@/lib/validations";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -135,11 +136,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    if (!body.title || !body.content) {
-      return NextResponse.json(
-        { error: "Title and content are required" },
-        { status: 400 }
-      );
+    // Validate input
+    const validation = validateBody(createAnnouncementSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     // Handle image upload if provided

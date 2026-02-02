@@ -61,6 +61,17 @@ export async function GET() {
       return NextResponse.json({ error: featureCheck.reason, upgrade_required: true }, { status: 403 });
     }
 
+    // Check user role - only admins/owners can manage portal clients
+    const { data: currentProfile } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentProfile || !["owner", "admin"].includes(currentProfile.role)) {
+      return NextResponse.json({ error: "Only admins can manage portal clients" }, { status: 403 });
+    }
+
     const { data: portalClients, error } = await serviceClient
       .from("portal_clients")
       .select("*, clients(id, name, email, company)")
@@ -110,6 +121,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: featureCheck.reason, upgrade_required: true }, { status: 403 });
     }
 
+    const { data: currentProfile } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentProfile || !["owner", "admin"].includes(currentProfile.role)) {
+      return NextResponse.json({ error: "Only admins can manage portal clients" }, { status: 403 });
+    }
+
     const body = await request.json();
     const { email, password, name, client_id, avatar_url } = body;
 
@@ -127,6 +148,20 @@ export async function POST(request: Request) {
 
     if (existing) {
       return NextResponse.json({ error: "A portal client with this email already exists" }, { status: 409 });
+    }
+
+    // Validate client_id belongs to the tenant
+    if (client_id) {
+      const { data: client } = await serviceClient
+        .from("clients")
+        .select("id")
+        .eq("id", client_id)
+        .eq("tenant_id", planInfo.tenantId)
+        .single();
+
+      if (!client) {
+        return NextResponse.json({ error: "Client not found in your organization" }, { status: 404 });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -186,6 +221,16 @@ export async function PUT(request: Request) {
     const featureCheck = checkFeatureAccess(planInfo.planType, "client_portal");
     if (!featureCheck.allowed) {
       return NextResponse.json({ error: featureCheck.reason, upgrade_required: true }, { status: 403 });
+    }
+
+    const { data: currentProfile } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentProfile || !["owner", "admin"].includes(currentProfile.role)) {
+      return NextResponse.json({ error: "Only admins can manage portal clients" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -254,6 +299,16 @@ export async function DELETE(request: Request) {
     const featureCheck = checkFeatureAccess(planInfo.planType, "client_portal");
     if (!featureCheck.allowed) {
       return NextResponse.json({ error: featureCheck.reason, upgrade_required: true }, { status: 403 });
+    }
+
+    const { data: currentProfile } = await serviceClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentProfile || !["owner", "admin"].includes(currentProfile.role)) {
+      return NextResponse.json({ error: "Only admins can manage portal clients" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

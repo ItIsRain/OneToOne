@@ -108,7 +108,7 @@ export async function POST(request: Request) {
 
     // Sanitize the filename for public_id
     const sanitizedName = sanitizePublicId(fileName || "file");
-    const publicId = `${Date.now()}-${sanitizedName}`;
+    const publicId = `${crypto.randomUUID().substring(0, 12)}-${sanitizedName}`;
 
     // For audio/video, we need to ensure the data URI is properly formatted
     // Cloudinary accepts data URIs but needs them to be valid
@@ -197,7 +197,7 @@ export async function PUT(request: Request) {
         : "raw";
 
       const sanitizedName = sanitizePublicId(fileName || "file");
-      const publicId = `${Date.now()}-${sanitizedName}`;
+      const publicId = `${crypto.randomUUID().substring(0, 12)}-${sanitizedName}`;
 
       // Handle data URI format for audio/video
       let uploadData = file;

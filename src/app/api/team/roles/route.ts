@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, createRoleSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -117,9 +118,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.name?.trim()) {
-      return NextResponse.json({ error: "Role name is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createRoleSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const roleData = {

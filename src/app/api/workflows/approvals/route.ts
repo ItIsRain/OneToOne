@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { executeWorkflow } from "@/lib/workflows/engine";
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,12 +95,39 @@ export async function PATCH(request: NextRequest) {
         })
         .eq("id", stepExecution.id);
 
-      // If approved, resume the workflow run
+      // If approved, resume the workflow by re-executing from the next step
       if (status === "approved" && stepExecution.run_id) {
         await supabase
           .from("workflow_runs")
           .update({ status: "running" })
           .eq("id", stepExecution.run_id);
+
+        // Fetch the workflow run to get workflow_id, trigger_data, tenant_id
+        const { data: workflowRun } = await supabase
+          .from("workflow_runs")
+          .select("workflow_id, trigger_data, tenant_id, triggered_by")
+          .eq("id", stepExecution.run_id)
+          .single();
+
+        if (workflowRun) {
+          // Re-execute the workflow - it will skip already-completed steps
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl && supabaseServiceKey) {
+            const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+            try {
+              await executeWorkflow(
+                workflowRun.workflow_id,
+                (workflowRun.trigger_data as Record<string, unknown>) || {},
+                serviceClient,
+                workflowRun.triggered_by || user.id,
+                workflowRun.tenant_id
+              );
+            } catch (err) {
+              console.error("Failed to resume workflow after approval:", err);
+            }
+          }
+        }
       }
 
       // If rejected, fail the workflow run

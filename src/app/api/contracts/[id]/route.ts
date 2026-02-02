@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateContractSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -113,6 +114,12 @@ export async function PUT(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateContractSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     const allowedFields = [
       "name",
       "slug",
@@ -136,7 +143,7 @@ export async function PUT(
       }
     }
 
-    // Validate status transitions - prevent reverting finalized contracts
+    // Validate status transitions
     if (updates.status) {
       const { data: current } = await supabase
         .from("contracts")
@@ -146,10 +153,21 @@ export async function PUT(
         .single();
 
       if (current) {
-        const immutableStatuses = ["signed", "declined"];
-        if (immutableStatuses.includes(current.status) && updates.status !== current.status) {
+        const validTransitions: Record<string, string[]> = {
+          draft: ["sent", "active"],
+          sent: ["viewed", "active", "signed", "declined", "expired", "draft"],
+          viewed: ["active", "signed", "declined", "expired", "sent"],
+          pending_signature: ["active", "signed", "declined"],
+          active: ["terminated", "expired"],
+          signed: [],
+          declined: ["draft"],
+          expired: ["draft"],
+          terminated: [],
+        };
+        const allowed = validTransitions[current.status] || [];
+        if (!allowed.includes(updates.status as string)) {
           return NextResponse.json(
-            { error: `Cannot change status of a ${current.status} contract` },
+            { error: `Cannot transition from "${current.status}" to "${updates.status}"` },
             { status: 400 }
           );
         }
@@ -181,6 +199,9 @@ export async function PUT(
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }
+
+// PATCH - Alias for PUT
+export const PATCH = PUT;
 
 // DELETE - Delete a contract
 export async function DELETE(

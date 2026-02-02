@@ -24,12 +24,6 @@ const STRIPE_PRICE_IDS: Record<string, { monthly: string; yearly: string }> = {
   },
 };
 
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter",
-  professional: "Professional",
-  business: "Business",
-};
-
 type PlanType = "starter" | "professional" | "business";
 type BillingInterval = "monthly" | "yearly";
 
@@ -44,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { planType: rawPlanType, billingInterval: rawBillingInterval, discountCode } = body;
+    const { planType: rawPlanType, billingInterval: rawBillingInterval } = body;
 
     if (!rawPlanType || !["starter", "professional", "business"].includes(rawPlanType)) {
       return NextResponse.json({ error: "Invalid plan type" }, { status: 400 });
@@ -110,52 +104,6 @@ export async function POST(request: NextRequest) {
         .eq("id", profile.tenant_id);
     }
 
-    // Check for discount code (LUNARLIMITED = 100% off)
-    let discountPercent = 0;
-    let couponId: string | undefined;
-
-    if (discountCode === "LUNARLIMITED") {
-      discountPercent = 100;
-      // For 100% discount, we'll handle this differently - skip Stripe and just update the subscription
-      // Update subscription directly
-      const periodDays = billingInterval === "yearly" ? 365 : 30;
-
-      await supabase
-        .from("tenant_subscriptions")
-        .update({
-          plan_type: planType,
-          billing_interval: billingInterval,
-          discount_code: discountCode,
-          status: "active",
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("tenant_id", profile.tenant_id);
-
-      // Create billing history record
-      await supabase.from("billing_history").insert({
-        tenant_id: profile.tenant_id,
-        invoice_number: `INV-${Date.now()}`,
-        amount: 0,
-        original_amount: billingInterval === "yearly"
-          ? (planType === "starter" ? 279 : planType === "professional" ? 758 : 1910)
-          : (planType === "starter" ? 29 : planType === "professional" ? 79 : 199),
-        currency: "USD",
-        status: "paid",
-        description: `${PLAN_NAMES[planType]} Plan - ${billingInterval === "yearly" ? "Annual" : "Monthly"} (100% discount applied)`,
-        discount_code: discountCode,
-        discount_percent: 100,
-        paid_at: new Date().toISOString(),
-      });
-
-      return NextResponse.json({
-        success: true,
-        freeUpgrade: true,
-        message: `Successfully upgraded to ${PLAN_NAMES[planType]} plan with 100% discount!`,
-      });
-    }
-
     // Get the price ID for the selected plan
     const planPrices = STRIPE_PRICE_IDS[planType];
     const priceId = planPrices[billingInterval];
@@ -192,7 +140,6 @@ export async function POST(request: NextRequest) {
         tenant_id: profile.tenant_id,
         plan_type: planType,
         billing_interval: billingInterval,
-        discount_code: discountCode || "",
       },
       subscription_data: {
         // Only offer trial if user hasn't used it before

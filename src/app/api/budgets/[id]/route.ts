@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateBudgetSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -136,6 +137,28 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateBudgetSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", body.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+
     // Fields that should be null when empty
     const nullableUuidFields = ["project_id", "client_id"];
     const nullableDateFields = ["start_date", "end_date"];
@@ -173,6 +196,7 @@ export async function PATCH(
         .from("budgets")
         .select("amount, spent")
         .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
         .single();
 
       if (currentBudget.data) {

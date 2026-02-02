@@ -185,6 +185,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
     ];
     newSections.forEach((s, i) => (s.order = i));
     setSections(newSections);
+    setHasUnsavedChanges(true);
   };
 
   const handleMoveDown = (index: number) => {
@@ -196,6 +197,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
     ];
     newSections.forEach((s, i) => (s.order = i));
     setSections(newSections);
+    setHasUnsavedChanges(true);
   };
 
   const handleAddSection = (type: string) => {
@@ -276,14 +278,14 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
             <Button variant="outline" size="sm" onClick={handlePreview}>
               Preview
             </Button>
-            <span title={contract.status !== "draft" ? `Cannot send: contract is ${contract.status}` : ""}>
+            <span title={!["draft", "sent"].includes(contract.status) ? `Cannot send: contract is ${contract.status}` : ""}>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowSendModal(true)}
-                disabled={contract.status !== "draft"}
+                disabled={!["draft", "sent"].includes(contract.status)}
               >
-                Send
+                {contract.status === "sent" ? "Resend" : "Send"}
               </Button>
             </span>
             <Button size="sm" onClick={handleSave} disabled={saving}>

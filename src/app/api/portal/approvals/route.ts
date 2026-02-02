@@ -1,36 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
-
-function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
-
-async function validatePortalClient(supabase: ReturnType<typeof getServiceClient>, portalClientId: string) {
-  const { data, error } = await supabase
-    .from("portal_clients")
-    .select("id, client_id, tenant_id, name, email, is_active")
-    .eq("id", portalClientId)
-    .eq("is_active", true)
-    .single();
-
-  if (error || !data) return null;
-  return data;
-}
+import { getPortalServiceClient, validatePortalClient, getPortalAuthHeaders } from "@/lib/portal-auth";
 
 // GET - List approvals for portal client
 export async function GET(request: Request) {
   try {
-    const portalClientId = request.headers.get("x-portal-client-id");
+    const { portalClientId, sessionToken } = getPortalAuthHeaders(request);
     if (!portalClientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceClient();
-    const portalClient = await validatePortalClient(supabase, portalClientId);
+    const supabase = getPortalServiceClient();
+    const portalClient = await validatePortalClient(supabase, portalClientId, sessionToken);
     if (!portalClient) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -82,13 +63,13 @@ export async function GET(request: Request) {
 // POST - Submit approval response
 export async function POST(request: Request) {
   try {
-    const portalClientId = request.headers.get("x-portal-client-id");
+    const { portalClientId, sessionToken } = getPortalAuthHeaders(request);
     if (!portalClientId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getServiceClient();
-    const portalClient = await validatePortalClient(supabase, portalClientId);
+    const supabase = getPortalServiceClient();
+    const portalClient = await validatePortalClient(supabase, portalClientId, sessionToken);
     if (!portalClient) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

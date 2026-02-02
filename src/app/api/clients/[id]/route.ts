@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateClientSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -111,12 +112,10 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Validate email format if provided
-    if (body.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(body.email)) {
-        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
-      }
+    // Validate input
+    const validation = validateBody(updateClientSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     // Fetch old client for status change trigger
@@ -223,6 +222,41 @@ export async function DELETE(
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Check for dependent records before deleting
+    const [
+      invoicesCheck, projectsCheck, contractsCheck,
+      expensesCheck, budgetsCheck, contactsCheck,
+      leadsCheck, paymentsCheck, proposalsCheck,
+    ] = await Promise.all([
+      supabase.from("invoices").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("contracts").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("expenses").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("budgets").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("contacts").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("converted_to_client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("payments").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+      supabase.from("proposals").select("id", { count: "exact", head: true }).eq("client_id", id).eq("tenant_id", profile.tenant_id),
+    ]);
+
+    const deps: string[] = [];
+    if (invoicesCheck.count && invoicesCheck.count > 0) deps.push(`${invoicesCheck.count} invoice(s)`);
+    if (projectsCheck.count && projectsCheck.count > 0) deps.push(`${projectsCheck.count} project(s)`);
+    if (contractsCheck.count && contractsCheck.count > 0) deps.push(`${contractsCheck.count} contract(s)`);
+    if (expensesCheck.count && expensesCheck.count > 0) deps.push(`${expensesCheck.count} expense(s)`);
+    if (budgetsCheck.count && budgetsCheck.count > 0) deps.push(`${budgetsCheck.count} budget(s)`);
+    if (contactsCheck.count && contactsCheck.count > 0) deps.push(`${contactsCheck.count} contact(s)`);
+    if (leadsCheck.count && leadsCheck.count > 0) deps.push(`${leadsCheck.count} lead(s)`);
+    if (paymentsCheck.count && paymentsCheck.count > 0) deps.push(`${paymentsCheck.count} payment(s)`);
+    if (proposalsCheck.count && proposalsCheck.count > 0) deps.push(`${proposalsCheck.count} proposal(s)`);
+
+    if (deps.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete client with existing ${deps.join(", ")}. Please remove or reassign them first.` },
+        { status: 409 }
+      );
     }
 
     const { error } = await supabase

@@ -16,6 +16,29 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify tenant owns this event
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 

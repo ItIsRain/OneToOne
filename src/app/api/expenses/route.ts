@@ -111,6 +111,29 @@ export async function POST(request: Request) {
     }
     const v = validation.data;
 
+    // Validate FK references belong to the same tenant
+    if (v.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", v.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (v.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", v.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (v.event_id) {
+      const { data: evt } = await supabase
+        .from("events").select("id").eq("id", v.event_id).eq("tenant_id", profile.tenant_id).single();
+      if (!evt) {
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
+      }
+    }
+
     const expenseData = {
       tenant_id: profile.tenant_id,
       description: v.description,

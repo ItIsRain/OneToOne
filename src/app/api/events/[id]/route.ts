@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateEventSchema } from "@/lib/validations";
 
 export async function GET(
   request: NextRequest,
@@ -121,6 +122,35 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updateEventSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (body.venue_id) {
+      const { data: venue } = await supabase
+        .from("venues").select("id").eq("id", body.venue_id).eq("tenant_id", profile.tenant_id).single();
+      if (!venue) {
+        return NextResponse.json({ error: "Venue not found" }, { status: 404 });
+      }
+    }
+    if (body.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
+      }
+    }
+
     // Allowlist fields to prevent mass assignment
     const allowedFields = [
       "title", "description", "event_type", "status", "is_public", "is_published",
@@ -132,6 +162,9 @@ export async function PATCH(
       "agenda", "sponsors", "speakers", "custom_fields",
       "judging_enabled", "judging_criteria", "judging_start", "judging_end",
       "teams_enabled", "max_team_size", "min_team_size",
+      "assigned_to", "is_virtual", "virtual_platform", "virtual_link",
+      "icon", "contact_name", "contact_email", "contact_phone",
+      "reminder_minutes", "requirements",
     ];
     const updateData: Record<string, unknown> = {};
     for (const key of allowedFields) {

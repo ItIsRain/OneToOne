@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, updateVendorSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -110,6 +111,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateVendorSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
 
     // Fetch old vendor for status change trigger
     const { data: oldVendor } = await supabase

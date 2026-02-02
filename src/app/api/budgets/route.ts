@@ -109,6 +109,22 @@ export async function POST(request: Request) {
     }
     const v = validation.data;
 
+    // Validate FK references belong to the same tenant
+    if (v.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", v.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (v.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", v.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+
     // Calculate end date based on period type if not provided
     let endDate = v.end_date || null;
     if (!endDate && v.start_date && v.period_type) {

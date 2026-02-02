@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { validateBody, updateKanbanBoardSchema } from "@/lib/validations";
 
 export async function GET(
   request: Request,
@@ -74,6 +75,12 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateKanbanBoardSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
 
     const allowedFields = ["name", "description", "project_id", "columns", "settings"];
     const updates: Record<string, unknown> = {

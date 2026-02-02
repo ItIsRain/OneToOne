@@ -24,9 +24,11 @@ export default function PortalApprovalsPage() {
 
   const fetchApprovals = useCallback(async (clientId: string) => {
     try {
+      const sessionToken = localStorage.getItem("portal_session_token") || "";
       const res = await fetch("/api/portal/approvals", {
         headers: {
           "x-portal-client-id": clientId,
+          "x-portal-session-token": sessionToken,
         },
       });
       if (res.ok) {

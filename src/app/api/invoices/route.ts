@@ -200,6 +200,34 @@ export async function POST(request: Request) {
     ) / 100;
     const total = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
 
+    // Validate client_id belongs to same tenant
+    if (v.client_id) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("id", v.client_id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+
+    // Validate project_id belongs to same tenant
+    if (v.project_id) {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", v.project_id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+
     const invoiceData = {
       tenant_id: profile.tenant_id,
       invoice_number: invoiceNumber,

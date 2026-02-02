@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createTimeEntrySchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -198,6 +199,12 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(createTimeEntrySchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Calculate duration if start and end time provided
     let durationMinutes = body.duration_minutes || 0;
     if (body.start_time && body.end_time && !body.duration_minutes) {
@@ -206,6 +213,48 @@ export async function POST(request: Request) {
       durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
       if (durationMinutes < 0) durationMinutes += 24 * 60; // Handle overnight
       durationMinutes -= body.break_minutes || 0;
+    }
+
+    // Validate user_id belongs to same tenant (if explicitly provided)
+    if (body.user_id && body.user_id !== user.id) {
+      const { data: targetUser } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", body.user_id)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .single();
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found in your organization" }, { status: 400 });
+      }
+    }
+
+    // Validate project_id belongs to same tenant
+    if (body.project_id) {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("id", body.project_id)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .single();
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 400 });
+      }
+    }
+
+    // Validate task_id belongs to same tenant
+    if (body.task_id) {
+      const { data: task } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("id", body.task_id)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .single();
+
+      if (!task) {
+        return NextResponse.json({ error: "Task not found" }, { status: 400 });
+      }
     }
 
     const timeEntryData = {

@@ -56,6 +56,15 @@ interface BroadcastInput {
   recipients: RecipientInput[];
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Generate HTML email from plain text content
 function generateEmailHtml(
   content: string,
@@ -66,24 +75,24 @@ function generateEmailHtml(
     attachments?: { url: string; fileName: string }[];
   }
 ): string {
-  // Convert line breaks to HTML paragraphs
+  // Convert line breaks to HTML paragraphs (escape user content first)
   const paragraphs = content
     .split("\n\n")
     .map((p) => p.trim())
     .filter((p) => p)
-    .map((p) => `<p style="color: #374151; margin: 0 0 16px 0; line-height: 1.6;">${p.replace(/\n/g, "<br>")}</p>`)
+    .map((p) => `<p style="color: #374151; margin: 0 0 16px 0; line-height: 1.6;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
     .join("");
 
   const ctaButton = options.ctaText && options.ctaUrl
     ? `<div style="margin: 24px 0;">
-        <a href="${options.ctaUrl}" style="display: inline-block; background: #4F46E5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">${options.ctaText}</a>
+        <a href="${escapeHtml(options.ctaUrl)}" style="display: inline-block; background: #4F46E5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">${escapeHtml(options.ctaText)}</a>
       </div>`
     : "";
 
   const attachmentsList = options.attachments && options.attachments.length > 0
     ? `<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
         <p style="color: #6b7280; font-size: 14px; margin-bottom: 8px;">Attachments:</p>
-        ${options.attachments.map((a) => `<a href="${a.url}" style="color: #4F46E5; font-size: 14px; display: block; margin-bottom: 4px;">${a.fileName}</a>`).join("")}
+        ${options.attachments.map((a) => `<a href="${escapeHtml(a.url)}" style="color: #4F46E5; font-size: 14px; display: block; margin-bottom: 4px;">${escapeHtml(a.fileName)}</a>`).join("")}
       </div>`
     : "";
 
@@ -93,7 +102,7 @@ function generateEmailHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  ${options.preheader ? `<span style="display: none; max-height: 0; overflow: hidden;">${options.preheader}</span>` : ""}
+  ${options.preheader ? `<span style="display: none; max-height: 0; overflow: hidden;">${escapeHtml(options.preheader)}</span>` : ""}
 </head>
 <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">

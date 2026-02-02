@@ -48,12 +48,16 @@ export const PortalInvoicesList: React.FC<PortalInvoicesListProps> = ({
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
+        const sessionToken = localStorage.getItem("portal_session_token") || "";
         const res = await fetch("/api/portal/invoices", {
-          headers: { "x-portal-client-id": portalClientId },
+          headers: {
+            "x-portal-client-id": portalClientId,
+            "x-portal-session-token": sessionToken,
+          },
         });
         if (!res.ok) throw new Error("Failed to load invoices");
         const json = await res.json();
-        setInvoices(json);
+        setInvoices(json.invoices || json || []);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {

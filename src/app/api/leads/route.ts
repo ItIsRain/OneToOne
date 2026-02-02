@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createLeadSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -142,24 +143,18 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.name) {
-      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createLeadSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Validate email format if provided
-    if (body.email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(body.email)) {
-        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
-      }
-    }
-
-    // Validate phone format if provided
-    if (body.phone) {
-      const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
-      if (!phoneRegex.test(body.phone)) {
-        return NextResponse.json({ error: "Invalid phone number format" }, { status: 400 });
+    // Validate FK references belong to the same tenant
+    if (body.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
       }
     }
 

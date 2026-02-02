@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserPlanInfo, checkEventLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createEventSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -160,6 +161,35 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(createEventSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (body.venue_id) {
+      const { data: venue } = await supabase
+        .from("venues").select("id").eq("id", body.venue_id).eq("tenant_id", profile.tenant_id).single();
+      if (!venue) {
+        return NextResponse.json({ error: "Venue not found" }, { status: 404 });
+      }
+    }
+    if (body.assigned_to) {
+      const { data: assignee } = await supabase
+        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+      if (!assignee) {
+        return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
+      }
+    }
 
     // Process dates if they come as separate date and time
     let startDate = body.start_date;

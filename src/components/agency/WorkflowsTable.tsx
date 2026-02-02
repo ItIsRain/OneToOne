@@ -6,6 +6,7 @@ import Badge from "@/components/ui/badge/Badge";
 import { Modal } from "@/components/ui/modal";
 import { useRouter } from "next/navigation";
 import { WorkflowTemplates } from "./WorkflowTemplates";
+import { toast } from "sonner";
 
 interface Workflow {
   id: string;
@@ -69,7 +70,7 @@ export const WorkflowsTable = () => {
         setWorkflows(Array.isArray(data) ? data : data.workflows ?? []);
       }
     } catch {
-      // silently fail
+      toast.error("Failed to load workflows");
     } finally {
       setLoading(false);
     }
@@ -101,20 +102,27 @@ export const WorkflowsTable = () => {
         setWorkflows((prev) =>
           prev.map((w) => (w.id === workflow.id ? { ...w, status: newStatus } : w))
         );
+      } else {
+        toast.error("Failed to update workflow status");
       }
     } catch {
-      // silently fail
+      toast.error("Failed to update workflow status");
     }
   };
 
   const handleRunNow = async (workflow: Workflow, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/workflows/${workflow.id}/execute`, {
+      const res = await fetch(`/api/workflows/${workflow.id}/execute`, {
         method: "POST",
       });
+      if (res.ok) {
+        toast.success("Workflow execution started");
+      } else {
+        toast.error("Failed to execute workflow");
+      }
     } catch {
-      // silently fail
+      toast.error("Failed to execute workflow");
     }
   };
 
@@ -127,9 +135,11 @@ export const WorkflowsTable = () => {
       });
       if (res.ok) {
         setWorkflows((prev) => prev.filter((w) => w.id !== workflow.id));
+      } else {
+        toast.error("Failed to delete workflow");
       }
     } catch {
-      // silently fail
+      toast.error("Failed to delete workflow");
     }
   };
 
@@ -159,9 +169,11 @@ export const WorkflowsTable = () => {
         } else {
           fetchWorkflows();
         }
+      } else {
+        toast.error("Failed to create workflow");
       }
     } catch {
-      // silently fail
+      toast.error("Failed to create workflow");
     } finally {
       setSaving(false);
     }

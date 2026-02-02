@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, createGoalSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -234,11 +235,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    if (!body.title || !body.target_type) {
-      return NextResponse.json(
-        { error: "Title and target_type are required" },
-        { status: 400 }
-      );
+    // Validate input
+    const validation = validateBody(createGoalSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const goalData = {

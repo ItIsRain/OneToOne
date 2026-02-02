@@ -59,8 +59,12 @@ export const PortalProjectDetail: React.FC<PortalProjectDetailProps> = ({
   useEffect(() => {
     const fetchProject = async () => {
       try {
+        const sessionToken = localStorage.getItem("portal_session_token") || "";
         const res = await fetch(`/api/portal/projects/${projectId}`, {
-          headers: { "x-portal-client-id": portalClientId },
+          headers: {
+            "x-portal-client-id": portalClientId,
+            "x-portal-session-token": sessionToken,
+          },
         });
         if (!res.ok) throw new Error("Failed to load project");
         const json = await res.json();

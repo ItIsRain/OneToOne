@@ -71,10 +71,29 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
   const segments = pathname.split("/");
   const basePath = segments.length >= 3 ? `/${segments[1]}/${segments[2]}` : "/portal";
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Invalidate session on server
+    const portalClientId = localStorage.getItem("portal_client_id") || "";
+    const sessionToken = localStorage.getItem("portal_session_token") || "";
+    try {
+      await fetch("/api/portal/auth/logout", {
+        method: "POST",
+        headers: {
+          "x-portal-client-id": portalClientId,
+          "x-portal-session-token": sessionToken,
+        },
+      });
+    } catch {
+      // Proceed with client-side logout regardless
+    }
     localStorage.removeItem("portal_client_id");
+    localStorage.removeItem("portal_session_token");
+    localStorage.removeItem("portal_tenant_slug");
+    localStorage.removeItem("portal_tenant_name");
+    localStorage.removeItem("portal_logo_url");
+    localStorage.removeItem("portal_primary_color");
     localStorage.removeItem("portal_tenant");
-    window.location.href = basePath + "/login";
+    window.location.href = basePath;
   };
 
   const isActive = (linkHref: string) => {

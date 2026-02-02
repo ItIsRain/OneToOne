@@ -343,8 +343,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         body: JSON.stringify({
           title: formData.title,
           description: formData.description || null,
-          start_date: formData.date,
-          end_date: formData.end_date || null,
+          date: formData.date,
+          end_date_value: formData.end_date || null,
           start_time: formData.start_time || null,
           end_time: formData.end_time || null,
           status: formData.status,

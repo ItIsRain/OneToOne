@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createAvailabilitySchema, bulkAvailabilitySchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -147,18 +148,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.member_id) {
-      return NextResponse.json({ error: "Member ID is required" }, { status: 400 });
-    }
-    if (body.day_of_week === undefined || body.day_of_week === null) {
-      return NextResponse.json({ error: "Day of week is required" }, { status: 400 });
-    }
-    if (!body.start_time) {
-      return NextResponse.json({ error: "Start time is required" }, { status: 400 });
-    }
-    if (!body.end_time) {
-      return NextResponse.json({ error: "End time is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createAvailabilitySchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const availabilityData = {
@@ -239,8 +232,10 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
 
-    if (!Array.isArray(body.entries)) {
-      return NextResponse.json({ error: "Entries array is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(bulkAvailabilitySchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
     const entries = body.entries.map((entry: Record<string, unknown>) => ({

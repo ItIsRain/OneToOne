@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updatePayrollRunSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -91,6 +92,7 @@ export async function GET(
         )
       `)
       .eq("payroll_run_id", id)
+      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: true });
 
     return NextResponse.json({
@@ -153,6 +155,12 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate input
+    const validation = validateBody(updatePayrollRunSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
     // Can't edit completed or cancelled runs
     if (["completed", "cancelled"].includes(existingRun.status) && !body.force) {
       return NextResponse.json(
@@ -214,6 +222,7 @@ export async function PATCH(
             paid_at: new Date().toISOString(),
           })
           .eq("payroll_run_id", id)
+          .eq("tenant_id", currentProfile.tenant_id)
           .eq("status", "pending");
       }
     }
@@ -301,7 +310,8 @@ export async function DELETE(
     await supabase
       .from("payroll_items")
       .delete()
-      .eq("payroll_run_id", id);
+      .eq("payroll_run_id", id)
+      .eq("tenant_id", currentProfile.tenant_id);
 
     // Delete payroll run
     const { error } = await supabase

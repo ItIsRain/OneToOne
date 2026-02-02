@@ -159,8 +159,8 @@ export async function PATCH(
     if (body.name !== undefined) updateData.name = body.name;
     if (body.contract_type !== undefined) updateData.contract_type = body.contract_type;
     if (body.category !== undefined) updateData.category = body.category;
-    if (body.client_id !== undefined) updateData.client_id = body.client_id;
-    if (body.project_id !== undefined) updateData.project_id = body.project_id;
+    if (body.client_id !== undefined) updateData.client_id = body.client_id || null;
+    if (body.project_id !== undefined) updateData.project_id = body.project_id || null;
     if (body.value !== undefined) updateData.value = body.value;
     if (body.currency !== undefined) updateData.currency = body.currency;
     if (body.payment_terms !== undefined) updateData.payment_terms = body.payment_terms;
@@ -212,7 +212,7 @@ export async function PATCH(
         const uploadResult = await cloudinary.uploader.upload(body.document, {
           folder: `contracts/${profile.tenant_id}`,
           resource_type: "auto",
-          public_id: `${Date.now()}_${existing.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
+          public_id: `${crypto.randomUUID().substring(0, 12)}_${existing.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
         });
         updateData.document_url = uploadResult.secure_url;
         updateData.document_public_id = uploadResult.public_id;

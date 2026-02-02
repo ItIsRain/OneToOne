@@ -40,7 +40,7 @@ export const CreateContractModal: React.FC<CreateContractModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/crm/clients")
+      fetch("/api/clients")
         .then((res) => (res.ok ? res.json() : { clients: [] }))
         .then((data) => setClients(data.clients || []))
         .catch(() => setClients([]));

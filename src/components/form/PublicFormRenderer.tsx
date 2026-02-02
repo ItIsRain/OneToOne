@@ -114,6 +114,20 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
         }
       }
 
+      if (field.type === "phone" && val) {
+        const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
+        if (!phoneRegex.test(String(val))) {
+          newErrors[field.id] = "Please enter a valid phone number";
+        }
+      }
+
+      if (field.type === "testimonial" && field.required && val) {
+        const testimonialVal = val as { text?: string; permission?: boolean };
+        if (!testimonialVal.text || !testimonialVal.text.trim()) {
+          newErrors[field.id] = `${field.label} is required`;
+        }
+      }
+
       if (field.type === "number" && val !== undefined && val !== "") {
         const numVal = Number(val);
         if (field.validation?.min !== undefined && numVal < (field.validation.min as number)) {

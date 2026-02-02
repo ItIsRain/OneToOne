@@ -30,12 +30,51 @@ export const PortalDashboard: React.FC<PortalDashboardProps> = ({
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
+        const sessionToken = localStorage.getItem("portal_session_token") || "";
         const res = await fetch("/api/portal/dashboard", {
-          headers: { "x-portal-client-id": portalClientId },
+          headers: {
+            "x-portal-client-id": portalClientId,
+            "x-portal-session-token": sessionToken,
+          },
         });
         if (!res.ok) throw new Error("Failed to load dashboard");
         const json = await res.json();
-        setData(json);
+
+        // Map API response to dashboard data structure
+        const projects = json.projects || [];
+        const invoices = json.invoices || [];
+        const files = json.files || [];
+
+        const activeProjectCount = projects.filter((p: { status: string }) =>
+          ["in_progress", "planning", "active"].includes(p.status?.toLowerCase())
+        ).length;
+        const outstandingInvoiceCount = invoices.filter((i: { status: string }) =>
+          ["sent", "overdue", "pending"].includes(i.status?.toLowerCase())
+        ).length;
+
+        // Build recent activity from all data
+        const recentActivity: DashboardData["recentActivity"] = [
+          ...invoices.slice(0, 3).map((i: { id: string; invoice_number: string; created_at: string }) => ({
+            id: i.id,
+            type: "invoice" as const,
+            title: `Invoice ${i.invoice_number || ""}`,
+            date: i.created_at,
+          })),
+          ...files.slice(0, 3).map((f: { id: string; file_name: string; created_at: string }) => ({
+            id: f.id,
+            type: "file" as const,
+            title: f.file_name,
+            date: f.created_at,
+          })),
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
+        setData({
+          activeProjects: activeProjectCount,
+          pendingApprovals: json.pending_approvals_count || 0,
+          outstandingInvoices: outstandingInvoiceCount,
+          sharedFiles: files.length,
+          recentActivity,
+        });
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {

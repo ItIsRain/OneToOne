@@ -23,6 +23,15 @@ interface CallUpdatePayload {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify webhook secret to prevent unauthorized calls
+    const webhookSecret = process.env.VOICE_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const authHeader = request.headers.get("authorization");
+      if (authHeader !== `Bearer ${webhookSecret}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const body: CallUpdatePayload = await request.json();
 
     // Use service role client for internal webhook

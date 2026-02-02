@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getUserPlanInfo, checkAttendeeLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createAttendeeSchema } from "@/lib/validations";
 
 // GET - List all attendees for an event (admin only)
 export async function GET(
@@ -19,11 +20,23 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify user has access to this event
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify user has access to this event (tenant isolation)
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("id, title, event_type, tenant_id")
       .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (eventError || !event) {
@@ -169,11 +182,14 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { email, name, phone, company, job_title, skills, bio, status = "confirmed" } = body;
 
-    if (!email || !name) {
-      return NextResponse.json({ error: "Email and name are required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createAttendeeSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+
+    const { email, name, phone, company, job_title, skills, bio, status = "confirmed" } = validation.data;
 
     // Check plan limits for attendees per event
     const planInfo = await getUserPlanInfo(supabase, user.id);

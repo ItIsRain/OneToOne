@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { validateBody, updateExpenseSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -101,10 +102,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's tenant_id from profile
+    // Get user's tenant_id and role from profile
     const { data: profile } = await supabase
       .from("profiles")
-      .select("tenant_id")
+      .select("tenant_id, role")
       .eq("id", user.id)
       .single();
 
@@ -113,6 +114,41 @@ export async function PATCH(
     }
 
     const body = await request.json();
+
+    // Validate input
+    const validation = validateBody(updateExpenseSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Only admins/owners can approve or reimburse expenses
+    if ((body.status === "approved" || body.status === "reimbursed") &&
+        !["owner", "admin"].includes(profile.role)) {
+      return NextResponse.json({ error: "Only admins can approve or reimburse expenses" }, { status: 403 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", body.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (body.event_id) {
+      const { data: evt } = await supabase
+        .from("events").select("id").eq("id", body.event_id).eq("tenant_id", profile.tenant_id).single();
+      if (!evt) {
+        return NextResponse.json({ error: "Event not found" }, { status: 404 });
+      }
+    }
 
     // Fields that should be null when empty (UUIDs and optional fields)
     const nullableUuidFields = ["client_id", "project_id", "event_id", "approved_by"];

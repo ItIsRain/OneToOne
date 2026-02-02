@@ -121,6 +121,76 @@ export async function GET(
   }
 }
 
+// PUT - Update a submission (mark as read)
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string; subId: string }> }
+) {
+  try {
+    const { id, subId } = await params;
+    const supabase = await getSupabaseClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify form belongs to tenant
+    const { data: form, error: formError } = await supabase
+      .from("forms")
+      .select("id")
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (formError || !form) {
+      return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    }
+
+    const body = await request.json();
+
+    const updates: Record<string, unknown> = {};
+    if (body.is_read !== undefined) {
+      updates.is_read = !!body.is_read;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const { data: submission, error } = await supabase
+      .from("form_submissions")
+      .update(updates)
+      .eq("id", subId)
+      .eq("form_id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ submission });
+  } catch (error) {
+    console.error("Update submission error:", error);
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}
+
 // DELETE - Delete a submission
 export async function DELETE(
   request: Request,

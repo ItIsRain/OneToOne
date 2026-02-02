@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { validateBody, createProposalSchema } from "@/lib/validations";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -141,8 +142,33 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    if (!body.title) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    // Validate input
+    const validation = validateBody(createProposalSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    // Validate FK references belong to the same tenant
+    if (body.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", body.client_id).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (body.lead_id) {
+      const { data: lead } = await supabase
+        .from("leads").select("id").eq("id", body.lead_id).eq("tenant_id", profile.tenant_id).single();
+      if (!lead) {
+        return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+      }
+    }
+    if (body.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", body.project_id).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
     }
 
     // If a template is selected, fetch its sections and pricing items
@@ -153,6 +179,7 @@ export async function POST(request: Request) {
         .from("proposal_templates")
         .select("sections, pricing_items")
         .eq("id", body.template_id)
+        .eq("tenant_id", profile.tenant_id)
         .single();
 
       if (templateError) {

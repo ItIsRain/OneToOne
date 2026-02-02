@@ -209,7 +209,7 @@ export async function POST(request: Request) {
         const uploadResult = await cloudinary.uploader.upload(body.document, {
           folder: `contracts/${profile.tenant_id}`,
           resource_type: "auto",
-          public_id: `${Date.now()}_${body.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
+          public_id: `${crypto.randomUUID().substring(0, 12)}_${body.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
         });
         documentUrl = uploadResult.secure_url;
         documentPublicId = uploadResult.public_id;

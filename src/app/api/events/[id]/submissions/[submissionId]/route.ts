@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { validateBody, updateSubmissionSchema } from "@/lib/validations";
 
 // GET - Get single submission details (admin only)
 export async function GET(
@@ -14,6 +15,29 @@ export async function GET(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify tenant owns this event
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     const { data: submission, error } = await supabase
@@ -62,8 +86,38 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify tenant owns this event
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
     const body = await request.json();
-    const { status, winner_place, winner_prize, judge_notes, score } = body;
+
+    // Validate input
+    const validation = validateBody(updateSubmissionSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const { status, winner_place, winner_prize, judge_notes, score } = validation.data;
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -108,6 +162,29 @@ export async function DELETE(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify tenant owns this event
+    const { data: event, error: eventError } = await supabase
+      .from("events")
+      .select("id")
+      .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (eventError || !event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     const { error } = await supabase
