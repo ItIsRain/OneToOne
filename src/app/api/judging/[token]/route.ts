@@ -71,6 +71,7 @@ export async function GET(
         demo_url,
         video_url,
         technologies,
+        screenshots,
         submitted_at,
         team:event_teams (
           id,

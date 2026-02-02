@@ -180,8 +180,8 @@ export const AddLeadModal: React.FC<AddLeadModalProps> = ({
         score: formData.score ? parseInt(formData.score) : 0,
         tags: formData.tags ? formData.tags.split(",").map(t => t.trim()).filter(Boolean) : null,
         services_interested: formData.services_interested ? formData.services_interested.split(",").map(s => s.trim()).filter(Boolean) : null,
-        next_follow_up: formData.next_follow_up || null,
-        expected_close_date: formData.expected_close_date || null,
+        next_follow_up: formData.next_follow_up ? formData.next_follow_up + ":00" : null,
+        expected_close_date: formData.expected_close_date ? formData.expected_close_date + ":00" : null,
       };
 
       const res = await fetch(url, {

@@ -121,6 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const abortController = new AbortController();
     const signal = abortController.signal;
 
+    // Auth pages handle their own auth flow; skip heavy init to prevent
+    // race conditions between getUser() token refresh and signInWithPassword().
+    const AUTH_PAGES = ["/signin", "/signup", "/reset-password", "/update-password"];
+    const isAuthPage = typeof window !== "undefined" &&
+      AUTH_PAGES.includes(window.location.pathname);
+
     const init = async () => {
       // ── Session-only check (cross-subdomain via cookies) ──
       const wasSessionOnly = getCookie("1i1_was_session_only");
@@ -134,8 +140,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setProfile(null);
           setLoading(false);
-          isRedirectingRef.current = true;
-          window.location.href = "/signin";
+          // Only redirect if not already on an auth page
+          if (!isAuthPage) {
+            isRedirectingRef.current = true;
+            window.location.href = "/signin";
+          }
+        }
+        return;
+      }
+
+      // On auth pages, skip getUser() to avoid stale token refresh racing
+      // with the sign-in form's signInWithPassword() call.
+      if (isAuthPage) {
+        if (!signal.aborted) {
+          setLoading(false);
         }
         return;
       }
@@ -170,7 +188,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setLoading(false);
 
-          if (hadSessionRef.current) {
+          // Don't redirect to /signin if already on an auth page — the
+          // sign-in form manages its own flow and redirecting here would
+          // set isRedirectingRef, blocking the subsequent SIGNED_IN event.
+          if (hadSessionRef.current && !isAuthPage) {
             isRedirectingRef.current = true;
             window.location.href = "/signin";
           }

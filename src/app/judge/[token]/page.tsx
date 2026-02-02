@@ -17,6 +17,7 @@ interface Submission {
   demo_url: string | null;
   video_url: string | null;
   technologies: string[];
+  screenshots: string[] | null;
   submitted_at: string;
   team: {
     id: string;
@@ -457,25 +458,120 @@ export default function JudgeDashboard() {
                 </div>
               )}
 
+              {/* Screenshots */}
+              {selectedSubmission.screenshots && selectedSubmission.screenshots.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Screenshots</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedSubmission.screenshots.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-brand-400 dark:hover:border-brand-500 transition-colors"
+                      >
+                        <img
+                          src={url}
+                          alt={`Screenshot ${i + 1}`}
+                          className="w-full h-auto object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Files */}
               {selectedSubmission.files && selectedSubmission.files.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Attached Files</h4>
-                  <div className="space-y-2">
-                    {selectedSubmission.files.map((file) => (
-                      <a
-                        key={file.id}
-                        href={file.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{file.file_name}</span>
-                      </a>
-                    ))}
+                  <div className="space-y-3">
+                    {selectedSubmission.files.map((file) => {
+                      const ext = file.file_name.split(".").pop()?.toLowerCase() || "";
+                      const isImage = file.file_type?.startsWith("image/") ||
+                        ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext);
+                      const isPdf = file.file_type === "application/pdf" || ext === "pdf";
+
+                      if (isImage) {
+                        return (
+                          <a
+                            key={file.id}
+                            href={file.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-brand-400 dark:hover:border-brand-500 transition-colors"
+                          >
+                            <img
+                              src={file.file_url}
+                              alt={file.file_name}
+                              className="w-full h-auto object-cover"
+                            />
+                            <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{file.file_name}</div>
+                          </a>
+                        );
+                      }
+
+                      if (isPdf) {
+                        return (
+                          <div key={file.id} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <iframe
+                              src={file.file_url}
+                              title={file.file_name}
+                              className="w-full h-[400px] bg-white"
+                            />
+                            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700/50">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{file.file_name}</span>
+                              <a
+                                href={file.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-brand-600 dark:text-brand-400 hover:underline"
+                              >
+                                Open in new tab
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Determine icon and label by file type
+                      const fileTypeInfo: Record<string, { label: string; color: string }> = {
+                        doc: { label: "DOC", color: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
+                        docx: { label: "DOCX", color: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
+                        xls: { label: "XLS", color: "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30" },
+                        xlsx: { label: "XLSX", color: "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30" },
+                        ppt: { label: "PPT", color: "text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30" },
+                        pptx: { label: "PPTX", color: "text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900/30" },
+                        zip: { label: "ZIP", color: "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30" },
+                        rar: { label: "RAR", color: "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30" },
+                        "7z": { label: "7Z", color: "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30" },
+                        txt: { label: "TXT", color: "text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700" },
+                        csv: { label: "CSV", color: "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30" },
+                      };
+                      const info = fileTypeInfo[ext] || { label: ext.toUpperCase() || "FILE", color: "text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700" };
+
+                      return (
+                        <a
+                          key={file.id}
+                          href={file.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${info.color}`}>
+                            {info.label}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{file.file_name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Click to download</p>
+                          </div>
+                          <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}

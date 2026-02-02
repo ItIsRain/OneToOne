@@ -135,7 +135,7 @@ const optionalPhone = z.union([
   z.literal(""), z.null(), z.undefined(),
 ]);
 
-const optionalDatetime = z.union([z.string().datetime({ offset: true }).or(z.string().datetime()), z.literal(""), z.null(), z.undefined()]);
+const optionalDatetime = z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/, "Invalid datetime"), z.literal(""), z.null(), z.undefined()]);
 
 // ── Event ───────────────────────────────────────────────────────────
 
