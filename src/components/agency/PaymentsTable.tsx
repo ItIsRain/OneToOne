@@ -236,7 +236,7 @@ export const PaymentsTable = () => {
               {filteredPayments.length} payment{filteredPayments.length !== 1 ? "s" : ""}
               {statusFilter !== "all" && ` (${statusFilter})`}
               {" - "}
-              <span className="font-medium text-success-500">{formatCurrency(stats.totalAmount, "USD")}</span> received
+              <span className="font-medium text-success-500">{formatCurrency(stats.totalAmount, filteredPayments[0]?.currency || "USD")}</span> received
             </p>
           </div>
 

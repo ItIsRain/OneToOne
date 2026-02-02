@@ -205,7 +205,7 @@ export const ContactDetailsSidebar: React.FC<ContactDetailsSidebarProps> = ({
           )}
           <InfoRow
             label="Preferred Method"
-            value={contact.preferred_contact_method?.charAt(0).toUpperCase() + (contact.preferred_contact_method?.slice(1) || "")}
+            value={contact.preferred_contact_method ? contact.preferred_contact_method.charAt(0).toUpperCase() + contact.preferred_contact_method.slice(1) : null}
           />
         </Section>
 
@@ -247,7 +247,7 @@ export const ContactDetailsSidebar: React.FC<ContactDetailsSidebarProps> = ({
           <InfoRow label="Next Follow-up" value={formatDate(contact.next_follow_up)} />
           <InfoRow
             label="Contact Frequency"
-            value={contact.contact_frequency?.charAt(0).toUpperCase() + (contact.contact_frequency?.slice(1).replace("_", " ") || "")}
+            value={contact.contact_frequency ? contact.contact_frequency.charAt(0).toUpperCase() + contact.contact_frequency.slice(1).replace("_", " ") : null}
           />
           <InfoRow label="Email Opt-in" value={contact.email_opt_in ? "Yes" : "No"} />
         </Section>

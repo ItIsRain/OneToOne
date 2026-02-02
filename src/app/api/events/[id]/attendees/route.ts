@@ -67,7 +67,11 @@ export async function GET(
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      // Sanitize search input to prevent PostgREST filter injection
+      const sanitized = search.replace(/[%_.*,()]/g, "");
+      if (sanitized.length > 0) {
+        query = query.or(`name.ilike.%${sanitized}%,email.ilike.%${sanitized}%,company.ilike.%${sanitized}%`);
+      }
     }
 
     const { data: attendees, error } = await query;
@@ -194,15 +198,20 @@ export async function POST(
     }
 
     // Check if attendee already exists
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from("event_attendees")
       .select("id")
       .eq("event_id", eventId)
       .eq("email", email.toLowerCase())
-      .single();
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("Duplicate check error:", existingError);
+      return NextResponse.json({ error: "Failed to check for existing attendee" }, { status: 500 });
+    }
 
     if (existing) {
-      return NextResponse.json({ error: "Attendee with this email already registered" }, { status: 400 });
+      return NextResponse.json({ error: "Attendee with this email already registered" }, { status: 409 });
     }
 
     // Create attendee

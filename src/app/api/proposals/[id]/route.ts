@@ -142,6 +142,26 @@ export async function PUT(
       }
     }
 
+    // Validate status transitions - prevent reverting finalized proposals
+    if (updates.status) {
+      const { data: current } = await supabase
+        .from("proposals")
+        .select("status")
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (current) {
+        const immutableStatuses = ["accepted", "declined"];
+        if (immutableStatuses.includes(current.status) && updates.status !== current.status) {
+          return NextResponse.json(
+            { error: `Cannot change status of a ${current.status} proposal` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     updates.updated_at = new Date().toISOString();
 
     const { data: proposal, error } = await supabase

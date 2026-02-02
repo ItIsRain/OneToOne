@@ -114,6 +114,14 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate email format if provided
+    if (body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+      }
+    }
+
     // Fetch old lead for status change trigger
     const { data: oldLead } = await supabase
       .from("leads")

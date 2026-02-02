@@ -224,6 +224,7 @@ export async function DELETE(
         .from("invoices")
         .select("amount_paid, total, amount")
         .eq("id", existingPayment.invoice_id)
+        .eq("tenant_id", profile.tenant_id)
         .single();
 
       if (invoice) {
@@ -244,7 +245,8 @@ export async function DELETE(
             paid_at: newStatus === "paid" ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", existingPayment.invoice_id);
+          .eq("id", existingPayment.invoice_id)
+          .eq("tenant_id", profile.tenant_id);
       }
     }
 

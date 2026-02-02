@@ -250,7 +250,7 @@ export const ProposalPreview: React.FC<ProposalPreviewProps> = ({
                 Agency Signature
               </p>
               <div className="h-24 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/30">
-                {proposal.agency_signature_data ? (
+                {proposal.agency_signature_data && proposal.agency_signature_data.startsWith("data:image/") ? (
                   <img
                     src={proposal.agency_signature_data}
                     alt="Agency signature"
@@ -275,7 +275,7 @@ export const ProposalPreview: React.FC<ProposalPreviewProps> = ({
                 Client Signature
               </p>
               <div className="h-24 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/30">
-                {proposal.client_signature_data ? (
+                {proposal.client_signature_data && proposal.client_signature_data.startsWith("data:image/") ? (
                   <img
                     src={proposal.client_signature_data}
                     alt="Client signature"

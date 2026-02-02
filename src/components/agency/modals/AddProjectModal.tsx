@@ -7,10 +7,53 @@ import Select from "@/components/form/Select";
 import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
 
+interface EditProject {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  project_type?: string;
+  category?: string;
+  start_date?: string;
+  end_date?: string;
+  estimated_hours?: number;
+  budget_amount?: number;
+  budget?: number;
+  budget_currency?: string;
+  currency?: string;
+  billing_type?: string;
+  visibility?: string;
+  color?: string;
+  tags?: string[];
+  client_id?: string;
+  client?: { id: string; name: string; company: string } | null;
+  project_manager_id?: string;
+  project_manager?: { id: string; first_name: string; last_name: string; avatar_url: string | null } | null;
+  team_lead_id?: string;
+  team_lead?: { id: string; first_name: string; last_name: string; avatar_url: string | null } | null;
+  hourly_rate?: number;
+  estimated_cost?: number;
+  payment_terms?: string;
+  department?: string;
+  scope_summary?: string;
+  requirements?: string;
+  out_of_scope?: string;
+  repository_url?: string;
+  staging_url?: string;
+  production_url?: string;
+  figma_url?: string;
+  drive_folder_url?: string;
+  contract_signed?: boolean;
+  nda_required?: boolean;
+  industry?: string;
+}
+
 interface AddProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  project?: EditProject | null;
 }
 
 interface Client {
@@ -29,15 +72,16 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  project = null,
 }) => {
+  const isEditMode = !!project;
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showOptionalFields, setShowOptionalFields] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    // Required fields
+  const defaultFormData = {
     name: "",
     client_id: "",
     project_type: "",
@@ -46,53 +90,81 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     start_date: "",
     end_date: "",
     project_manager_id: "",
-
-    // Recommended fields
     description: "",
     budget_amount: "",
     billing_type: "fixed_price",
     estimated_hours: "",
-
-    // Financial Details
     hourly_rate: "",
     estimated_cost: "",
     budget_currency: "USD",
     payment_terms: "net_30",
-
-    // Team & Assignment
     team_lead_id: "",
     department: "",
-
-    // Scope & Requirements
     scope_summary: "",
     requirements: "",
     out_of_scope: "",
-
-    // External Links
     repository_url: "",
     staging_url: "",
     production_url: "",
     figma_url: "",
     drive_folder_url: "",
-
-    // Contract & Legal
     contract_signed: false,
     nda_required: false,
-
-    // Other
     visibility: "team",
     color: "#6366f1",
     tags: "",
     industry: "",
     category: "",
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
 
   useEffect(() => {
     if (isOpen) {
       fetchClients();
       fetchProfiles();
+      if (project) {
+        setFormData({
+          name: project.name || "",
+          client_id: project.client_id || project.client?.id || "",
+          project_type: project.project_type || "",
+          status: project.status || "planning",
+          priority: project.priority || "medium",
+          start_date: project.start_date ? project.start_date.split("T")[0] : "",
+          end_date: project.end_date ? project.end_date.split("T")[0] : "",
+          project_manager_id: project.project_manager_id || project.project_manager?.id || "",
+          description: project.description || "",
+          budget_amount: project.budget_amount?.toString() || project.budget?.toString() || "",
+          billing_type: project.billing_type || "fixed_price",
+          estimated_hours: project.estimated_hours?.toString() || "",
+          hourly_rate: project.hourly_rate?.toString() || "",
+          estimated_cost: project.estimated_cost?.toString() || "",
+          budget_currency: project.budget_currency || project.currency || "USD",
+          payment_terms: project.payment_terms || "net_30",
+          team_lead_id: project.team_lead_id || project.team_lead?.id || "",
+          department: project.department || "",
+          scope_summary: project.scope_summary || "",
+          requirements: project.requirements || "",
+          out_of_scope: project.out_of_scope || "",
+          repository_url: project.repository_url || "",
+          staging_url: project.staging_url || "",
+          production_url: project.production_url || "",
+          figma_url: project.figma_url || "",
+          drive_folder_url: project.drive_folder_url || "",
+          contract_signed: project.contract_signed || false,
+          nda_required: project.nda_required || false,
+          visibility: project.visibility || "team",
+          color: project.color || "#6366f1",
+          tags: Array.isArray(project.tags) ? project.tags.join(", ") : "",
+          industry: project.industry || "",
+          category: project.category || "",
+        });
+      } else {
+        setFormData(defaultFormData);
+      }
     }
-  }, [isOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, project]);
 
   const fetchClients = async () => {
     try {
@@ -253,7 +325,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     try {
       const submitData = {
         ...formData,
-        budget_amount: formData.budget_amount ? parseFloat(formData.budget_amount) : null,
+        budget: formData.budget_amount ? parseFloat(formData.budget_amount) : null,
+        currency: formData.budget_currency || "USD",
         estimated_hours: formData.estimated_hours ? parseFloat(formData.estimated_hours) : null,
         hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
         estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : null,
@@ -263,54 +336,25 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       };
 
-      const response = await fetch("/api/projects", {
-        method: "POST",
+      const url = isEditMode ? `/api/projects/${project!.id}` : "/api/projects";
+      const method = isEditMode ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        toast.error(error.error || "Failed to create project");
+        toast.error(error.error || `Failed to ${isEditMode ? "update" : "create"} project`);
         return;
       }
 
+      toast.success(`Project ${isEditMode ? "updated" : "created"} successfully`);
+
       // Reset form
-      setFormData({
-        name: "",
-        client_id: "",
-        project_type: "",
-        status: "planning",
-        priority: "medium",
-        start_date: "",
-        end_date: "",
-        project_manager_id: "",
-        description: "",
-        budget_amount: "",
-        billing_type: "fixed_price",
-        estimated_hours: "",
-        hourly_rate: "",
-        estimated_cost: "",
-        budget_currency: "USD",
-        payment_terms: "net_30",
-        team_lead_id: "",
-        department: "",
-        scope_summary: "",
-        requirements: "",
-        out_of_scope: "",
-        repository_url: "",
-        staging_url: "",
-        production_url: "",
-        figma_url: "",
-        drive_folder_url: "",
-        contract_signed: false,
-        nda_required: false,
-        visibility: "team",
-        color: "#6366f1",
-        tags: "",
-        industry: "",
-        category: "",
-      });
+      setFormData(defaultFormData);
       setShowOptionalFields(false);
       setActiveSection(null);
 
@@ -320,8 +364,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
         onClose();
       }
     } catch (error) {
-      console.error("Error creating project:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create project");
+      console.error(`Error ${isEditMode ? "updating" : "creating"} project:`, error);
+      toast.error(error instanceof Error ? error.message : `Failed to ${isEditMode ? "update" : "create"} project`);
     } finally {
       setLoading(false);
     }
@@ -353,10 +397,10 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl p-6 lg:p-8">
       <div className="mb-6">
         <h3 className="text-xl font-semibold text-gray-800 dark:text-white/90">
-          Create New Project
+          {isEditMode ? "Edit Project" : "Create New Project"}
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Set up a new project for your team
+          {isEditMode ? "Update project details" : "Set up a new project for your team"}
         </p>
       </div>
 
@@ -784,10 +828,10 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
           </button>
           <button
             type="submit"
-            disabled={loading || !formData.name}
+            disabled={loading || !formData.name || !formData.project_type}
             className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Creating..." : "Create Project"}
+            {loading ? (isEditMode ? "Saving..." : "Creating...") : (isEditMode ? "Save Changes" : "Create Project")}
           </button>
         </div>
       </form>

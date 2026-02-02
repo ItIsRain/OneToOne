@@ -167,18 +167,38 @@ export async function POST(request: Request) {
     }
     const v = validation.data;
 
+    // Validate date constraints
+    const issueDate = body.issue_date || new Date().toISOString().split('T')[0];
+    if (v.due_date && v.due_date < issueDate) {
+      return NextResponse.json({ error: "Due date cannot be before issue date" }, { status: 400 });
+    }
+
     // Generate invoice number if not provided
     const invoiceNumber = v.invoice_number || await generateInvoiceNumber(supabase, profile.tenant_id);
+
+    // Check invoice number uniqueness within tenant
+    const { data: existingInvoice } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("tenant_id", profile.tenant_id)
+      .eq("invoice_number", invoiceNumber)
+      .maybeSingle();
+
+    if (existingInvoice) {
+      return NextResponse.json({ error: "Invoice number already exists" }, { status: 409 });
+    }
 
     // Calculate totals
     const subtotal = v.subtotal ?? v.amount ?? 0;
     const taxRate = v.tax_rate ?? 0;
-    const taxAmount = subtotal * (taxRate / 100);
+    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
     const discountValue = v.discount_value ?? 0;
-    const discountAmount = v.discount_type === 'percentage'
-      ? subtotal * (discountValue / 100)
-      : discountValue;
-    const total = subtotal + taxAmount - discountAmount;
+    const discountAmount = Math.round(
+      (v.discount_type === 'percentage'
+        ? subtotal * (discountValue / 100)
+        : discountValue) * 100
+    ) / 100;
+    const total = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
 
     const invoiceData = {
       tenant_id: profile.tenant_id,
@@ -198,14 +218,14 @@ export async function POST(request: Request) {
       amount_paid: 0,
       currency: v.currency,
       status: v.status,
-      issue_date: body.issue_date || new Date().toISOString().split('T')[0],
+      issue_date: issueDate,
       due_date: v.due_date || null,
       payment_terms: body.payment_terms || 'net_30',
       notes: v.notes || null,
       terms_and_conditions: body.terms_and_conditions || null,
       footer_note: body.footer_note || null,
       billing_name: body.billing_name || null,
-      billing_email: body.billing_email || null,
+      billing_email: body.billing_email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.billing_email) ? body.billing_email : null,
       billing_address: body.billing_address || null,
       billing_city: body.billing_city || null,
       billing_country: body.billing_country || null,

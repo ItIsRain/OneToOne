@@ -264,7 +264,7 @@ export default function SignUpForm() {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email }),
+        body: JSON.stringify({ email: formData.email.trim() }),
       });
 
       const data = await res.json();
@@ -296,7 +296,7 @@ export default function SignUpForm() {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email }),
+        body: JSON.stringify({ email: formData.email.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to resend OTP");
@@ -318,7 +318,7 @@ export default function SignUpForm() {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email, otp: code }),
+        body: JSON.stringify({ email: formData.email.trim(), otp: code }),
       });
 
       const data = await res.json();
@@ -405,7 +405,7 @@ export default function SignUpForm() {
     setError("");
 
     const phone = `${formData.countryCode}${formData.phoneNumber.replace(/\D/g, "")}`;
-    const payload = { ...formData, otp: undefined, plan: selectedPlan, phone };
+    const payload = { ...formData, email: formData.email.trim(), otp: undefined, plan: selectedPlan, phone };
 
     try {
       const res = await fetch("/api/auth/register", {
@@ -419,12 +419,16 @@ export default function SignUpForm() {
 
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
       });
 
       if (signInError) {
         console.error("Sign in error:", signInError);
+        // Account was created but auto-login failed; redirect to sign in
+        setError("Account created! Please sign in with your credentials.");
+        window.location.href = "/signin";
+        return;
       }
 
       window.location.href = getTenantUrl(formData.subdomain, "/dashboard?subscribed=true");

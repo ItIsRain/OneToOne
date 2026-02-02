@@ -188,14 +188,12 @@ export const SalesPipeline = () => {
       });
 
       if (!res.ok) {
-        // Revert on failure
-        setLeads(leads);
         const data = await res.json();
         throw new Error(data.error || "Failed to update lead status");
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update lead status");
-      setLeads(leads); // Revert
+      fetchLeads(); // Refetch from server to get actual state
     }
 
     setDraggedLead(null);
@@ -493,6 +491,13 @@ export const SalesPipeline = () => {
         onClose={() => setViewingLead(null)}
         lead={viewingLead}
         onEdit={handleEditLead}
+        onDelete={(id) => {
+          setLeads(leads.filter((l) => l.id !== id));
+          setViewingLead(null);
+        }}
+        onStatusChange={(id, status) => {
+          setLeads(leads.map((l) => l.id === id ? { ...l, status: status as Lead["status"] } : l));
+        }}
       />
     </>
   );

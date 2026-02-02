@@ -70,6 +70,7 @@ export const ProjectsTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -274,7 +275,7 @@ export const ProjectsTable: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => { setEditProject(null); setIsAddModalOpen(true); }}
           className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
         >
           New Project
@@ -297,7 +298,7 @@ export const ProjectsTable: React.FC = () => {
           </p>
           {!searchQuery && statusFilter === "all" && priorityFilter === "all" && (
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => { setEditProject(null); setIsAddModalOpen(true); }}
               className="mt-4 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
             >
               Create Project
@@ -505,11 +506,16 @@ export const ProjectsTable: React.FC = () => {
 
       <AddProjectModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditProject(null);
+        }}
         onSuccess={() => {
           setIsAddModalOpen(false);
+          setEditProject(null);
           fetchProjects();
         }}
+        project={editProject}
       />
 
       <ProjectDetailsSidebar
@@ -518,7 +524,7 @@ export const ProjectsTable: React.FC = () => {
         project={selectedProject}
         onEdit={(project) => {
           setSelectedProject(null);
-          // Open edit modal
+          setEditProject(project);
           setIsAddModalOpen(true);
         }}
         onDelete={handleDelete}

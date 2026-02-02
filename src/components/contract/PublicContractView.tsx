@@ -509,9 +509,19 @@ export const PublicContractView: React.FC<PublicContractViewProps> = ({
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
       <div className="mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6 lg:px-8">
-        {sortedSections.map((section) => (
-          <div key={section.id}>{renderSection(section)}</div>
-        ))}
+        {sortedSections.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <svg className="mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p className="text-lg font-medium text-gray-500 dark:text-gray-400">This contract has no content yet.</p>
+            <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">The contract is still being prepared.</p>
+          </div>
+        ) : (
+          sortedSections.map((section) => (
+            <div key={section.id}>{renderSection(section)}</div>
+          ))
+        )}
 
         {/* Contract dates */}
         {(contract.start_date || contract.end_date) && (

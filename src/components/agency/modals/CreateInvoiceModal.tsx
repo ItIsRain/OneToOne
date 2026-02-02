@@ -314,9 +314,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 207) {
         toast.error(data.error || "Failed to save invoice");
         return;
+      }
+
+      if (res.status === 207) {
+        toast.warning(data.error || "Invoice saved but line items may not have been updated");
       }
 
       onSave(data.invoice);

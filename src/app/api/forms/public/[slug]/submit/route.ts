@@ -69,10 +69,14 @@ export async function POST(
       return NextResponse.json({ error: submissionError.message }, { status: 500 });
     }
 
-    // Increment submissions_count on the form
+    // Update submissions_count based on actual count to avoid race conditions
+    const { count: submissionCount } = await serviceClient
+      .from("form_submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("form_id", form.id);
     await serviceClient
       .from("forms")
-      .update({ submissions_count: (form.submissions_count || 0) + 1 })
+      .update({ submissions_count: submissionCount || 0 })
       .eq("id", form.id);
 
     // Auto-create lead if enabled

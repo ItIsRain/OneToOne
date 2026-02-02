@@ -10,7 +10,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email and OTP are required" }, { status: 400 });
     }
 
-    // Rate limit: 5 verification attempts per email per 15 minutes
+    // Rate limit by IP: 10 verification attempts per IP per 15 minutes
+    const clientIp = getClientIp(request);
+    const ipRateCheck = await checkRateLimit({
+      key: "verify-otp-ip",
+      identifier: clientIp,
+      maxRequests: 10,
+      windowSeconds: 15 * 60,
+    });
+    if (!ipRateCheck.allowed) {
+      return rateLimitResponse(ipRateCheck.retryAfterSeconds!);
+    }
+
+    // Rate limit by email: 5 verification attempts per email per 15 minutes
     const rateCheck = await checkRateLimit({
       key: "verify-otp",
       identifier: email.toLowerCase(),

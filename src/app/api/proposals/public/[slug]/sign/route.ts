@@ -41,6 +41,29 @@ export async function POST(
       );
     }
 
+    // Validate signature inputs
+    if (typeof body.signature_name !== "string" || body.signature_name.length > 200) {
+      return NextResponse.json(
+        { error: "Signature name must be a string under 200 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof body.signature_data !== "string" || body.signature_data.length > 500000) {
+      return NextResponse.json(
+        { error: "Signature data is too large" },
+        { status: 400 }
+      );
+    }
+
+    // Validate signature_data is a valid data URI (base64 image)
+    if (!body.signature_data.startsWith("data:image/")) {
+      return NextResponse.json(
+        { error: "Signature data must be a valid image data URI" },
+        { status: 400 }
+      );
+    }
+
     // Get client IP from headers
     const forwardedFor = request.headers.get("x-forwarded-for");
     const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown";

@@ -178,6 +178,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
     }
 
+    // Validate from_email format if provided
+    if (from_email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(from_email)) {
+        return NextResponse.json({ error: 'Invalid from_email format' }, { status: 400 });
+      }
+    }
+
     // Check if settings already exist
     const { data: existing } = await supabase
       .from('tenant_email_settings')

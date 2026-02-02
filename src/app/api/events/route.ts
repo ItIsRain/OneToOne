@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       query = query.gte("start_date", startDate);
     }
     if (endDate) {
-      query = query.lte("start_date", endDate);
+      query = query.lte("end_date", endDate);
     }
 
     // Order by start_date
@@ -79,33 +79,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Fetch assignee and creator info
-    const eventsWithUsers = await Promise.all(
-      (events || []).map(async (event) => {
-        let assignee = null;
-        let creator = null;
+    // Batch fetch assignee and creator info to avoid N+1 queries
+    const assigneeIds = [...new Set((events || []).map(e => e.assigned_to).filter(Boolean))];
+    const creatorIds = [...new Set((events || []).map(e => e.created_by).filter(Boolean))];
+    const allUserIds = [...new Set([...assigneeIds, ...creatorIds])];
 
-        if (event.assigned_to) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name, avatar_url, email")
-            .eq("id", event.assigned_to)
-            .single();
-          assignee = data;
-        }
+    let usersMap: Record<string, { id: string; first_name: string; last_name: string | null; avatar_url: string | null; email: string }> = {};
+    if (allUserIds.length > 0) {
+      const { data: users } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, avatar_url, email")
+        .in("id", allUserIds);
 
-        if (event.created_by) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .eq("id", event.created_by)
-            .single();
-          creator = data;
-        }
+      if (users) {
+        usersMap = users.reduce((acc, u) => {
+          acc[u.id] = u;
+          return acc;
+        }, {} as typeof usersMap);
+      }
+    }
 
-        return { ...event, assignee, creator };
-      })
-    );
+    const eventsWithUsers = (events || []).map((event) => ({
+      ...event,
+      assignee: event.assigned_to ? usersMap[event.assigned_to] || null : null,
+      creator: event.created_by ? usersMap[event.created_by] || null : null,
+    }));
 
     return NextResponse.json(eventsWithUsers);
   } catch (error) {

@@ -241,9 +241,6 @@ export const MembersTable = () => {
   };
 
   const handleRoleChange = async (member: TeamMember, newRoleId: string | null) => {
-    const newRole = newRoleId ? roles.find(r => r.id === newRoleId) : null;
-    const roleName = newRole?.name || "No Role";
-
     try {
       const res = await fetch(`/api/team/members/${member.id}`, {
         method: "PATCH",

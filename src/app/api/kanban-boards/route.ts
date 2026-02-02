@@ -73,13 +73,20 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    const allowedFields = ["name", "description", "project_id", "columns", "settings"];
+    const insertData: Record<string, unknown> = {
+      tenant_id: profile.tenant_id,
+      created_by: user.id,
+    };
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        insertData[key] = body[key];
+      }
+    }
+
     const { data, error } = await supabase
       .from("kanban_boards")
-      .insert({
-        ...body,
-        tenant_id: profile.tenant_id,
-        created_by: user.id,
-      })
+      .insert(insertData)
       .select()
       .single();
 

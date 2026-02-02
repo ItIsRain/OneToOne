@@ -160,12 +160,17 @@ export const ProposalDetailsSidebar: React.FC<ProposalDetailsSidebarProps> = ({
       const res = await fetch(`/api/proposals/${proposal.id}/convert`, {
         method: "POST",
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         window.location.href = `/dashboard/projects/${data.project.id}`;
+      } else if (res.status === 409) {
+        alert(data.error || "This proposal has already been converted");
+      } else {
+        alert(data.error || "Failed to convert proposal");
       }
     } catch (err) {
       console.error("Error converting to project:", err);
+      alert("Failed to convert proposal. Please try again.");
     }
   };
 

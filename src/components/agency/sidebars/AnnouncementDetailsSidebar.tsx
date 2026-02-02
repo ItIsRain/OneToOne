@@ -87,9 +87,13 @@ export const AnnouncementDetailsSidebar: React.FC<AnnouncementDetailsSidebarProp
       if (res.ok) {
         onDelete?.(announcement.id);
         onClose();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to delete announcement");
       }
     } catch (error) {
       console.error("Delete error:", error);
+      alert("Failed to delete announcement. Please try again.");
     } finally {
       setIsDeleting(false);
     }

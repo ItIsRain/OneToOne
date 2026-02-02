@@ -259,9 +259,13 @@ export const EventDetailsSidebar: React.FC<EventDetailsSidebarProps> = ({
       if (response.ok) {
         if (onDelete) onDelete(event.id);
         onClose();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || "Failed to delete event");
       }
     } catch (error) {
       console.error("Error deleting event:", error);
+      alert("Failed to delete event. Please try again.");
     } finally {
       setIsDeleting(false);
     }

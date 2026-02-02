@@ -323,7 +323,14 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim() || !formData.date) return;
+    if (!formData.title.trim()) {
+      toast.error("Event title is required");
+      return;
+    }
+    if (!formData.date) {
+      toast.error("Event date is required");
+      return;
+    }
 
     setLoading(true);
     try {

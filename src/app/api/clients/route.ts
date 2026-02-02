@@ -146,13 +146,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
+    // Validate email format if provided
+    if (body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+      }
+    }
+
+    // Validate phone format if provided
+    if (body.phone) {
+      const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
+      if (!phoneRegex.test(body.phone)) {
+        return NextResponse.json({ error: "Invalid phone number format" }, { status: 400 });
+      }
+    }
+
     const clientData = {
       tenant_id: profile.tenant_id,
-      name: body.name,
+      name: body.name.slice(0, 200),
       email: body.email || null,
       phone: body.phone || null,
-      company: body.company || null,
-      notes: body.notes || null,
+      company: body.company ? body.company.slice(0, 200) : null,
+      notes: body.notes ? body.notes.slice(0, 5000) : null,
       status: body.status || "active",
       website: body.website || null,
       address: body.address || null,

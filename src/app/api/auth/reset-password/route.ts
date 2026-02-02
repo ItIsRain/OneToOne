@@ -1,8 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 reset requests per IP per 15 minutes
+    const ip = getClientIp(request);
+    const ipRateCheck = await checkRateLimit({
+      key: "reset-password-ip",
+      identifier: ip,
+      maxRequests: 5,
+      windowSeconds: 15 * 60,
+    });
+    if (!ipRateCheck.allowed) {
+      return rateLimitResponse(ipRateCheck.retryAfterSeconds!);
+    }
+
     const { email } = await request.json();
 
     if (!email) {
@@ -12,35 +25,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limit: 3 reset requests per email per 15 minutes
+    const emailRateCheck = await checkRateLimit({
+      key: "reset-password-email",
+      identifier: email.toLowerCase(),
+      maxRequests: 3,
+      windowSeconds: 15 * 60,
+    });
+    if (!emailRateCheck.allowed) {
+      return rateLimitResponse(emailRateCheck.retryAfterSeconds!);
+    }
+
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Check if user exists in auth.users
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    // Check if user exists by looking up their profile (avoids fetching ALL users)
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", email.toLowerCase())
+      .single();
 
-    if (listError) {
-      console.error("Error listing users:", listError);
-      return NextResponse.json(
-        { error: "Something went wrong" },
-        { status: 500 }
-      );
+    if (!profile) {
+      // Return success even if user doesn't exist to prevent account enumeration
+      return NextResponse.json({ success: true });
     }
 
-    const userExists = users.users.some(
-      (user) => user.email?.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!userExists) {
-      return NextResponse.json(
-        { error: "No account found with this email address" },
-        { status: 404 }
-      );
-    }
-
-    // Generate reset link
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    // Generate reset link - use env var only, never trust Origin header
+    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: "recovery",
       email: email,

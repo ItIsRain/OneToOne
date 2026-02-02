@@ -26,6 +26,21 @@ export async function PUT(
 
     const body = await request.json();
 
+    // Validate steps structure if steps are being updated
+    if (body.steps !== undefined) {
+      if (!Array.isArray(body.steps) || body.steps.length === 0) {
+        return NextResponse.json({ error: "At least one step is required" }, { status: 400 });
+      }
+      for (const step of body.steps) {
+        if (!step.title?.trim()) {
+          return NextResponse.json({ error: "Each step must have a title" }, { status: 400 });
+        }
+        if (!step.type) {
+          return NextResponse.json({ error: "Each step must have a type" }, { status: 400 });
+        }
+      }
+    }
+
     // If marking as default, unset other defaults first
     if (body.is_default) {
       await supabase

@@ -154,10 +154,12 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
       onSubmitSuccess?.();
 
       if (form.thank_you_redirect_url) {
-        // Validate redirect URL to prevent open redirect attacks
-        const redirectUrl = form.thank_you_redirect_url;
-        const isSafe = redirectUrl.startsWith("/") && !redirectUrl.startsWith("//")
-          || redirectUrl.startsWith("https://");
+        // Validate redirect URL to prevent XSS and open redirect attacks
+        const redirectUrl = form.thank_you_redirect_url.trim();
+        const isRelativePath = redirectUrl.startsWith("/") && !redirectUrl.startsWith("//");
+        const isHttps = redirectUrl.startsWith("https://");
+        const hasDangerousProtocol = /^[a-z]+:/i.test(redirectUrl) && !isHttps;
+        const isSafe = (isRelativePath || isHttps) && !hasDangerousProtocol;
         if (isSafe) {
           setTimeout(() => {
             window.location.href = redirectUrl;

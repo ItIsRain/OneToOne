@@ -136,6 +136,26 @@ export async function PUT(
       }
     }
 
+    // Validate status transitions - prevent reverting finalized contracts
+    if (updates.status) {
+      const { data: current } = await supabase
+        .from("contracts")
+        .select("status")
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (current) {
+        const immutableStatuses = ["signed", "declined"];
+        if (immutableStatuses.includes(current.status) && updates.status !== current.status) {
+          return NextResponse.json(
+            { error: `Cannot change status of a ${current.status} contract` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     updates.updated_at = new Date().toISOString();
 
     const { data: contract, error } = await supabase

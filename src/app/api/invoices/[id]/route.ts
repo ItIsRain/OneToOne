@@ -320,6 +320,26 @@ export async function DELETE(
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
+    // Check invoice status before deletion - prevent deleting paid invoices
+    const { data: currentInvoice } = await supabase
+      .from("invoices")
+      .select("status")
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!currentInvoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    const protectedStatuses = ["paid", "partially_paid"];
+    if (protectedStatuses.includes(currentInvoice.status)) {
+      return NextResponse.json(
+        { error: `Cannot delete a ${currentInvoice.status.replace("_", " ")} invoice` },
+        { status: 400 }
+      );
+    }
+
     // Delete invoice items first (cascade should handle this, but being explicit)
     await supabase
       .from("invoice_items")

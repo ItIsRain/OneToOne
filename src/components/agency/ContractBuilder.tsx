@@ -91,6 +91,18 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
   const [showSendModal, setShowSendModal] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [error, setError] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Warn about unsaved changes on page leave
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
 
   const fetchContract = useCallback(async () => {
     setLoading(true);
@@ -133,6 +145,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
       if (res.ok) {
         const data = await res.json();
         setContract(data.contract);
+        setHasUnsavedChanges(false);
       } else {
         const data = await res.json();
         setError(data.error || "Failed to save contract");
@@ -155,10 +168,12 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
     const newSections = [...sections];
     newSections[index] = updated;
     setSections(newSections);
+    setHasUnsavedChanges(true);
   };
 
   const handleDeleteSection = (index: number) => {
     setSections(sections.filter((_, i) => i !== index));
+    setHasUnsavedChanges(true);
   };
 
   const handleMoveUp = (index: number) => {
@@ -216,6 +231,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
 
     setSections([...sections, newSection]);
     setShowAddSection(false);
+    setHasUnsavedChanges(true);
   };
 
   if (loading) {
@@ -248,7 +264,7 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setHasUnsavedChanges(true); }}
               placeholder="Contract title"
               className="flex-1 bg-transparent text-xl font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-hidden dark:text-white/90 dark:placeholder:text-white/30"
             />
@@ -260,14 +276,16 @@ export const ContractBuilder: React.FC<ContractBuilderProps> = ({
             <Button variant="outline" size="sm" onClick={handlePreview}>
               Preview
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowSendModal(true)}
-              disabled={contract.status !== "draft"}
-            >
-              Send
-            </Button>
+            <span title={contract.status !== "draft" ? `Cannot send: contract is ${contract.status}` : ""}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSendModal(true)}
+                disabled={contract.status !== "draft"}
+              >
+                Send
+              </Button>
+            </span>
             <Button size="sm" onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save"}
             </Button>

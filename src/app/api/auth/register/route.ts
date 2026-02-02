@@ -160,7 +160,13 @@ export async function POST(request: Request) {
 
     if (profileError) {
       console.error("Profile error:", profileError);
-      // Continue anyway - profile can be created later
+      // Rollback: delete tenant and user if profile creation fails
+      await supabase.from("tenants").delete().eq("id", tenant.id);
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json(
+        { error: "Failed to create user profile" },
+        { status: 500 }
+      );
     }
 
     // Create subscription for the tenant with selected plan

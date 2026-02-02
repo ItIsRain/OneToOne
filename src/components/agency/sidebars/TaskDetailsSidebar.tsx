@@ -182,9 +182,13 @@ export const TaskDetailsSidebar: React.FC<TaskDetailsSidebarProps> = ({
       if (response.ok) {
         if (onDelete) onDelete(task.id);
         onClose();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        alert(data.error || "Failed to delete task");
       }
     } catch (error) {
       console.error("Error deleting task:", error);
+      alert("Failed to delete task. Please try again.");
     } finally {
       setIsDeleting(false);
     }

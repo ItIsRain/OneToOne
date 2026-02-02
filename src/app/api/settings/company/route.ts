@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 
 // GET - Get company settings
 export async function GET(request: NextRequest) {
@@ -128,6 +129,23 @@ export async function PATCH(request: NextRequest) {
     for (const field of allowedFields) {
       if (field in body) {
         updateData[field] = body[field];
+      }
+    }
+
+    // Enforce plan limits for branding features (logo_url, primary_color)
+    if (updateData.logo_url !== undefined || updateData.primary_color !== undefined) {
+      const planInfo = await getUserPlanInfo(supabase, user.id);
+      const brandingAccess = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
+      if (!brandingAccess.allowed) {
+        // Remove branding fields from update
+        delete updateData.logo_url;
+        delete updateData.primary_color;
+        if (Object.keys(updateData).filter(k => k !== "updated_at").length === 0) {
+          return NextResponse.json(
+            { error: "Custom branding requires the Starter plan or above", upgrade_required: true },
+            { status: 403 }
+          );
+        }
       }
     }
 

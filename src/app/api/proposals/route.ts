@@ -149,11 +149,16 @@ export async function POST(request: Request) {
     let templateSections: unknown[] = [];
     let templatePricingItems: unknown[] = [];
     if (body.template_id) {
-      const { data: template } = await supabase
+      const { data: template, error: templateError } = await supabase
         .from("proposal_templates")
         .select("sections, pricing_items")
         .eq("id", body.template_id)
         .single();
+
+      if (templateError) {
+        console.error("Template fetch error:", templateError);
+        return NextResponse.json({ error: "Failed to load template" }, { status: 400 });
+      }
 
       if (template) {
         templateSections = template.sections || [];
@@ -163,7 +168,7 @@ export async function POST(request: Request) {
 
     // Auto-generate slug from title
     const baseSlug = body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const randomSuffix = crypto.randomUUID().substring(0, 8);
     const slug = `${baseSlug}-${randomSuffix}`;
 
     const proposalData = {

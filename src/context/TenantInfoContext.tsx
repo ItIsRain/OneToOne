@@ -68,8 +68,6 @@ export function TenantInfoProvider({ children }: { children: React.ReactNode }) 
     } else {
       localStorage.removeItem("custom_logo_url");
     }
-    // Dispatch event for any non-context consumers
-    window.dispatchEvent(new CustomEvent("logo-changed", { detail: url }));
   }, []);
 
   return (

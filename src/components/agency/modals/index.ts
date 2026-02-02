@@ -16,7 +16,6 @@ export { InviteMemberModal } from "./InviteMemberModal";
 export { UploadFileModal } from "./UploadFileModal";
 export { AddVenueModal } from "./AddVenueModal";
 export { NewBookingModal } from "./NewBookingModal";
-export { AddDealModal } from "./AddDealModal";
 export { RecordPaymentModal } from "./RecordPaymentModal";
 export { CreateBudgetModal } from "./CreateBudgetModal";
 export { CreateRoleModal } from "./CreateRoleModal";

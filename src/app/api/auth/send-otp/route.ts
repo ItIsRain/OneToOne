@@ -7,13 +7,31 @@ import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
+    // Rate limit by IP: 10 OTP requests per IP per 15 minutes
+    const ip = getClientIp(request);
+    const ipRateCheck = await checkRateLimit({
+      key: "send-otp-ip",
+      identifier: ip,
+      maxRequests: 10,
+      windowSeconds: 15 * 60,
+    });
+    if (!ipRateCheck.allowed) {
+      return rateLimitResponse(ipRateCheck.retryAfterSeconds!);
+    }
+
     const { email } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Rate limit: 5 OTP requests per email per 15 minutes
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+    }
+
+    // Rate limit by email: 5 OTP requests per email per 15 minutes
     const rateCheck = await checkRateLimit({
       key: "send-otp",
       identifier: email.toLowerCase(),
@@ -41,10 +59,10 @@ export async function POST(request: Request) {
         .single();
 
       if (existingProfile) {
-        const tenantInfo = existingProfile.tenants as unknown as { name: string; subdomain: string } | null;
-        const portalName = tenantInfo?.name || "another portal";
+        // Return generic error to prevent account enumeration
+        // Don't reveal which portal the email is affiliated with
         return NextResponse.json(
-          { error: `This email is already affiliated with ${portalName}. Please sign in instead.`, code: "EMAIL_AFFILIATED" },
+          { error: "This email is already in use. Please sign in instead.", code: "EMAIL_AFFILIATED" },
           { status: 409 }
         );
       }

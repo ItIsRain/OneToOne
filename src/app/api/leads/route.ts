@@ -147,11 +147,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
+    // Validate email format if provided
+    if (body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+      }
+    }
+
+    // Validate phone format if provided
+    if (body.phone) {
+      const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
+      if (!phoneRegex.test(body.phone)) {
+        return NextResponse.json({ error: "Invalid phone number format" }, { status: 400 });
+      }
+    }
+
+    // Truncate text fields to prevent oversized payloads
+    const truncate = (val: string | null | undefined, max: number) =>
+      val ? val.slice(0, max) : null;
+
     const leadData = {
       tenant_id: profile.tenant_id,
       created_by: user.id,
       // Contact Information
-      name: body.name,
+      name: body.name.slice(0, 200),
       email: body.email || null,
       phone: body.phone || null,
       company: body.company || null,
@@ -162,10 +182,10 @@ export async function POST(request: Request) {
       country: body.country || null,
       // Sales Pipeline
       status: body.status || "new",
-      estimated_value: body.estimated_value || 0,
-      probability: body.probability || 0,
+      estimated_value: Math.max(0, parseFloat(body.estimated_value) || 0),
+      probability: Math.min(100, Math.max(0, parseFloat(body.probability) || 0)),
       priority: body.priority || "medium",
-      score: body.score || 0,
+      score: Math.min(100, Math.max(0, parseInt(body.score) || 0)),
       // Source & Attribution
       source: body.source || null,
       campaign: body.campaign || null,
@@ -181,10 +201,10 @@ export async function POST(request: Request) {
       // Assignment
       assigned_to: body.assigned_to || null,
       // Notes & Requirements
-      notes: body.notes || null,
-      requirements: body.requirements || null,
-      pain_points: body.pain_points || null,
-      competitor_info: body.competitor_info || null,
+      notes: truncate(body.notes, 5000),
+      requirements: truncate(body.requirements, 5000),
+      pain_points: truncate(body.pain_points, 5000),
+      competitor_info: truncate(body.competitor_info, 5000),
       // Categorization
       tags: body.tags || null,
       services_interested: body.services_interested || null,

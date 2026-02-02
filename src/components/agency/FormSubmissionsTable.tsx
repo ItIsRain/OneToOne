@@ -413,7 +413,7 @@ export const FormSubmissionsTable: React.FC<FormSubmissionsTableProps> = ({
                         ? <span className="text-gray-400 italic">Not provided</span>
                         : Array.isArray(val)
                         ? val.join(", ")
-                        : field.type === "signature" && typeof val === "string"
+                        : field.type === "signature" && typeof val === "string" && val.startsWith("data:image/")
                         ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img

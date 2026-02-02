@@ -151,12 +151,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "First name and last name are required" }, { status: 400 });
     }
 
+    // Validate phone formats if provided
+    const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
+    const phoneFields = ["phone", "mobile_phone", "work_phone"];
+    for (const field of phoneFields) {
+      if (body[field] && !phoneRegex.test(body[field])) {
+        return NextResponse.json({ error: `Invalid ${field.replace(/_/g, " ")} format` }, { status: 400 });
+      }
+    }
+
     const contactData = {
       tenant_id: profile.tenant_id,
       created_by: user.id,
       // Personal Info
-      first_name: body.first_name,
-      last_name: body.last_name,
+      first_name: body.first_name.slice(0, 200),
+      last_name: body.last_name.slice(0, 200),
       email: body.email || null,
       secondary_email: body.secondary_email || null,
       phone: body.phone || null,
@@ -184,7 +193,7 @@ export async function POST(request: Request) {
       preferred_contact_method: body.preferred_contact_method || null,
       do_not_contact: body.do_not_contact || false,
       email_opt_in: body.email_opt_in !== false,
-      communication_notes: body.communication_notes || null,
+      communication_notes: body.communication_notes ? body.communication_notes.slice(0, 5000) : null,
       // Engagement
       status: body.status || "active",
       last_contacted_at: body.last_contacted_at || null,
@@ -193,13 +202,13 @@ export async function POST(request: Request) {
       // Personal
       birthday: body.birthday || null,
       anniversary: body.anniversary || null,
-      personal_notes: body.personal_notes || null,
+      personal_notes: body.personal_notes ? body.personal_notes.slice(0, 5000) : null,
       // Categorization
       contact_type: body.contact_type || "other",
       tags: body.tags || null,
       source: body.source || null,
       // Notes & Media
-      notes: body.notes || null,
+      notes: body.notes ? body.notes.slice(0, 5000) : null,
       avatar_url: body.avatar_url || null,
       // Assignment
       assigned_to: body.assigned_to || null,

@@ -114,6 +114,20 @@ export async function PATCH(
 
     const body = await request.json();
 
+    // Validate email format if provided
+    if (body.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.email)) {
+        return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+      }
+    }
+    if (body.secondary_email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.secondary_email)) {
+        return NextResponse.json({ error: "Invalid secondary email address" }, { status: 400 });
+      }
+    }
+
     // Only allow updating specific fields
     const allowedFields = [
       "first_name",

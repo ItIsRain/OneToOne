@@ -47,6 +47,37 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
+    // Verify proposal exists and is in a sendable state
+    const { data: existing } = await supabase
+      .from("proposals")
+      .select("status")
+      .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+    }
+
+    const sendableStatuses = ["draft", "sent"]; // Allow re-sending
+    if (!sendableStatuses.includes(existing.status)) {
+      return NextResponse.json(
+        { error: `Cannot send a proposal with status "${existing.status}"` },
+        { status: 400 }
+      );
+    }
+
     // Update proposal status to sent
     const { data: proposal, error } = await supabase
       .from("proposals")
@@ -56,6 +87,7 @@ export async function POST(
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .select(`
         *,
         client:clients(id, name, company, email)

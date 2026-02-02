@@ -45,11 +45,23 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     // Fetch original proposal
     const { data: original, error: fetchError } = await supabase
       .from("proposals")
       .select("*")
       .eq("id", id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (fetchError || !original) {
@@ -57,7 +69,7 @@ export async function POST(
     }
 
     // Generate new slug with -copy and random suffix
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const randomSuffix = crypto.randomUUID().substring(0, 8);
     const newSlug = `${original.slug}-copy-${randomSuffix}`;
 
     const duplicateData = {

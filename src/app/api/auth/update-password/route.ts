@@ -1,8 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 password update attempts per IP per 15 minutes
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit({
+      key: "update-password",
+      identifier: ip,
+      maxRequests: 5,
+      windowSeconds: 15 * 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
+    }
+
     const { password, accessToken } = await request.json();
 
     if (!password) {
@@ -19,9 +32,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: "Password must be at least 8 characters" },
         { status: 400 }
       );
     }

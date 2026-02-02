@@ -248,7 +248,15 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
                 }
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) onChange(file);
+                  if (file) {
+                    const maxSize = (field.validation?.maxFileSize as number) || 10 * 1024 * 1024; // 10MB default
+                    if (file.size > maxSize) {
+                      alert(`File size exceeds ${Math.round(maxSize / 1024 / 1024)}MB limit`);
+                      e.target.value = "";
+                      return;
+                    }
+                    onChange(file);
+                  }
                 }}
               />
             </label>

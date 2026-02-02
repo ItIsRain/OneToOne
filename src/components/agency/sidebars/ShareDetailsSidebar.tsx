@@ -119,7 +119,13 @@ export const ShareDetailsSidebar: React.FC<ShareDetailsSidebarProps> = ({
       if (res.ok && onDelete) {
         onDelete(share.id);
         onClose();
+      } else if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to delete share");
       }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Failed to delete share. Please try again.");
     } finally {
       setIsProcessing(false);
     }

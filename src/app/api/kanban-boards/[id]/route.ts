@@ -75,12 +75,20 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
+    const allowedFields = ["name", "description", "project_id", "columns", "settings"];
+    const updates: Record<string, unknown> = {
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    };
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        updates[key] = body[key];
+      }
+    }
+
     const { data, error } = await supabase
       .from("kanban_boards")
-      .update({
-        ...body,
-        updated_by: user.id,
-      })
+      .update(updates)
       .eq("id", id)
       .eq("tenant_id", profile.tenant_id)
       .select()

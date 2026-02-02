@@ -265,7 +265,7 @@ export const TimeEntriesTable = () => {
     return days.map((day, index) => {
       const date = new Date(weekStart);
       date.setDate(weekStart.getDate() + index);
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = date.toLocaleDateString("en-CA");
       const dayMinutes = timeEntries
         .filter((e) => e.date === dateStr)
         .reduce((sum, e) => sum + (e.duration_minutes || 0), 0);
@@ -503,7 +503,7 @@ export const TimeEntriesTable = () => {
                           </span>
                           {entry.start_time && (
                             <p className="text-xs text-gray-500">
-                              {formatTime(entry.start_time)} - {formatTime(entry.end_time)}
+                              {formatTime(entry.start_time)}{entry.end_time ? ` - ${formatTime(entry.end_time)}` : " - In progress"}
                             </p>
                           )}
                         </div>

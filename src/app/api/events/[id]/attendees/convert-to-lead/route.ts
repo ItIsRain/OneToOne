@@ -18,11 +18,34 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user's tenant_id from profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    }
+
     const body = await request.json();
     const { attendeeId, notes, priority = "medium", source } = body;
 
     if (!attendeeId) {
       return NextResponse.json({ error: "Attendee ID is required" }, { status: 400 });
+    }
+
+    // Get event details and verify it belongs to user's tenant
+    const { data: event } = await supabase
+      .from("events")
+      .select("title, tenant_id")
+      .eq("id", eventId)
+      .eq("tenant_id", profile.tenant_id)
+      .single();
+
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     // Get attendee details
@@ -37,33 +60,28 @@ export async function POST(
       return NextResponse.json({ error: "Attendee not found" }, { status: 404 });
     }
 
-    // Get event details for source
-    const { data: event } = await supabase
-      .from("events")
-      .select("title, tenant_id")
-      .eq("id", eventId)
-      .single();
+    // Check if lead already exists with this email (only if attendee has email)
+    if (attendee.email) {
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("email", attendee.email)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
 
-    // Check if lead already exists with this email
-    const { data: existingLead } = await supabase
-      .from("leads")
-      .select("id")
-      .eq("email", attendee.email)
-      .eq("tenant_id", event?.tenant_id)
-      .single();
-
-    if (existingLead) {
-      return NextResponse.json({
-        error: "Lead with this email already exists",
-        leadId: existingLead.id
-      }, { status: 400 });
+      if (existingLead) {
+        return NextResponse.json({
+          error: "Lead with this email already exists",
+          leadId: existingLead.id
+        }, { status: 400 });
+      }
     }
 
     // Create lead from attendee
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .insert({
-        tenant_id: event?.tenant_id,
+        tenant_id: profile.tenant_id,
         name: attendee.name,
         email: attendee.email,
         phone: attendee.phone,
@@ -104,7 +122,7 @@ export async function POST(
             lead_estimated_value: lead.estimated_value || null,
           },
           serviceClient,
-          event?.tenant_id,
+          profile.tenant_id,
           user.id
         );
       } catch (err) {

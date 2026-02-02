@@ -68,6 +68,29 @@ export const PortalFilesList: React.FC<PortalFilesListProps> = ({
     e.preventDefault();
     if (!newFileUrl.trim()) return;
 
+    // Validate URL is not an internal/private address
+    try {
+      const url = new URL(newFileUrl);
+      const hostname = url.hostname.toLowerCase();
+      if (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "0.0.0.0" ||
+        hostname.startsWith("10.") ||
+        hostname.startsWith("192.168.") ||
+        hostname.startsWith("172.") ||
+        hostname.endsWith(".local") ||
+        hostname.endsWith(".internal") ||
+        url.protocol === "file:"
+      ) {
+        setError("Invalid file URL: internal addresses are not allowed");
+        return;
+      }
+    } catch {
+      setError("Invalid URL format");
+      return;
+    }
+
     setUploading(true);
     try {
       const res = await fetch("/api/portal/files", {

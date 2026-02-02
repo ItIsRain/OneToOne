@@ -35,6 +35,7 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   };
 
   const handleRemoveOption = (index: number) => {
+    if (field.options.length <= 1) return; // Must keep at least one option
     const newOptions = field.options.filter((_, i) => i !== index);
     onChange({ ...field, options: newOptions });
   };

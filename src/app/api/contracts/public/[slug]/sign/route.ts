@@ -34,6 +34,29 @@ export async function POST(
       );
     }
 
+    // Validate signature inputs
+    if (typeof signature_name !== "string" || signature_name.length > 200) {
+      return NextResponse.json(
+        { error: "Signature name must be a string under 200 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof signature_data !== "string" || signature_data.length > 500000) {
+      return NextResponse.json(
+        { error: "Signature data is too large" },
+        { status: 400 }
+      );
+    }
+
+    // Validate signature_data is a valid data URI (base64 image)
+    if (!signature_data.startsWith("data:image/")) {
+      return NextResponse.json(
+        { error: "Signature data must be a valid image data URI" },
+        { status: 400 }
+      );
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

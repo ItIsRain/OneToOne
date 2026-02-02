@@ -98,9 +98,13 @@ export const GoalDetailsSidebar: React.FC<GoalDetailsSidebarProps> = ({
       if (res.ok) {
         onDelete?.(goal.id);
         onClose();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to delete goal");
       }
     } catch (error) {
       console.error("Delete error:", error);
+      alert("Failed to delete goal. Please try again.");
     } finally {
       setIsDeleting(false);
     }
