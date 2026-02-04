@@ -44,45 +44,40 @@ export default function SignInForm() {
       }
 
       // Determine where to redirect
-      // Only allow relative paths to prevent open redirect attacks
       const safeRedirect = redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")
         ? redirectPath
         : "/dashboard";
 
-      // Get user's tenant subdomain for redirect
-      // Use timeout to ensure redirect always fires even if queries hang
-      const tenantRedirect = await Promise.race([
-        (async () => {
-          try {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("tenant_id")
-              .eq("id", authData.user.id)
-              .single();
+      // Try to get tenant subdomain, but don't let it block navigation
+      let finalRedirect = safeRedirect;
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", authData.user.id)
+          .single();
 
-            if (profile?.tenant_id) {
-              const { data: tenant } = await supabase
-                .from("tenants")
-                .select("subdomain")
-                .eq("id", profile.tenant_id)
-                .single();
+        if (profile?.tenant_id) {
+          const { data: tenant } = await supabase
+            .from("tenants")
+            .select("subdomain")
+            .eq("id", profile.tenant_id)
+            .single();
 
-              if (tenant?.subdomain) {
-                return getTenantUrl(tenant.subdomain, safeRedirect);
-              }
-            }
-          } catch (queryErr) {
-            console.error("Post-login query failed:", queryErr);
+          if (tenant?.subdomain) {
+            finalRedirect = getTenantUrl(tenant.subdomain, safeRedirect);
           }
-          return null;
-        })(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-      ]);
+        }
+      } catch {
+        // Ignore query errors, just redirect to default
+      }
 
-      window.location.href = tenantRedirect || safeRedirect;
+      // Force navigation with a small delay to let auth state settle
+      setTimeout(() => {
+        window.location.assign(finalRedirect);
+      }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setIsLoading(false);
     }
   };

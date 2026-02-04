@@ -198,6 +198,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // On auth pages, don't fetch profile - the sign-in/signup forms
+        // handle their own navigation and we don't want to interfere
+        if (isAuthPage && session?.user) {
+          hadSessionRef.current = true;
+          setUser(session.user);
+          setLoading(false);
+          return;
+        }
+
         if (session?.user && !signal.aborted) {
           hadSessionRef.current = true;
           setUser(session.user);

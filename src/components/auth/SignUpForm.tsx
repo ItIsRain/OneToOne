@@ -3,12 +3,11 @@ import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getTenantUrl, getSubdomainSuffix } from "@/lib/url";
 
-type Step = "credentials" | "otp" | "mobile" | "onboarding" | "plan";
+type Step = "credentials" | "otp" | "mobile" | "onboarding";
 
 const COUNTRY_CODES = [
   { code: "+971", flag: "🇦🇪", name: "UAE" },
@@ -49,61 +48,6 @@ const useCaseOptions = [
   { value: "invoicing", label: "Invoicing & Payments" },
   { value: "projects", label: "Project Management" },
   { value: "other", label: "Other" },
-];
-
-const planOptions = [
-  {
-    value: "free",
-    name: "Free",
-    price: "0",
-    description: "Try the platform with basic features",
-    features: [
-      "3 events total",
-      "2 team members",
-      "500 MB storage",
-      "Basic analytics",
-    ],
-  },
-  {
-    value: "starter",
-    name: "Starter",
-    price: "29",
-    description: "For small teams getting started",
-    features: [
-      "10 events/month",
-      "5 team members",
-      "5 GB storage",
-      "Email support",
-      "Basic CRM & invoicing",
-    ],
-  },
-  {
-    value: "professional",
-    name: "Professional",
-    price: "79",
-    description: "For growing organizations",
-    features: [
-      "50 events/month",
-      "15 team members",
-      "25 GB storage",
-      "Priority support",
-      "Full CRM & judging system",
-    ],
-    popular: true,
-  },
-  {
-    value: "business",
-    name: "Business",
-    price: "199",
-    description: "For large organizations",
-    features: [
-      "Unlimited events",
-      "Unlimited team members",
-      "100 GB storage",
-      "Dedicated account manager",
-      "White-label & SSO",
-    ],
-  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -160,8 +104,6 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 /* ------------------------------------------------------------------ */
 
 export default function SignUpForm() {
-  const searchParams = useSearchParams();
-  const preselectedPlan = searchParams.get("plan") || "";
   const [step, setStep] = useState<Step>("credentials");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -187,7 +129,6 @@ export default function SignUpForm() {
     phoneNumber: "",
     useCase: "",
     subdomain: "",
-    plan: "",
   });
 
   const updateFormData = (field: string, value: string | string[]) => {
@@ -391,21 +332,11 @@ export default function SignUpForm() {
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    const validPlans = planOptions.map((p) => p.value);
-    if (preselectedPlan && validPlans.includes(preselectedPlan)) {
-      handleSelectPlan(preselectedPlan);
-      return;
-    }
-    setStep("plan");
-  };
-
-  const handleSelectPlan = async (selectedPlan: string) => {
     setIsLoading(true);
     setError("");
 
     const phone = `${formData.countryCode}${formData.phoneNumber.replace(/\D/g, "")}`;
-    const payload = { ...formData, email: formData.email.trim(), otp: undefined, plan: selectedPlan, phone };
+    const payload = { ...formData, email: formData.email.trim(), otp: undefined, plan: "free", phone };
 
     try {
       const res = await fetch("/api/auth/register", {
@@ -417,6 +348,13 @@ export default function SignUpForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create account");
 
+      // In dev mode (no Supabase configured), skip sign-in and redirect to dashboard
+      if (data.message?.includes("dev mode")) {
+        setTimeout(() => { window.location.assign("/dashboard"); }, 100);
+        return;
+      }
+
+      // Sign in the user
       const supabase = createClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email.trim(),
@@ -425,29 +363,29 @@ export default function SignUpForm() {
 
       if (signInError) {
         console.error("Sign in error:", signInError);
-        // Account was created but auto-login failed; redirect to sign in
         setError("Account created! Please sign in with your credentials.");
-        window.location.href = "/signin";
+        setIsLoading(false);
+        setTimeout(() => { window.location.assign("/signin"); }, 1500);
         return;
       }
 
-      window.location.href = getTenantUrl(formData.subdomain, "/dashboard?subscribed=true");
+      // Force navigation with a small delay to let auth state settle
+      const redirectUrl = getTenantUrl(formData.subdomain, "/dashboard");
+      setTimeout(() => { window.location.assign(redirectUrl); }, 100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setIsLoading(false);
     }
   };
 
   /* ---------- Render helpers ---------- */
 
-  const steps: Step[] = ["credentials", "otp", "mobile", "onboarding", "plan"];
+  const steps: Step[] = ["credentials", "otp", "mobile", "onboarding"];
   const stepLabels: Record<Step, string> = {
     credentials: "Account",
     otp: "Verify",
     mobile: "Phone",
     onboarding: "Portal",
-    plan: "Plan",
   };
 
   const renderStepIndicator = () => (
@@ -925,7 +863,14 @@ export default function SignUpForm() {
           disabled={isLoading || !formData.useCase || !formData.subdomain || !formData.firstName || !formData.lastName || subdomainStatus !== "available"}
           className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? "Creating your portal..." : "Continue"}
+          {isLoading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+              Creating your portal...
+            </>
+          ) : (
+            "Create Portal"
+          )}
         </button>
 
         <button
@@ -939,70 +884,6 @@ export default function SignUpForm() {
     </form>
   );
 
-  /* ---- Step 5: Plan ---- */
-  const renderPlanStep = () => (
-    <div className="space-y-4 pt-4 pb-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {planOptions.map((plan) => (
-          <div
-            key={plan.value}
-            onClick={() => !isLoading && handleSelectPlan(plan.value)}
-            className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${
-              formData.plan === plan.value
-                ? "border-brand-500 bg-brand-50 dark:border-brand-600 dark:bg-brand-900/20"
-                : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
-            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {"popular" in plan && plan.popular && (
-              <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-brand-500 text-white text-xs font-semibold rounded-full">
-                Popular
-              </span>
-            )}
-            <div>
-              <div className="flex items-baseline justify-between">
-                <h3 className="font-semibold text-gray-900 dark:text-white">{plan.name}</h3>
-                <div>
-                  <span className="text-xl font-bold text-gray-900 dark:text-white">${plan.price}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">/mo</span>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{plan.description}</p>
-            </div>
-            <ul className="mt-3 space-y-1">
-              {plan.features.map((feature) => (
-                <li key={feature} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                  <svg className="w-3.5 h-3.5 text-brand-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  {feature}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      {error && (
-        <p className="text-sm text-error-500">{error}</p>
-      )}
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-4">
-          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Creating your portal...</span>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setStep("onboarding")}
-        className="w-full text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 pb-2"
-      >
-        &larr; Back
-      </button>
-    </div>
-  );
-
   const getStepTitle = () => {
     switch (step) {
       case "credentials":
@@ -1013,8 +894,6 @@ export default function SignUpForm() {
         return { title: "Add your phone", subtitle: "We'll use this for account recovery & notifications" };
       case "onboarding":
         return { title: "Set up your portal", subtitle: "Tell us a bit about how you'll use 1i1" };
-      case "plan":
-        return { title: "Choose your plan", subtitle: "Select the plan that works best for you" };
     }
   };
 
@@ -1031,7 +910,7 @@ export default function SignUpForm() {
           Back to home
         </Link>
       </div>
-      <div className={`flex flex-col justify-center flex-1 w-full mx-auto px-4 ${step === "plan" ? "max-w-xl" : "max-w-md"}`}>
+      <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-4">
         <div>
           {renderStepIndicator()}
 
@@ -1048,7 +927,6 @@ export default function SignUpForm() {
           {step === "otp" && renderOTPStep()}
           {step === "mobile" && renderMobileStep()}
           {step === "onboarding" && renderOnboardingStep()}
-          {step === "plan" && renderPlanStep()}
 
           {step === "credentials" && (
             <div className="mt-5">
