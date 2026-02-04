@@ -33,6 +33,8 @@ const PUBLIC_PREFIXES = [
   "/book",
   "/api/book",
   "/invoice",
+  "/sitemap.xml",
+  "/robots.txt",
 ];
 
 function isPublicRoute(pathname: string): boolean {
