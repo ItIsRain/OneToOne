@@ -196,7 +196,7 @@ export async function GET() {
 
     // Project status distribution
     const projectStatus = {
-      active: projects.filter((p) => p.status === "active" || p.status === "in_progress").length,
+      active: projects.filter((p) => p.status === "in_progress").length,
       completed: projects.filter((p) => p.status === "completed").length,
       onHold: projects.filter((p) => p.status === "on_hold").length,
       planning: projects.filter((p) => p.status === "planning" || p.status === "draft").length,

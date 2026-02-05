@@ -79,7 +79,7 @@ export async function GET() {
 
     const { data: vendors, error } = await supabase
       .from("vendors")
-      .select("*")
+      .select("*, event_vendors(count)")
       .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false })
       .limit(500);
@@ -88,7 +88,16 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ vendors });
+    // Map event_vendors count to events_count for frontend compatibility
+    const vendorsWithCount = (vendors || []).map((v: Record<string, unknown>) => ({
+      ...v,
+      events_count: Array.isArray(v.event_vendors) && v.event_vendors.length > 0
+        ? (v.event_vendors[0] as { count: number }).count
+        : 0,
+      event_vendors: undefined,
+    }));
+
+    return NextResponse.json({ vendors: vendorsWithCount });
   } catch (error) {
     console.error("Get vendors error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
@@ -149,7 +158,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const vendorData = {
+    const vendorData: Record<string, unknown> = {
       tenant_id: profile.tenant_id,
       name: body.name,
       company: body.company || null,
@@ -157,8 +166,8 @@ export async function POST(request: Request) {
       phone: body.phone || null,
       category: body.category || null,
       services: body.services || null,
-      hourly_rate: body.hourly_rate || null,
-      rating: body.rating || null,
+      hourly_rate: body.hourly_rate ?? null,
+      rating: body.rating ?? null,
       status: body.status || "active",
       notes: body.notes || null,
       website: body.website || null,
@@ -167,6 +176,23 @@ export async function POST(request: Request) {
       country: body.country || null,
       tags: body.tags || null,
     };
+
+    // If a category name is provided, look up the category_id
+    if (body.category) {
+      const serviceClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: catRecord } = await serviceClient
+        .from("vendor_categories")
+        .select("id")
+        .eq("tenant_id", profile.tenant_id)
+        .eq("name", body.category)
+        .single();
+      if (catRecord) {
+        vendorData.category_id = catRecord.id;
+      }
+    }
 
     const { data: vendor, error } = await supabase
       .from("vendors")

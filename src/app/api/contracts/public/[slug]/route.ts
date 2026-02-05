@@ -25,7 +25,7 @@ export async function GET(
         client:clients(id, name)
       `)
       .eq("slug", slug)
-      .in("status", ["draft", "sent", "viewed", "active", "accepted", "declined", "signed"])
+      .in("status", ["draft", "sent", "viewed", "active", "pending_signature", "declined", "signed"])
       .single();
 
     if (error || !contract) {

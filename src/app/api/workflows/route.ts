@@ -62,6 +62,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, description, trigger_type, trigger_config, steps } = body;
 
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      return NextResponse.json({ error: "Workflow name is required" }, { status: 400 });
+    }
+    if (!trigger_type || typeof trigger_type !== "string") {
+      return NextResponse.json({ error: "Trigger type is required" }, { status: 400 });
+    }
+
     const { data: workflow, error: workflowError } = await supabase
       .from("workflows")
       .insert({

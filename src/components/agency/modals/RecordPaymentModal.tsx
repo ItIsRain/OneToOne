@@ -11,11 +11,14 @@ interface RecordPaymentModalProps {
 }
 
 const paymentMethods = [
-  { value: "bank-transfer", label: "Bank Transfer" },
-  { value: "credit-card", label: "Credit Card" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "credit_card", label: "Credit Card" },
+  { value: "debit_card", label: "Debit Card" },
   { value: "paypal", label: "PayPal" },
+  { value: "stripe", label: "Stripe" },
   { value: "check", label: "Check" },
   { value: "cash", label: "Cash" },
+  { value: "other", label: "Other" },
 ];
 
 const clients = [
@@ -38,7 +41,7 @@ export function RecordPaymentModal({ isOpen, onClose }: RecordPaymentModalProps)
     client: "",
     invoice: "",
     amount: "",
-    method: "bank-transfer",
+    method: "bank_transfer",
     date: "",
     reference: "",
     notes: "",

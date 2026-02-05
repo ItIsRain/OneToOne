@@ -99,15 +99,25 @@ export const NotificationsTable = () => {
     });
   };
 
-  const handleDeleteNotification = (id: string) => {
+  const handleDeleteNotification = async (id: string) => {
     setNotifications(notifications.filter((n) => n.id !== id));
+    await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [id] }),
+    });
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (!confirm("Are you sure you want to clear all notifications?")) {
       return;
     }
     setNotifications([]);
+    await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
   };
 
   if (loading) {

@@ -85,7 +85,7 @@ export async function GET() {
         .from("projects")
         .select("id, status, progress_percentage", { count: "exact" })
         .eq("tenant_id", tenantId)
-        .in("status", ["active", "in_progress", "on_hold"]),
+        .in("status", ["in_progress", "on_hold"]),
 
       // Pending tasks
       supabase
@@ -251,7 +251,7 @@ export async function GET() {
           low: tasks.filter((t) => t.priority === "low").length,
         },
         projectsByStatus: {
-          active: projects.filter((p) => p.status === "active" || p.status === "in_progress").length,
+          active: projects.filter((p) => p.status === "in_progress").length,
           onHold: projects.filter((p) => p.status === "on_hold").length,
         },
         invoicesByStatus: {

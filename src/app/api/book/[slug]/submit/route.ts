@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { validateBody, publicBookingSubmitSchema } from "@/lib/validations";
+import { headers } from "next/headers";
 
 // PUBLIC route - no auth required, uses service role client
 // POST - Submit a booking
@@ -30,13 +31,22 @@ export async function POST(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Scope slug lookup to tenant if accessed via subdomain (x-tenant-id set by middleware)
+    const headersList = await headers();
+    const tenantId = headersList.get("x-tenant-id");
+
     // Look up booking page by slug
-    const { data: bookingPage, error: pageError } = await supabase
+    let pageQuery = supabase
       .from("booking_pages")
       .select("*")
       .eq("slug", slug)
-      .eq("is_active", true)
-      .single();
+      .eq("is_active", true);
+
+    if (tenantId) {
+      pageQuery = pageQuery.eq("tenant_id", tenantId);
+    }
+
+    const { data: bookingPage, error: pageError } = await pageQuery.single();
 
     if (pageError || !bookingPage) {
       return NextResponse.json({ error: "Booking page not found" }, { status: 404 });
@@ -80,26 +90,36 @@ export async function POST(
 
     // Resolve availability — match the same logic as the GET route
     const memberId = bookingPage.assigned_member_id;
-    const dayOfWeek = requestedStart.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const dateStr = requestedStart.toISOString().split("T")[0];
 
-    // Fetch matching availability slots (scoped to member if assigned, otherwise any tenant member)
+    // Helper: get time string (HH:MM:SS) for a UTC date in a given timezone
+    function getTimeInTimezone(utcDate: Date, timezone: string): string {
+      return utcDate.toLocaleTimeString("en-GB", { timeZone: timezone, hour12: false });
+    }
+
+    // Helper: get day of week (0=Sun..6=Sat) for a UTC date in a given timezone
+    function getDayInTimezone(utcDate: Date, timezone: string): number {
+      const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).formatToParts(utcDate);
+      const weekday = parts.find((p) => p.type === "weekday")?.value;
+      const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      return dayMap[weekday || ""] ?? utcDate.getDay();
+    }
+
+    // First, fetch all availability for this member/tenant to determine timezone
     let availQuery = supabase
       .from("team_availability")
       .select("*")
       .eq("tenant_id", bookingPage.tenant_id)
-      .eq("day_of_week", dayOfWeek)
       .eq("is_available", true);
 
     if (memberId) {
       availQuery = availQuery.eq("member_id", memberId);
     }
 
-    const { data: availSlots } = await availQuery;
+    const { data: allAvailSlots } = await availQuery;
 
     // If no slots and no assigned member, try tenant owner
-    let resolvedSlots = availSlots;
-    if ((!availSlots || availSlots.length === 0) && !memberId) {
+    let allResolvedSlots = allAvailSlots;
+    if ((!allAvailSlots || allAvailSlots.length === 0) && !memberId) {
       const { data: tenantData } = await supabase
         .from("tenants")
         .select("owner_id")
@@ -112,25 +132,44 @@ export async function POST(
           .select("*")
           .eq("tenant_id", bookingPage.tenant_id)
           .eq("member_id", tenantData.owner_id)
-          .eq("day_of_week", dayOfWeek)
           .eq("is_available", true);
 
-        resolvedSlots = ownerSlots;
+        allResolvedSlots = ownerSlots;
       }
     }
 
-    if (!resolvedSlots || resolvedSlots.length === 0) {
+    if (!allResolvedSlots || allResolvedSlots.length === 0) {
       return NextResponse.json(
         { error: "The selected time is not within available hours" },
         { status: 400 }
       );
     }
 
-    // Check if the requested time falls within any available window
+    // Filter slots for the correct day of week using timezone-aware day calculation
+    // Use the first slot's timezone to determine the day of week
+    const slotTimezone = allResolvedSlots[0]?.timezone || "UTC";
+    const dayOfWeek = getDayInTimezone(requestedStart, slotTimezone);
+    // Compute date string in the availability timezone (en-CA gives YYYY-MM-DD)
+    const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: slotTimezone }).format(requestedStart);
+
+    const resolvedSlots = allResolvedSlots.filter((slot) => slot.day_of_week === dayOfWeek);
+
+    if (resolvedSlots.length === 0) {
+      return NextResponse.json(
+        { error: "The selected time is not within available hours" },
+        { status: 400 }
+      );
+    }
+
+    // Check if the requested time falls within any available window (timezone-aware)
     const fitsAnySlot = resolvedSlots.some((slot) => {
-      const availStart = new Date(`${dateStr}T${slot.start_time}`);
-      const availEnd = new Date(`${dateStr}T${slot.end_time}`);
-      return requestedStart >= availStart && requestedEnd <= availEnd;
+      const tz = slot.timezone || "UTC";
+      const startInTz = getTimeInTimezone(requestedStart, tz);
+      const endInTz = getTimeInTimezone(requestedEnd, tz);
+      // Normalize slot times to HH:MM:SS
+      const slotStart = slot.start_time.length === 5 ? slot.start_time + ":00" : slot.start_time;
+      const slotEnd = slot.end_time.length === 5 ? slot.end_time + ":00" : slot.end_time;
+      return startInTz >= slotStart && endInTz <= slotEnd;
     });
 
     if (!fitsAnySlot) {
@@ -161,10 +200,13 @@ export async function POST(
         }
 
         if (override.is_blocked && override.start_time && override.end_time) {
-          const blockStart = new Date(`${dateStr}T${override.start_time}`);
-          const blockEnd = new Date(`${dateStr}T${override.end_time}`);
+          // Compare in the availability timezone
+          const startInTz = getTimeInTimezone(requestedStart, slotTimezone);
+          const endInTz = getTimeInTimezone(requestedEnd, slotTimezone);
+          const blockStart = override.start_time.length === 5 ? override.start_time + ":00" : override.start_time;
+          const blockEnd = override.end_time.length === 5 ? override.end_time + ":00" : override.end_time;
 
-          if (requestedStart < blockEnd && requestedEnd > blockStart) {
+          if (startInTz < blockEnd && endInTz > blockStart) {
             return NextResponse.json(
               { error: "The selected time overlaps with a blocked period" },
               { status: 400 }
@@ -181,14 +223,22 @@ export async function POST(
     const bufferedStart = new Date(requestedStart.getTime() - bufferBefore * 60 * 1000);
     const bufferedEnd = new Date(requestedEnd.getTime() + bufferAfter * 60 * 1000);
 
-    const { data: conflictingAppointments } = await supabase
+    // Check across ALL booking pages for the same assigned member to prevent double-booking
+    let overlapQuery = supabase
       .from("appointments")
       .select("id, start_time, end_time")
       .eq("tenant_id", bookingPage.tenant_id)
-      .eq("booking_page_id", bookingPage.id)
       .neq("status", "cancelled")
       .lt("start_time", bufferedEnd.toISOString())
       .gt("end_time", bufferedStart.toISOString());
+
+    if (resolvedMemberId) {
+      overlapQuery = overlapQuery.eq("assigned_member_id", resolvedMemberId);
+    } else {
+      overlapQuery = overlapQuery.eq("booking_page_id", bookingPage.id);
+    }
+
+    const { data: conflictingAppointments } = await overlapQuery;
 
     if (conflictingAppointments && conflictingAppointments.length > 0) {
       return NextResponse.json(

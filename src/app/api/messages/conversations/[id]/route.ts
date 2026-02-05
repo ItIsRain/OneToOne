@@ -187,6 +187,11 @@ export async function POST(
     const body = await request.json();
     const { content, type = "text", fileName, fileUrl } = body;
 
+    const validMessageTypes = ["text", "image", "file", "voice", "video"];
+    if (!validMessageTypes.includes(type)) {
+      return NextResponse.json({ error: `Invalid message type. Must be one of: ${validMessageTypes.join(", ")}` }, { status: 400 });
+    }
+
     if (!content && !fileUrl) {
       return NextResponse.json({ error: "Content or file required" }, { status: 400 });
     }

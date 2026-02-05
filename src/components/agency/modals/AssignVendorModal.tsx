@@ -12,7 +12,7 @@ interface Vendor {
 
 interface Event {
   id: string;
-  name: string;
+  title: string;
 }
 
 interface AssignVendorModalProps {
@@ -171,7 +171,7 @@ export const AssignVendorModal: React.FC<AssignVendorModalProps> = ({
               <option value="">Select event</option>
               {events.map((ev) => (
                 <option key={ev.id} value={ev.id}>
-                  {ev.name}
+                  {ev.title}
                 </option>
               ))}
             </select>

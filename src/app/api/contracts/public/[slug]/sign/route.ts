@@ -77,12 +77,16 @@ export async function POST(
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 
-    if (contract.status === "signed" || contract.status === "accepted") {
+    if (contract.status === "signed") {
       return NextResponse.json({ error: "Contract already signed" }, { status: 400 });
     }
 
     if (contract.status === "declined") {
       return NextResponse.json({ error: "Contract was declined" }, { status: 400 });
+    }
+
+    if (contract.status === "terminated" || contract.status === "expired") {
+      return NextResponse.json({ error: `Contract is ${contract.status}` }, { status: 400 });
     }
 
     // Reuse IP from rate limit check above

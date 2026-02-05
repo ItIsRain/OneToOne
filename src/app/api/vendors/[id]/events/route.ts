@@ -177,10 +177,11 @@ export async function POST(
     const { data: eventVendor, error } = await supabase
       .from("event_vendors")
       .insert({
+        tenant_id: profile.tenant_id,
         event_id: body.event_id,
         vendor_id: vendorId,
         role: body.role || null,
-        agreed_rate: body.agreed_rate || null,
+        agreed_rate: body.agreed_rate ?? null,
         status: body.status || "pending",
         notes: body.notes || null,
       })

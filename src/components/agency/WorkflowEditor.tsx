@@ -1043,7 +1043,6 @@ function NodeConfigPanel({
                 <option value="">Any</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="prospect">Prospect</option>
                 <option value="archived">Archived</option>
               </select>
             </div>
@@ -1053,7 +1052,6 @@ function NodeConfigPanel({
                 <option value="">Any</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="prospect">Prospect</option>
                 <option value="archived">Archived</option>
               </select>
             </div>
@@ -1312,7 +1310,7 @@ function NodeConfigPanel({
           <>
             <div><label className={labelClass}>Project Name</label><input className={inputClass} value={(node.config.name as string) ?? ""} onChange={(e) => update("name", e.target.value)} onFocus={trackFocus("name")} placeholder="e.g. Client Onboarding" /></div>
             <div><label className={labelClass}>Description</label><textarea className={inputClass} rows={2} value={(node.config.description as string) ?? ""} onChange={(e) => update("description", e.target.value)} onFocus={trackFocus("description")} placeholder="Project description" /></div>
-            <div><label className={labelClass}>Initial Status</label><select className={inputClass} value={(node.config.status as string) || "planning"} onChange={(e) => update("status", e.target.value)}><option value="planning">Planning</option><option value="active">Active</option><option value="on_hold">On Hold</option></select></div>
+            <div><label className={labelClass}>Initial Status</label><select className={inputClass} value={(node.config.status as string) || "planning"} onChange={(e) => update("status", e.target.value)}><option value="planning">Planning</option><option value="in_progress">In Progress</option><option value="on_hold">On Hold</option></select></div>
           </>
         );
       case "create_event":
@@ -1346,7 +1344,7 @@ function NodeConfigPanel({
         return (
           <>
             <div><label className={labelClass}>Entity Type</label><select className={inputClass} value={(node.config.entity_type as string) || ""} onChange={(e) => update("entity_type", e.target.value)}><option value="">Use trigger entity</option><option value="task">Task</option><option value="project">Project</option><option value="event">Event</option></select></div>
-            <div><label className={labelClass}>New Status</label><input className={inputClass} value={(node.config.new_status as string) ?? ""} onChange={(e) => update("new_status", e.target.value)} placeholder="e.g. completed, active" /></div>
+            <div><label className={labelClass}>New Status</label><input className={inputClass} value={(node.config.new_status as string) ?? ""} onChange={(e) => update("new_status", e.target.value)} placeholder="e.g. completed, in_progress" /></div>
           </>
         );
       case "update_field":

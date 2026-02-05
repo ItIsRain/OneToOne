@@ -124,6 +124,9 @@ export async function PUT(
       "name",
       "slug",
       "status",
+      "client_id",
+      "project_id",
+      "proposal_id",
       "sections",
       "contract_type",
       "start_date",
@@ -140,6 +143,29 @@ export async function PUT(
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
         updates[key] = body[key];
+      }
+    }
+
+    // Validate FK references belong to the same tenant
+    if (updates.client_id) {
+      const { data: client } = await supabase
+        .from("clients").select("id").eq("id", updates.client_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!client) {
+        return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      }
+    }
+    if (updates.project_id) {
+      const { data: project } = await supabase
+        .from("projects").select("id").eq("id", updates.project_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+    }
+    if (updates.proposal_id) {
+      const { data: proposal } = await supabase
+        .from("proposals").select("id").eq("id", updates.proposal_id as string).eq("tenant_id", profile.tenant_id).single();
+      if (!proposal) {
+        return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
       }
     }
 

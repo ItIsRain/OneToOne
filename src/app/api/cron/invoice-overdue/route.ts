@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .lt("due_date", today)
       .not("status", "eq", "paid")
       .not("status", "eq", "cancelled")
-      .not("status", "eq", "void");
+      .not("status", "eq", "refunded");
 
     if (error) {
       console.error("Failed to fetch overdue invoices:", error.message);

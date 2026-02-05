@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       "due_date", "start_date", "completed_at", "started_at",
       "estimated_hours", "actual_hours", "position", "tags",
       "category", "notes", "is_recurring", "recurrence_pattern",
-      "kanban_column_id", "board_id",
+      "kanban_board_id", "swimlane",
     ];
     const filtered: Record<string, unknown> = {};
     for (const key of allowedFields) {

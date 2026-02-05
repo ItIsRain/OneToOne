@@ -175,7 +175,7 @@ export async function PATCH(
     const allowedFields = [
       "booking_page_id", "client_name", "client_email", "client_phone",
       "start_time", "end_time", "status", "form_response_id", "lead_id",
-      "source", "notes", "assigned_member_id",
+      "source", "notes", "assigned_member_id", "cancellation_reason",
     ];
 
     const updates: Record<string, unknown> = {};

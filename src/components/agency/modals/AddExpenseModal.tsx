@@ -29,15 +29,20 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   });
 
   const categoryOptions = [
-    { value: "venues", label: "Venues" },
-    { value: "food-beverage", label: "Food & Beverage" },
-    { value: "marketing", label: "Marketing" },
-    { value: "technology", label: "Technology" },
     { value: "travel", label: "Travel" },
-    { value: "equipment", label: "Equipment" },
     { value: "supplies", label: "Office Supplies" },
-    { value: "professional-services", label: "Professional Services" },
+    { value: "equipment", label: "Equipment" },
+    { value: "software", label: "Software" },
+    { value: "marketing", label: "Marketing" },
+    { value: "meals", label: "Meals & Entertainment" },
     { value: "utilities", label: "Utilities" },
+    { value: "rent", label: "Rent" },
+    { value: "salaries", label: "Salaries" },
+    { value: "contractors", label: "Contractors" },
+    { value: "insurance", label: "Insurance" },
+    { value: "taxes", label: "Taxes" },
+    { value: "entertainment", label: "Entertainment" },
+    { value: "professional_services", label: "Professional Services" },
     { value: "other", label: "Other" },
   ];
 

@@ -62,7 +62,7 @@ export async function GET() {
         .from("leads")
         .select("id, name, company, estimated_value, probability, expected_close_date, status, source")
         .eq("tenant_id", tenantId)
-        .in("status", ["new", "qualification", "proposal", "negotiation"]),
+        .in("status", ["new", "contacted", "qualified", "proposal", "negotiation"]),
       supabase
         .from("proposals")
         .select("id, title, pricing_items, status, valid_until, currency, client_id, clients(name)")

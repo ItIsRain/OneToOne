@@ -70,7 +70,16 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { steps, graph_layout, ...workflowFields } = body;
+    const { steps, graph_layout, ...rawFields } = body;
+
+    // Whitelist allowed fields to prevent overwriting tenant_id, created_by, etc.
+    const allowedFields = ["name", "description", "trigger_type", "trigger_config", "status", "is_template", "template_category", "canvas_data"];
+    const workflowFields: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (rawFields[key] !== undefined) {
+        workflowFields[key] = rawFields[key];
+      }
+    }
 
     // Persist graph_layout alongside other workflow fields
     if (graph_layout !== undefined) {

@@ -98,11 +98,11 @@ export async function GET(request: Request) {
 
     const now = new Date().toISOString();
     if (upcoming === "true") {
-      query = query.gte("start_time", now);
+      query = query.gte("start_time", now).neq("status", "cancelled");
     }
 
     if (past === "true") {
-      query = query.lt("start_time", now);
+      query = query.lt("start_time", now).neq("status", "cancelled");
     }
 
     query = query.order("start_time", { ascending: false });
@@ -188,6 +188,7 @@ export async function POST(request: Request) {
       source: body.source || null,
       notes: body.notes || null,
       assigned_member_id: body.assigned_member_id || null,
+      cancellation_reason: body.cancellation_reason || null,
     };
 
     const { data: appointment, error } = await supabase

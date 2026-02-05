@@ -148,7 +148,30 @@ export async function PATCH(
     const updates: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
-        updates[key] = body[key];
+        // Use nullish coalescing for numeric fields to preserve 0 values
+        if (key === "hourly_rate" || key === "rating") {
+          updates[key] = body[key] ?? null;
+        } else {
+          updates[key] = body[key];
+        }
+      }
+    }
+
+    // If category name is updated, also update category_id FK
+    if (body.category !== undefined) {
+      if (body.category) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+        const svcClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        const { data: catRecord } = await svcClient
+          .from("vendor_categories")
+          .select("id")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("name", body.category)
+          .single();
+        updates.category_id = catRecord?.id || null;
+      } else {
+        updates.category_id = null;
       }
     }
 

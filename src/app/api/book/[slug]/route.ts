@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 
 // PUBLIC route - no auth required, uses service role client
 // GET - Fetch public booking page data by slug
@@ -15,13 +16,22 @@ export async function GET(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Scope slug lookup to tenant if accessed via subdomain (x-tenant-id set by middleware)
+    const headersList = await headers();
+    const tenantId = headersList.get("x-tenant-id");
+
     // Look up booking page by slug where active
-    const { data: bookingPage, error: pageError } = await supabase
+    let pageQuery = supabase
       .from("booking_pages")
       .select("*")
       .eq("slug", slug)
-      .eq("is_active", true)
-      .single();
+      .eq("is_active", true);
+
+    if (tenantId) {
+      pageQuery = pageQuery.eq("tenant_id", tenantId);
+    }
+
+    const { data: bookingPage, error: pageError } = await pageQuery.single();
 
     if (pageError || !bookingPage) {
       return NextResponse.json({ error: "Booking page not found" }, { status: 404 });

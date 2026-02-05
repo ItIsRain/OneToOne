@@ -163,7 +163,7 @@ export async function POST(request: Request) {
       tenant_id: profile.tenant_id,
       member_id: body.member_id,
       override_date: body.override_date,
-      is_blocked: body.is_blocked !== undefined ? body.is_blocked : false,
+      is_blocked: body.is_blocked !== undefined ? body.is_blocked : true,
       start_time: body.start_time || null,
       end_time: body.end_time || null,
       reason: body.reason || null,

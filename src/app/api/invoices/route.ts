@@ -248,7 +248,7 @@ export async function POST(request: Request) {
       status: v.status,
       issue_date: issueDate,
       due_date: v.due_date || null,
-      payment_terms: body.payment_terms || 'net_30',
+      payment_terms: v.payment_terms,
       notes: v.notes || null,
       terms_and_conditions: body.terms_and_conditions || null,
       footer_note: body.footer_note || null,

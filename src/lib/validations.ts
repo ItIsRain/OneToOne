@@ -21,8 +21,9 @@ export const createInvoiceSchema = z.object({
   discount_value: z.coerce.number().min(0).optional().default(0),
   currency: z.string().min(3).max(3).optional().default("USD"),
   due_date: optionalDate,
+  payment_terms: z.enum(["due_on_receipt", "net_7", "net_15", "net_30", "net_45", "net_60", "custom"]).optional().default("net_30"),
   notes: z.string().max(5000).nullish(),
-  status: z.enum(["draft", "sent", "viewed", "paid", "partially_paid", "overdue", "cancelled", "refunded", "void"]).optional().default("draft"),
+  status: z.enum(["draft", "sent", "viewed", "paid", "partially_paid", "overdue", "cancelled", "refunded"]).optional().default("draft"),
   items: z
     .array(
       z.object({
@@ -46,7 +47,7 @@ export const createPaymentSchema = z.object({
   amount: nonNegativeNumber,
   currency: z.string().min(3).max(3).optional().default("USD"),
   payment_date: optionalDate,
-  payment_method: z.string().max(100).nullish(),
+  payment_method: z.enum(["cash", "bank_transfer", "credit_card", "debit_card", "check", "paypal", "stripe", "other"]).nullish(),
   transaction_id: z.string().max(255).nullish(),
   reference_number: z.string().max(255).nullish(),
   status: z.enum(["pending", "completed", "failed", "refunded", "cancelled"]).optional().default("completed"),
@@ -60,13 +61,13 @@ export const createExpenseSchema = z.object({
   amount: nonNegativeNumber,
   currency: z.string().min(3).max(3).optional().default("USD"),
   expense_date: optionalDate,
-  category: z.string().max(255).nullish(),
+  category: z.enum(["travel", "supplies", "equipment", "software", "marketing", "meals", "utilities", "rent", "salaries", "contractors", "insurance", "taxes", "entertainment", "professional_services", "other"]).nullish(),
   project_id: optionalUuid,
   event_id: optionalUuid,
   client_id: optionalUuid,
   vendor_id: optionalUuid,
   vendor_name: z.string().max(255).nullish(),
-  payment_method: z.string().max(100).nullish(),
+  payment_method: z.enum(["cash", "bank_transfer", "credit_card", "debit_card", "check", "paypal", "company_card", "petty_cash", "other"]).nullish(),
   receipt_url: z.union([z.string().url(), z.literal(""), z.null(), z.undefined()]),
   receipt_number: z.string().max(100).nullish(),
   is_reimbursable: z.boolean().optional(),
@@ -86,22 +87,22 @@ export const createBudgetSchema = z.object({
   amount: nonNegativeNumber,
   spent: nonNegativeNumber.optional().default(0),
   currency: z.string().min(3).max(3).optional().default("USD"),
-  period_type: z.enum(["monthly", "quarterly", "yearly", "custom"]).optional().default("monthly"),
+  period_type: z.enum(["monthly", "quarterly", "yearly", "project", "custom"]).optional().default("monthly"),
   start_date: z.string().date("Invalid start date"),
   end_date: optionalDate,
-  category: z.string().max(255).nullish(),
+  category: z.enum(["marketing", "operations", "payroll", "travel", "equipment", "software", "contractors", "events", "general", "other"]).nullish(),
   project_id: optionalUuid,
   client_id: optionalUuid,
   department: z.string().max(255).nullish(),
   alert_threshold: z.coerce.number().min(0).max(100).optional().default(80),
-  status: z.enum(["active", "paused", "completed", "cancelled"]).optional().default("active"),
+  status: z.enum(["draft", "active", "paused", "completed", "exceeded"]).optional().default("active"),
   notes: z.string().max(5000).nullish(),
   tags: z.any().nullish(),
   rollover_enabled: z.boolean().optional().default(false),
   rollover_amount: nonNegativeNumber.optional().default(0),
   fiscal_year: z.coerce.number().int().min(2000).max(2100).optional(),
   is_recurring: z.boolean().optional().default(false),
-  recurrence_interval: z.string().max(50).nullish(),
+  recurrence_interval: z.enum(["monthly", "quarterly", "yearly"]).nullish(),
 });
 
 // ── Registration ─────────────────────────────────────────────────────
@@ -146,8 +147,8 @@ export const createEventSchema = z.object({
   end_date_value: optionalDatetime,
   start_time: z.string().max(10).nullish(),
   end_time: z.string().max(10).nullish(),
-  status: z.enum(["upcoming", "in_progress", "completed", "cancelled", "postponed"]).optional().default("upcoming"),
-  event_type: z.enum(["general", "hackathon", "workshop", "meetup", "game_jam", "demo_day", "conference", "webinar", "networking", "seminar"]).optional().default("general"),
+  status: z.enum(["upcoming", "in_progress", "completed", "cancelled"]).optional().default("upcoming"),
+  event_type: z.enum(["general", "meeting", "conference", "workshop", "webinar", "hackathon", "game_jam", "keynote", "panel", "fireside_chat", "product_launch", "demo_day", "design_sprint", "awards", "networking", "training", "team_building", "client_meeting", "deadline", "milestone", "meetup"]).optional().default("general"),
   category: z.string().max(100).optional().default("General"),
   icon: z.string().max(10).optional(),
   color: z.string().max(20).nullish(),
@@ -203,7 +204,7 @@ export const createAttendeeSchema = z.object({
   job_title: z.string().max(255).nullish(),
   skills: z.array(z.string().max(100)).optional().default([]),
   bio: z.string().max(2000).nullish(),
-  status: z.enum(["confirmed", "attended", "no_show", "cancelled", "waitlisted"]).optional().default("confirmed"),
+  status: z.enum(["pending", "confirmed", "declined", "maybe", "attended", "no_show"]).optional().default("confirmed"),
 });
 
 export const updateAttendeeSchema = z.object({
@@ -213,7 +214,7 @@ export const updateAttendeeSchema = z.object({
   job_title: z.string().max(255).nullish(),
   skills: z.array(z.string().max(100)).optional(),
   bio: z.string().max(2000).nullish(),
-  status: z.enum(["confirmed", "attended", "no_show", "cancelled", "waitlisted"]).optional(),
+  status: z.enum(["pending", "confirmed", "declined", "maybe", "attended", "no_show"]).optional(),
   looking_for_team: z.boolean().optional(),
 });
 
@@ -227,7 +228,7 @@ export const createJudgeSchema = z.object({
 // ── Event Submission (admin update) ─────────────────────────────────
 
 export const updateSubmissionSchema = z.object({
-  status: z.enum(["draft", "submitted", "accepted", "rejected", "winner"]).optional(),
+  status: z.enum(["draft", "submitted", "under_review", "accepted", "rejected", "winner"]).optional(),
   winner_place: z.coerce.number().int().min(1).nullish(),
   winner_prize: z.string().max(500).nullish(),
   judge_notes: z.string().max(5000).nullish(),
@@ -282,7 +283,7 @@ export const createContactSchema = z.object({
   postal_code: z.string().max(20).nullish(),
   country: z.string().max(100).nullish(),
   timezone: z.string().max(100).nullish(),
-  preferred_contact_method: z.enum(["email", "phone", "whatsapp", "linkedin", "sms", "other"]).nullish(),
+  preferred_contact_method: z.enum(["email", "phone", "whatsapp", "linkedin", "sms"]).nullish(),
   do_not_contact: z.boolean().optional(),
   email_opt_in: z.boolean().optional(),
   communication_notes: z.string().max(2000).nullish(),
@@ -316,7 +317,7 @@ export const createClientSchema = z.object({
   state: z.string().max(100).nullish(),
   postal_code: z.string().max(20).nullish(),
   country: z.string().max(100).nullish(),
-  status: z.enum(["active", "inactive", "archived", "prospect"]).optional().default("active"),
+  status: z.enum(["active", "inactive", "archived"]).optional().default("active"),
   industry: z.string().max(100).nullish(),
   source: z.string().max(100).nullish(),
   notes: z.string().max(5000).nullish(),
@@ -337,7 +338,7 @@ export const createLeadSchema = z.object({
   email: optionalEmail,
   phone: optionalPhone,
   website: optionalUrl,
-  status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost", "on_hold"]).optional().default("new"),
+  status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]).optional().default("new"),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional().default("medium"),
   source: z.string().max(100).nullish(),
   estimated_value: nonNegativeNumber.nullish(),
@@ -376,7 +377,7 @@ export const createProjectSchema = z.object({
   description: z.string().max(5000).nullish(),
   project_code: z.string().max(50).nullish(),
   project_type: z.string().max(100).nullish(),
-  status: z.enum(["draft", "planning", "in_progress", "on_hold", "review", "completed", "cancelled"]).optional().default("draft"),
+  status: z.enum(["draft", "planning", "in_progress", "on_hold", "review", "completed", "cancelled", "archived"]).optional().default("draft"),
   priority: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
   start_date: optionalDate,
   end_date: optionalDate,
@@ -406,12 +407,12 @@ export const updateProjectSchema = createProjectSchema.partial();
 export const createTaskSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500),
   description: z.string().max(5000).nullish(),
-  status: z.enum(["todo", "in_progress", "in_review", "done", "blocked", "cancelled"]).optional().default("todo"),
-  priority: z.enum(["low", "medium", "high", "urgent"]).optional().default("medium"),
+  status: z.enum(["backlog", "todo", "pending", "in_progress", "in_review", "blocked", "completed", "cancelled"]).optional().default("todo"),
+  priority: z.enum(["low", "medium", "high", "urgent", "critical"]).optional().default("medium"),
   project_id: optionalUuid,
   assigned_to: optionalUuid,
-  board_id: optionalUuid,
-  column_id: z.string().max(100).nullish(),
+  kanban_board_id: optionalUuid,
+  swimlane: z.string().max(100).nullish(),
   start_date: optionalDate,
   due_date: optionalDate,
   estimated_hours: nonNegativeNumber.nullish(),
@@ -447,7 +448,7 @@ export const createVendorSchema = z.object({
   services: z.any().nullish(),
   hourly_rate: nonNegativeNumber.nullish(),
   rating: z.coerce.number().min(0, "Rating must be at least 0").max(5, "Rating must be at most 5").nullish(),
-  status: z.enum(["active", "inactive", "pending", "blacklisted"]).optional().default("active"),
+  status: z.enum(["active", "inactive", "archived"]).optional().default("active"),
   notes: z.string().max(5000).nullish(),
   website: optionalUrl,
   address: z.string().max(500).nullish(),
@@ -503,7 +504,7 @@ export const updateBookingPageSchema = createBookingPageSchema.partial();
 
 // ── Appointment ────────────────────────────────────────────────────
 
-export const createAppointmentSchema = z.object({
+const appointmentBaseSchema = z.object({
   booking_page_id: z.string().uuid("Invalid booking page ID"),
   client_name: z.string().min(1, "Client name is required").max(255),
   client_email: z.string().email("Invalid email address").max(255),
@@ -516,9 +517,19 @@ export const createAppointmentSchema = z.object({
   source: z.string().max(100).nullish(),
   notes: z.string().max(5000).nullish(),
   assigned_member_id: optionalUuid,
+  cancellation_reason: z.string().max(1000).nullish(),
 });
 
-export const updateAppointmentSchema = createAppointmentSchema.partial();
+export const createAppointmentSchema = appointmentBaseSchema.refine((data) => {
+  return new Date(data.end_time) > new Date(data.start_time);
+}, { message: "End time must be after start time", path: ["end_time"] });
+
+export const updateAppointmentSchema = appointmentBaseSchema.partial().refine((data) => {
+  if (data.start_time && data.end_time) {
+    return new Date(data.end_time) > new Date(data.start_time);
+  }
+  return true;
+}, { message: "End time must be after start time", path: ["end_time"] });
 
 // ── Availability ───────────────────────────────────────────────────
 
@@ -529,6 +540,8 @@ export const createAvailabilitySchema = z.object({
   end_time: z.string().min(1, "End time is required").regex(/^\d{2}:\d{2}(:\d{2})?$/, "Time must be in HH:MM or HH:MM:SS format"),
   timezone: z.string().max(100).optional().default("America/New_York"),
   is_available: z.boolean().optional().default(true),
+}).refine((data) => data.end_time > data.start_time, {
+  message: "End time must be after start time", path: ["end_time"],
 });
 
 export const bulkAvailabilitySchema = z.object({
@@ -540,6 +553,8 @@ export const bulkAvailabilitySchema = z.object({
     end_time: z.string().min(1).regex(/^\d{2}:\d{2}(:\d{2})?$/),
     timezone: z.string().max(100).optional(),
     is_available: z.boolean().optional(),
+  }).refine((data) => data.end_time > data.start_time, {
+    message: "End time must be after start time", path: ["end_time"],
   })).min(1, "At least one entry is required"),
 });
 
@@ -548,11 +563,16 @@ export const bulkAvailabilitySchema = z.object({
 export const createAvailabilityOverrideSchema = z.object({
   member_id: z.string().uuid("Invalid member ID"),
   override_date: z.string().date("Invalid date format"),
-  is_blocked: z.boolean().optional().default(false),
+  is_blocked: z.boolean().optional().default(true),
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Time must be in HH:MM or HH:MM:SS format").nullish(),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Time must be in HH:MM or HH:MM:SS format").nullish(),
   reason: z.string().max(500).nullish(),
-});
+}).refine((data) => {
+  if (data.start_time && data.end_time) {
+    return data.end_time > data.start_time;
+  }
+  return true;
+}, { message: "End time must be after start time", path: ["end_time"] });
 
 export const updateAvailabilityOverrideSchema = z.object({
   override_date: z.string().date("Invalid date format").optional(),
@@ -560,13 +580,18 @@ export const updateAvailabilityOverrideSchema = z.object({
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullish(),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullish(),
   reason: z.string().max(500).nullish(),
-});
+}).refine((data) => {
+  if (data.start_time && data.end_time) {
+    return data.end_time > data.start_time;
+  }
+  return true;
+}, { message: "End time must be after start time", path: ["end_time"] });
 
 // ── Booking Reminder ───────────────────────────────────────────────
 
 export const createBookingReminderSchema = z.object({
   booking_page_id: z.string().uuid("Invalid booking page ID"),
-  type: z.enum(["email", "sms", "push"]),
+  type: z.enum(["email", "sms"]),
   minutes_before: z.coerce.number().int().min(0, "Minutes must be non-negative").max(10080, "Cannot exceed 7 days"),
   template_subject: z.string().max(500).nullish(),
   template_body: z.string().max(5000).nullish(),
@@ -583,7 +608,9 @@ export const publicBookingSubmitSchema = z.object({
   end_time: z.string().min(1, "End time is required"),
   notes: z.string().max(5000).nullish(),
   form_response_id: optionalUuid,
-});
+}).refine((data) => {
+  return new Date(data.end_time) > new Date(data.start_time);
+}, { message: "End time must be after start time", path: ["end_time"] });
 
 // ── Invoice Update ────────────────────────────────────────────────────
 
@@ -597,7 +624,7 @@ export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
   issue_date: optionalDate,
   sent_date: optionalDate,
   paid_at: optionalDate,
-  payment_terms: z.string().max(255).nullish(),
+  payment_terms: z.enum(["due_on_receipt", "net_7", "net_15", "net_30", "net_45", "net_60", "custom"]).nullish(),
   terms_and_conditions: z.string().max(10000).nullish(),
   footer_note: z.string().max(2000).nullish(),
   billing_name: z.string().max(255).nullish(),
@@ -645,9 +672,9 @@ export const createTeamMemberSchema = z.object({
   phone: optionalPhone,
   job_title: z.string().max(255).nullish(),
   department: z.string().max(255).nullish(),
-  employment_type: z.enum(["full-time", "part-time", "contract", "freelance", "intern"]).optional().default("full-time"),
+  employment_type: z.enum(["full-time", "part-time", "contractor", "freelancer", "intern"]).optional().default("full-time"),
   start_date: optionalDate,
-  role: z.enum(["owner", "admin", "manager", "member", "viewer"]).optional().default("member"),
+  role: z.enum(["owner", "admin", "member"]).optional().default("member"),
   custom_role_id: optionalUuid,
   manager_id: optionalUuid,
   hourly_rate: nonNegativeNumber.optional(),
@@ -678,9 +705,9 @@ export const updateTeamMemberSchema = z.object({
   notes: z.string().max(5000).nullish(),
   tags: z.any().nullish(),
   // Admin-only fields (enforced at route level)
-  role: z.enum(["owner", "admin", "manager", "member", "viewer"]).optional(),
+  role: z.enum(["owner", "admin", "member"]).optional(),
   status: z.string().max(50).optional(),
-  employment_type: z.enum(["full-time", "part-time", "contract", "freelance", "intern"]).optional(),
+  employment_type: z.enum(["full-time", "part-time", "contractor", "freelancer", "intern"]).optional(),
   hourly_rate: nonNegativeNumber.optional(),
   manager_id: optionalUuid,
   custom_role_id: optionalUuid,
@@ -760,7 +787,7 @@ export const createTimeEntrySchema = z.object({
   hourly_rate: nonNegativeNumber.optional(),
   status: z.enum(["draft", "submitted", "approved", "rejected", "invoiced"]).optional().default("draft"),
   break_minutes: z.coerce.number().int().min(0).optional().default(0),
-  work_type: z.enum(["regular", "overtime", "holiday", "training", "meeting", "travel", "other"]).optional().default("regular"),
+  work_type: z.enum(["regular", "overtime", "holiday", "weekend", "on_call"]).optional().default("regular"),
   location: z.string().max(255).nullish(),
   notes: z.string().max(5000).nullish(),
   tags: z.array(z.string().max(100)).optional().default([]),
@@ -908,6 +935,9 @@ export const updateContractSchema = z.object({
   name: z.string().min(1).max(500).optional(),
   slug: z.string().max(255).optional(),
   status: z.enum(["draft", "sent", "viewed", "active", "signed", "declined", "expired", "terminated", "pending_signature"]).optional(),
+  client_id: optionalUuid,
+  project_id: optionalUuid,
+  proposal_id: optionalUuid,
   sections: z.any().optional(),
   contract_type: z.string().max(100).optional(),
   start_date: optionalDate,

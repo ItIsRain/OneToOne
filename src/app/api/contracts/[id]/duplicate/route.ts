@@ -82,6 +82,8 @@ export async function POST(
       proposal_id: original.proposal_id,
       sections: original.sections || [],
       contract_type: original.contract_type,
+      start_date: original.start_date,
+      end_date: original.end_date,
       value: original.value,
       currency: original.currency,
       terms_and_conditions: original.terms_and_conditions,

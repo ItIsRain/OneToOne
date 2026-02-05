@@ -37,7 +37,7 @@ interface Stats {
   confirmed: number;
   attended: number;
   no_show: number;
-  cancelled: number;
+  declined: number;
   looking_for_team: number;
 }
 
@@ -232,8 +232,8 @@ export default function EventAttendeesPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">No Show</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-            <p className="text-2xl font-bold text-gray-600">{stats.cancelled}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Cancelled</p>
+            <p className="text-2xl font-bold text-gray-600">{stats.declined}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Declined</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <p className="text-2xl font-bold text-purple-600">{stats.looking_for_team}</p>
@@ -259,10 +259,12 @@ export default function EventAttendeesPage() {
           className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Status</option>
+          <option value="pending">Pending</option>
           <option value="confirmed">Confirmed</option>
+          <option value="declined">Declined</option>
+          <option value="maybe">Maybe</option>
           <option value="attended">Attended</option>
           <option value="no_show">No Show</option>
-          <option value="cancelled">Cancelled</option>
         </select>
         <button
           onClick={() => setShowAddModal(true)}

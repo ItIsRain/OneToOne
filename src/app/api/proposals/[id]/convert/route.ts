@@ -147,13 +147,19 @@ export async function POST(
     }
 
     // Standard mode: duplicate check — prevent converting the same proposal twice
-    const { data: existingProject } = await supabase
+    let existingProjectQuery = supabase
       .from("projects")
       .select("id")
       .eq("name", proposal.title)
-      .eq("tenant_id", proposal.tenant_id)
-      .eq("client_id", proposal.client_id || "")
-      .maybeSingle();
+      .eq("tenant_id", proposal.tenant_id);
+
+    if (proposal.client_id) {
+      existingProjectQuery = existingProjectQuery.eq("client_id", proposal.client_id);
+    } else {
+      existingProjectQuery = existingProjectQuery.is("client_id", null);
+    }
+
+    const { data: existingProject } = await existingProjectQuery.maybeSingle();
 
     if (existingProject) {
       // Also check if an invoice already exists linked to that project
@@ -194,7 +200,8 @@ export async function POST(
         name: proposal.title,
         client_id: proposal.client_id,
         status: "planning",
-        budget: proposal.total,
+        budget_amount: proposal.total || 0,
+        budget_currency: proposal.currency || "USD",
         created_by: user.id,
       })
       .select()
@@ -223,6 +230,14 @@ export async function POST(
       sort_order: index,
     }));
 
+    // Calculate tax and discount amounts from proposal
+    const invoiceSubtotal = proposal.subtotal || proposal.total || 0;
+    const taxRate = proposal.tax_percent || 0;
+    const taxAmount = Math.round(invoiceSubtotal * (taxRate / 100) * 100) / 100;
+    const discountPercent = proposal.discount_percent || 0;
+    const discountAmount = Math.round(invoiceSubtotal * (discountPercent / 100) * 100) / 100;
+    const invoiceTotal = proposal.total || Math.round((invoiceSubtotal + taxAmount - discountAmount) * 100) / 100;
+
     // Create invoice from proposal
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoices")
@@ -232,9 +247,14 @@ export async function POST(
         client_id: proposal.client_id,
         project_id: project.id,
         title: `Invoice for ${proposal.title}`,
-        amount: proposal.total,
-        total: proposal.total,
-        subtotal: proposal.subtotal || proposal.total,
+        subtotal: invoiceSubtotal,
+        tax_rate: taxRate,
+        tax_amount: taxAmount,
+        discount_type: discountPercent > 0 ? "percentage" : "fixed",
+        discount_value: discountPercent > 0 ? discountPercent : 0,
+        discount_amount: discountAmount,
+        total: invoiceTotal,
+        amount: invoiceTotal,
         status: "draft",
         currency: proposal.currency || "USD",
         created_by: user.id,

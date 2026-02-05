@@ -245,6 +245,23 @@ export async function DELETE(
       );
     }
 
+    // Check for dependent appointments before deleting (FK is CASCADE)
+    const { count: appointmentCount } = await supabase
+      .from("appointments")
+      .select("id", { count: "exact", head: true })
+      .eq("booking_page_id", id)
+      .eq("tenant_id", profile.tenant_id);
+
+    if (appointmentCount && appointmentCount > 0) {
+      return NextResponse.json(
+        {
+          error: `Cannot delete booking page with ${appointmentCount} appointment(s). Please delete or reassign them first.`,
+          dependent_appointments: appointmentCount,
+        },
+        { status: 409 }
+      );
+    }
+
     const { error } = await supabase
       .from("booking_pages")
       .delete()

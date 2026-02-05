@@ -225,13 +225,12 @@ export async function PATCH(
 
       if (currentInvoice) {
         const validTransitions: Record<string, string[]> = {
-          draft: ["sent", "cancelled", "void"],
-          sent: ["paid", "partially_paid", "overdue", "cancelled", "void", "draft"],
-          overdue: ["paid", "partially_paid", "cancelled", "void", "sent"],
-          partially_paid: ["paid", "overdue", "cancelled", "void"],
-          paid: ["void", "refunded"],
+          draft: ["sent", "cancelled"],
+          sent: ["paid", "partially_paid", "overdue", "cancelled", "draft"],
+          overdue: ["paid", "partially_paid", "cancelled", "sent"],
+          partially_paid: ["paid", "overdue", "cancelled"],
+          paid: ["refunded"],
           cancelled: ["draft"],
-          void: [],
           refunded: [],
         };
         const allowed = validTransitions[currentInvoice.status] || [];

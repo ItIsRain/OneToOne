@@ -146,7 +146,7 @@ export const contactFields: FieldDefinition[] = [
     type: 'enum',
     required: false,
     aliases: ['preferred contact', 'contact method', 'preferred_contact_method', 'contact preference'],
-    enumValues: ['email', 'phone', 'sms', 'mail'],
+    enumValues: ['email', 'phone', 'whatsapp', 'linkedin', 'sms'],
   },
   {
     name: 'status',
@@ -154,7 +154,7 @@ export const contactFields: FieldDefinition[] = [
     type: 'enum',
     required: false,
     aliases: ['status', 'contact status'],
-    enumValues: ['active', 'inactive', 'archived'],
+    enumValues: ['active', 'inactive', 'do_not_contact'],
   },
   {
     name: 'contact_type',
@@ -457,7 +457,7 @@ export const clientFields: FieldDefinition[] = [
     type: 'enum',
     required: false,
     aliases: ['status', 'client status'],
-    enumValues: ['active', 'inactive', 'churned', 'prospect'],
+    enumValues: ['active', 'inactive', 'archived'],
   },
   {
     name: 'notes',

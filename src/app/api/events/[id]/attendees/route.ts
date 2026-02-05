@@ -147,7 +147,7 @@ export async function GET(
       confirmed: attendees?.filter(a => a.status === "confirmed").length || 0,
       attended: attendees?.filter(a => a.status === "attended").length || 0,
       no_show: attendees?.filter(a => a.status === "no_show").length || 0,
-      cancelled: attendees?.filter(a => a.status === "cancelled").length || 0,
+      declined: attendees?.filter(a => a.status === "declined").length || 0,
       looking_for_team: attendees?.filter(a => a.looking_for_team).length || 0,
     };
 

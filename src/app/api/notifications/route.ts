@@ -100,3 +100,46 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await request.json();
+    const { ids, all } = body;
+
+    if (all === true) {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id)
+        .in("id", ids);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "Provide 'ids' array or 'all: true'" }, { status: 400 });
+  } catch (error) {
+    console.error("DELETE /api/notifications error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

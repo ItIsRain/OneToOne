@@ -29,10 +29,12 @@ interface EventAttendeesTableProps {
 }
 
 const statusColors: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  declined: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400",
+  maybe: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   attended: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   no_show: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  cancelled: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400",
 };
 
 const formatDate = (dateString: string) => {
@@ -184,10 +186,12 @@ export default function EventAttendeesTable({
                       onChange={(e) => onUpdateStatus(attendee.id, e.target.value)}
                       className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
+                      <option value="pending">Pending</option>
                       <option value="confirmed">Confirmed</option>
+                      <option value="declined">Declined</option>
+                      <option value="maybe">Maybe</option>
                       <option value="attended">Attended</option>
                       <option value="no_show">No Show</option>
-                      <option value="cancelled">Cancelled</option>
                     </select>
                     <button
                       onClick={() => onConvertToLead(attendee.id)}

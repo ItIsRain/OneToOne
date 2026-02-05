@@ -37,7 +37,7 @@ export async function GET() {
     const [projectsRes, invoicesRes, timeEntriesRes, expensesRes, membersRes] = await Promise.all([
       supabase
         .from("projects")
-        .select("id, name, project_code, status, budget, currency, billing_type, hourly_rate, estimated_hours, start_date, end_date, client_id, client:clients(id, name, company)")
+        .select("id, name, project_code, status, budget_amount, budget_currency, billing_type, hourly_rate, estimated_hours, start_date, end_date, client_id, client:clients(id, name, company)")
         .eq("tenant_id", tenantId)
         .not("status", "eq", "cancelled"),
 
@@ -132,7 +132,7 @@ export async function GET() {
       const margin = totalRevenue > 0 ? Math.round((profit / totalRevenue) * 1000) / 10 : 0;
       const laborPercent = totalRevenue > 0 ? Math.round((labor.cost / totalRevenue) * 1000) / 10 : 0;
       const expensePercent = totalRevenue > 0 ? Math.round((expense.total / totalRevenue) * 1000) / 10 : 0;
-      const budgetUsed = proj.budget && proj.budget > 0 ? Math.round((totalCost / proj.budget) * 1000) / 10 : null;
+      const budgetUsed = proj.budget_amount && proj.budget_amount > 0 ? Math.round((totalCost / proj.budget_amount) * 1000) / 10 : null;
 
       const client = safeClient(proj);
 
@@ -142,10 +142,10 @@ export async function GET() {
         project_code: proj.project_code,
         status: proj.status,
         billing_type: proj.billing_type,
-        currency: proj.currency || "USD",
+        currency: proj.budget_currency || "USD",
         client_name: client?.name || null,
         client_company: client?.company || null,
-        budget: proj.budget,
+        budget: proj.budget_amount,
         estimated_hours: proj.estimated_hours,
         start_date: proj.start_date,
         end_date: proj.end_date,
