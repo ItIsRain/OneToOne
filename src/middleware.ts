@@ -193,12 +193,55 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Step 2: Public routes — return immediately, NO auth work ──
+  // ── Step 2: Redirect authenticated users away from auth pages ──
+  const AUTH_PAGES = ["/signin", "/signup"];
+  if (AUTH_PAGES.some((p) => pathname === p || pathname.startsWith(p + "/")) && isSupabaseConfigured) {
+    const cookieDomainAuth = getCookieDomain(hostname);
+    let authCheckResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    const authCheckClient = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            authCheckResponse = NextResponse.next({ request: { headers: requestHeaders } });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              authCheckResponse.cookies.set(name, value, {
+                ...options,
+                domain: cookieDomainAuth ?? options?.domain,
+                path: "/",
+              })
+            );
+          },
+        },
+      }
+    );
+    const { data: { user: existingUser } } = await authCheckClient.auth.getUser();
+    if (existingUser) {
+      const dashboardUrl = new URL("/dashboard", request.url);
+      const redirectResponse = NextResponse.redirect(dashboardUrl);
+      authCheckResponse.cookies.getAll().forEach((c) =>
+        redirectResponse.cookies.set(c.name, c.value, {
+          domain: cookieDomainAuth ?? undefined,
+          path: "/",
+        })
+      );
+      return applySecurityHeaders(redirectResponse);
+    }
+  }
+
+  // ── Step 3: Public routes — return immediately, NO auth work ──
   if (isPublicRoute(pathname)) {
     return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
-  // ── Step 3: Protected routes — create Supabase auth client ──
+  // ── Step 4: Protected routes — create Supabase auth client ──
   const cookieDomain = getCookieDomain(hostname);
 
   let response = NextResponse.next({
@@ -270,7 +313,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Step 4: Redirect to signin if not authenticated ──
+  // ── Step 5: Redirect to signin if not authenticated ──
   if (!user) {
     if (pathname.startsWith("/api/")) {
       const apiResponse = NextResponse.json(
@@ -297,7 +340,7 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(redirectResponse);
   }
 
-  // ── Step 5: Subscription check (only for dashboard pages, not every API call) ──
+  // ── Step 6: Subscription check (only for dashboard pages, not every API call) ──
   // Uses a short-lived cookie cache to avoid querying the DB on every request
   // (including RSC data fetches), which can cause a redirect/refresh loop when
   // the auth token refresh sets new cookies and invalidates the Router Cache.
