@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // These refs ensure we only process the first SIGNED_OUT and redirect once.
   const hadSessionRef = useRef(false);
   const isRedirectingRef = useRef(false);
+  const profileUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string, signal?: AbortSignal) => {
     if (signal?.aborted) return null;
@@ -112,7 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (signal?.aborted) return null;
-    setProfile(profileData);
+    // Only update if we got valid data — don't clear existing profile on transient errors
+    if (profileData) {
+      setProfile(profileData);
+      profileUserIdRef.current = userId;
+    }
     return profileData;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -186,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
+          profileUserIdRef.current = null;
           setLoading(false);
 
           // Don't redirect to /signin if already on an auth page — the
@@ -210,7 +216,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user && !signal.aborted) {
           hadSessionRef.current = true;
           setUser(session.user);
-          await fetchProfile(session.user.id, signal);
+          // Skip profile re-fetch on token refreshes if we already have it for this user
+          if (profileUserIdRef.current !== session.user.id) {
+            await fetchProfile(session.user.id, signal);
+          }
         }
 
         if (!signal.aborted) {
@@ -236,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setProfile(null);
+    profileUserIdRef.current = null;
     window.location.href = "/signin";
   };
 
