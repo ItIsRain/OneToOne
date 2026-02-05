@@ -224,7 +224,31 @@ export async function middleware(request: NextRequest) {
     );
     const { data: { user: existingUser } } = await authCheckClient.auth.getUser();
     if (existingUser) {
-      const dashboardUrl = new URL("/dashboard", request.url);
+      // Look up tenant subdomain so we redirect to tenantslug.1i1.ae/dashboard
+      let dashboardUrl = new URL("/dashboard", request.url);
+      if (isSupabaseConfigured) {
+        try {
+          const svc = createClient(supabaseUrl!, supabaseServiceKey!);
+          const { data: prof } = await svc
+            .from("profiles")
+            .select("tenant_id")
+            .eq("id", existingUser.id)
+            .single();
+          if (prof?.tenant_id) {
+            const { data: t } = await svc
+              .from("tenants")
+              .select("subdomain")
+              .eq("id", prof.tenant_id)
+              .single();
+            if (t?.subdomain && !isLocalDev()) {
+              const url = new URL(request.url);
+              dashboardUrl = new URL(`${url.protocol}//${t.subdomain}.${url.host.split(":")[0]}${url.port ? ":" + url.port : ""}/dashboard`);
+            }
+          }
+        } catch {
+          // Fall back to /dashboard on current domain
+        }
+      }
       const redirectResponse = NextResponse.redirect(dashboardUrl);
       authCheckResponse.cookies.getAll().forEach((c) =>
         redirectResponse.cookies.set(c.name, c.value, {

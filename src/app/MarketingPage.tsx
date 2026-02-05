@@ -281,7 +281,7 @@ function Marquee({ children, direction = "left", speed = 30 }: { children: React
 }
 
 
-export default function MarketingPage() {
+export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string | null }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
@@ -322,18 +322,29 @@ export default function MarketingPage() {
 
             {/* CTA Buttons */}
             <div className="hidden md:flex items-center gap-4">
-              <Link
-                href="/signin"
-                className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg hover:bg-lime-600 transition-colors"
-              >
-                Get Started Free
-              </Link>
+              {dashboardUrl ? (
+                <a
+                  href={dashboardUrl}
+                  className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg hover:bg-lime-600 transition-colors"
+                >
+                  Dashboard
+                </a>
+              ) : (
+                <>
+                  <Link
+                    href="/signin"
+                    className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg hover:bg-lime-600 transition-colors"
+                  >
+                    Get Started Free
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -353,10 +364,18 @@ export default function MarketingPage() {
                 <a href="#how-it-works" className="text-sm text-gray-600 dark:text-gray-400">How It Works</a>
                 <a href="#pricing" className="text-sm text-gray-600 dark:text-gray-400">Pricing</a>
                 <a href="#faq" className="text-sm text-gray-600 dark:text-gray-400">FAQ</a>
-                <Link href="/signin" className="text-sm text-gray-600 dark:text-gray-400">Sign In</Link>
-                <Link href="/signup" className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg text-center">
-                  Get Started Free
-                </Link>
+                {dashboardUrl ? (
+                  <a href={dashboardUrl} className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg text-center">
+                    Dashboard
+                  </a>
+                ) : (
+                  <>
+                    <Link href="/signin" className="text-sm text-gray-600 dark:text-gray-400">Sign In</Link>
+                    <Link href="/signup" className="px-4 py-2 bg-lime-500 text-white text-sm font-medium rounded-lg text-center">
+                      Get Started Free
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           )}

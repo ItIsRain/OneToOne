@@ -1,5 +1,7 @@
 import { getTenantFromHeaders } from "@/hooks/useTenantFromHeaders";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { getTenantUrl } from "@/lib/url";
 import MarketingPage from "./MarketingPage";
 import TenantPortalLanding from "@/components/portal/TenantPortalLanding";
 import PortalHeader from "@/components/portal/PortalHeader";
@@ -41,7 +43,41 @@ export default async function RootPage() {
   const tenant = await getTenantFromHeaders();
 
   if (!tenant.isSubdomainAccess) {
-    return <MarketingPage />;
+    // Check if user is authenticated to show "Dashboard" instead of sign-in CTAs
+    let dashboardUrl: string | null = null;
+    try {
+      const supabase = await createServerSupabase();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (supabaseUrl && supabaseServiceKey) {
+          const svc = createClient(supabaseUrl, supabaseServiceKey);
+          const { data: profile } = await svc
+            .from("profiles")
+            .select("tenant_id")
+            .eq("id", user.id)
+            .single();
+          if (profile?.tenant_id) {
+            const { data: t } = await svc
+              .from("tenants")
+              .select("subdomain")
+              .eq("id", profile.tenant_id)
+              .single();
+            dashboardUrl = t?.subdomain
+              ? getTenantUrl(t.subdomain, "/dashboard")
+              : "/dashboard";
+          } else {
+            dashboardUrl = "/dashboard";
+          }
+        } else {
+          dashboardUrl = "/dashboard";
+        }
+      }
+    } catch {
+      // Not authenticated, show default CTAs
+    }
+    return <MarketingPage dashboardUrl={dashboardUrl} />;
   }
 
   // Tenant subdomain — render the portal landing
