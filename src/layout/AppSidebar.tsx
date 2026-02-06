@@ -1,10 +1,12 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import { useTenantInfo } from "@/context/TenantInfoContext";
+import { usePermissions } from "@/context/PermissionsContext";
+import { PERMISSIONS, PermissionId } from "@/lib/permissions";
 import SidebarWidget from "./SidebarWidget";
 import {
   BoltIcon,
@@ -28,11 +30,20 @@ import {
   UserCircleIcon,
 } from "../icons/index";
 
+type SubItem = {
+  name: string;
+  path: string;
+  pro?: boolean;
+  new?: boolean;
+  permission?: PermissionId | PermissionId[];
+};
+
 type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  permission?: PermissionId | PermissionId[];
+  subItems?: SubItem[];
 };
 
 // Main navigation - Core business functions
@@ -41,118 +52,130 @@ const navItems: NavItem[] = [
   {
     icon: <GroupIcon />,
     name: "CRM",
+    permission: [PERMISSIONS.CLIENTS_VIEW, PERMISSIONS.CRM_VIEW],
     subItems: [
-      { name: "Clients", path: "/dashboard/crm/clients" },
-      { name: "Leads", path: "/dashboard/crm/leads", new: true },
-      { name: "Contacts", path: "/dashboard/crm/contacts" },
-      { name: "Pipeline", path: "/dashboard/crm/pipeline" },
-      { name: "Onboarding", path: "/dashboard/crm/onboarding", new: true },
+      { name: "Clients", path: "/dashboard/crm/clients", permission: PERMISSIONS.CLIENTS_VIEW },
+      { name: "Leads", path: "/dashboard/crm/leads", new: true, permission: PERMISSIONS.CRM_VIEW },
+      { name: "Contacts", path: "/dashboard/crm/contacts", permission: PERMISSIONS.CRM_VIEW },
+      { name: "Pipeline", path: "/dashboard/crm/pipeline", permission: PERMISSIONS.CRM_VIEW },
+      { name: "Onboarding", path: "/dashboard/crm/onboarding", new: true, permission: PERMISSIONS.CRM_VIEW },
     ],
   },
   {
     icon: <BoxCubeIcon />,
     name: "Projects",
+    permission: PERMISSIONS.PROJECTS_VIEW,
     subItems: [
-      { name: "All Projects", path: "/dashboard/projects" },
-      { name: "Tasks", path: "/dashboard/projects/tasks" },
-      { name: "Kanban Board", path: "/dashboard/projects/kanban", new: true },
-      { name: "Timeline", path: "/dashboard/projects/timeline" },
-      { name: "Scope Creep", path: "/dashboard/projects/scope-creep", new: true },
-      { name: "Pipeline", path: "/dashboard/projects/pipeline", new: true, pro: true },
+      { name: "All Projects", path: "/dashboard/projects", permission: PERMISSIONS.PROJECTS_VIEW },
+      { name: "Tasks", path: "/dashboard/projects/tasks", permission: PERMISSIONS.TASKS_VIEW },
+      { name: "Kanban Board", path: "/dashboard/projects/kanban", new: true, permission: PERMISSIONS.PROJECTS_VIEW },
+      { name: "Timeline", path: "/dashboard/projects/timeline", permission: PERMISSIONS.PROJECTS_VIEW },
+      { name: "Scope Creep", path: "/dashboard/projects/scope-creep", new: true, permission: PERMISSIONS.PROJECTS_VIEW },
+      { name: "Pipeline", path: "/dashboard/projects/pipeline", new: true, pro: true, permission: PERMISSIONS.PROJECTS_VIEW },
     ],
   },
   {
     icon: <CalenderIcon />,
     name: "Events",
+    permission: PERMISSIONS.EVENTS_VIEW,
     subItems: [
-      { name: "All Events", path: "/dashboard/events" },
-      { name: "Calendar", path: "/dashboard/events/calendar" },
-      { name: "Venues", path: "/dashboard/events/venues" },
+      { name: "All Events", path: "/dashboard/events", permission: PERMISSIONS.EVENTS_VIEW },
+      { name: "Calendar", path: "/dashboard/events/calendar", permission: PERMISSIONS.EVENTS_VIEW },
+      { name: "Venues", path: "/dashboard/events/venues", permission: PERMISSIONS.EVENTS_VIEW },
     ],
   },
   {
     icon: <ShootingStarIcon />,
     name: "Vendors",
+    permission: PERMISSIONS.VENDORS_VIEW,
     subItems: [
-      { name: "All Vendors", path: "/dashboard/vendors" },
-      { name: "Categories", path: "/dashboard/vendors/categories", new: true },
+      { name: "All Vendors", path: "/dashboard/vendors", permission: PERMISSIONS.VENDORS_VIEW },
+      { name: "Categories", path: "/dashboard/vendors/categories", new: true, permission: PERMISSIONS.VENDORS_MANAGE },
     ],
   },
   {
     icon: <TimeIcon />,
     name: "Booking",
+    permission: PERMISSIONS.BOOKING_VIEW,
     subItems: [
-      { name: "Booking Pages", path: "/dashboard/booking/pages", new: true },
-      { name: "Appointments", path: "/dashboard/booking/appointments" },
-      { name: "Availability", path: "/dashboard/booking/availability" },
+      { name: "Booking Pages", path: "/dashboard/booking/pages", new: true, permission: PERMISSIONS.BOOKING_VIEW },
+      { name: "Appointments", path: "/dashboard/booking/appointments", permission: PERMISSIONS.BOOKING_VIEW },
+      { name: "Availability", path: "/dashboard/booking/availability", permission: PERMISSIONS.BOOKING_MANAGE },
     ],
   },
   {
     icon: <DollarLineIcon />,
     name: "Finance",
+    permission: PERMISSIONS.FINANCE_VIEW,
     subItems: [
-      { name: "Overview", path: "/dashboard/finance" },
-      { name: "Invoices", path: "/dashboard/finance/invoices" },
-      { name: "Expenses", path: "/dashboard/finance/expenses" },
-      { name: "Payments", path: "/dashboard/finance/payments" },
-      { name: "Budgets", path: "/dashboard/finance/budgets" },
-      { name: "Forecast", path: "/dashboard/finance/forecast", new: true },
-      { name: "Profitability", path: "/dashboard/finance/profitability", new: true },
+      { name: "Overview", path: "/dashboard/finance", permission: PERMISSIONS.FINANCE_VIEW },
+      { name: "Invoices", path: "/dashboard/finance/invoices", permission: PERMISSIONS.FINANCE_VIEW },
+      { name: "Expenses", path: "/dashboard/finance/expenses", permission: PERMISSIONS.EXPENSES_VIEW },
+      { name: "Payments", path: "/dashboard/finance/payments", permission: PERMISSIONS.FINANCE_VIEW },
+      { name: "Budgets", path: "/dashboard/finance/budgets", permission: PERMISSIONS.BUDGETS_MANAGE },
+      { name: "Forecast", path: "/dashboard/finance/forecast", new: true, permission: PERMISSIONS.FINANCE_VIEW },
+      { name: "Profitability", path: "/dashboard/finance/profitability", new: true, permission: PERMISSIONS.FINANCE_VIEW },
     ],
   },
   {
     icon: <UserCircleIcon />,
     name: "Team",
+    permission: PERMISSIONS.TEAM_VIEW,
     subItems: [
-      { name: "Members", path: "/dashboard/team" },
-      { name: "Roles & Permissions", path: "/dashboard/team/roles" },
-      { name: "Time Tracking", path: "/dashboard/team/time-tracking" },
-      { name: "Utilization", path: "/dashboard/team/utilization", new: true },
-      { name: "Payroll", path: "/dashboard/team/payroll", pro: true },
+      { name: "Members", path: "/dashboard/team", permission: PERMISSIONS.TEAM_VIEW },
+      { name: "Roles & Permissions", path: "/dashboard/team/roles", permission: PERMISSIONS.ROLES_MANAGE },
+      { name: "Time Tracking", path: "/dashboard/team/time-tracking", permission: PERMISSIONS.TEAM_VIEW },
+      { name: "Utilization", path: "/dashboard/team/utilization", new: true, permission: PERMISSIONS.TEAM_VIEW },
+      { name: "Payroll", path: "/dashboard/team/payroll", pro: true, permission: [PERMISSIONS.TEAM_VIEW, PERMISSIONS.FINANCE_VIEW] },
     ],
   },
   {
     icon: <FolderIcon />,
     name: "Documents",
+    permission: PERMISSIONS.DOCUMENTS_VIEW,
     subItems: [
-      { name: "All Files", path: "/dashboard/documents" },
-      { name: "Templates", path: "/dashboard/documents/templates" },
-      { name: "Shared", path: "/dashboard/documents/shared" },
+      { name: "All Files", path: "/dashboard/documents", permission: PERMISSIONS.DOCUMENTS_VIEW },
+      { name: "Templates", path: "/dashboard/documents/templates", permission: PERMISSIONS.DOCUMENTS_VIEW },
+      { name: "Shared", path: "/dashboard/documents/shared", permission: PERMISSIONS.DOCUMENTS_VIEW },
     ],
   },
   {
     icon: <PageIcon />,
     name: "Forms",
+    permission: PERMISSIONS.FORMS_VIEW,
     subItems: [
-      { name: "All Forms", path: "/dashboard/forms", new: true },
-      { name: "Surveys", path: "/dashboard/surveys", new: true },
-      { name: "Templates", path: "/dashboard/forms/templates" },
+      { name: "All Forms", path: "/dashboard/forms", new: true, permission: PERMISSIONS.FORMS_VIEW },
+      { name: "Surveys", path: "/dashboard/surveys", new: true, permission: PERMISSIONS.FORMS_VIEW },
+      { name: "Templates", path: "/dashboard/forms/templates", permission: PERMISSIONS.FORMS_VIEW },
     ],
   },
   {
     icon: <DocsIcon />,
     name: "Proposals",
+    permission: PERMISSIONS.PROPOSALS_VIEW,
     subItems: [
-      { name: "All Proposals", path: "/dashboard/proposals", new: true },
-      { name: "Templates", path: "/dashboard/proposals/templates" },
+      { name: "All Proposals", path: "/dashboard/proposals", new: true, permission: PERMISSIONS.PROPOSALS_VIEW },
+      { name: "Templates", path: "/dashboard/proposals/templates", permission: PERMISSIONS.PROPOSALS_VIEW },
     ],
   },
   {
     icon: <FileIcon />,
     name: "Contracts",
+    permission: PERMISSIONS.CONTRACTS_VIEW,
     subItems: [
-      { name: "All Contracts", path: "/dashboard/contracts", new: true },
-      { name: "Templates", path: "/dashboard/contracts/templates" },
+      { name: "All Contracts", path: "/dashboard/contracts", new: true, permission: PERMISSIONS.CONTRACTS_VIEW },
+      { name: "Templates", path: "/dashboard/contracts/templates", permission: PERMISSIONS.CONTRACTS_VIEW },
     ],
   },
   {
     icon: <BoltIcon />,
     name: "Automation",
+    permission: PERMISSIONS.AUTOMATION_VIEW,
     subItems: [
-      { name: "Workflows", path: "/dashboard/automation/workflows" },
-      { name: "Integrations", path: "/dashboard/automation/integrations", new: true },
-      { name: "Approvals", path: "/dashboard/automation/approvals" },
-      { name: "Run History", path: "/dashboard/automation/runs" },
+      { name: "Workflows", path: "/dashboard/automation/workflows", permission: PERMISSIONS.AUTOMATION_VIEW },
+      { name: "Integrations", path: "/dashboard/automation/integrations", new: true, permission: PERMISSIONS.INTEGRATIONS_MANAGE },
+      { name: "Approvals", path: "/dashboard/automation/approvals", permission: PERMISSIONS.AUTOMATION_VIEW },
+      { name: "Run History", path: "/dashboard/automation/runs", permission: PERMISSIONS.AUTOMATION_VIEW },
     ],
   },
 ];
@@ -171,12 +194,13 @@ const secondaryItems: NavItem[] = [
   {
     icon: <PieChartIcon />,
     name: "Reports",
+    permission: PERMISSIONS.REPORTS_VIEW,
     subItems: [
-      { name: "Analytics", path: "/dashboard/reports" },
-      { name: "Sales Reports", path: "/dashboard/reports/sales" },
-      { name: "Financial Reports", path: "/dashboard/reports/financial" },
-      { name: "Team Reports", path: "/dashboard/reports/team" },
-      { name: "Custom Reports", path: "/dashboard/reports/custom", new: true },
+      { name: "Analytics", path: "/dashboard/reports", permission: PERMISSIONS.REPORTS_VIEW },
+      { name: "Sales Reports", path: "/dashboard/reports/sales", permission: PERMISSIONS.REPORTS_VIEW },
+      { name: "Financial Reports", path: "/dashboard/reports/financial", permission: PERMISSIONS.REPORTS_VIEW },
+      { name: "Team Reports", path: "/dashboard/reports/team", permission: PERMISSIONS.REPORTS_VIEW },
+      { name: "Custom Reports", path: "/dashboard/reports/custom", new: true, permission: PERMISSIONS.REPORTS_CREATE },
     ],
   },
 ];
@@ -186,15 +210,16 @@ const settingsItems: NavItem[] = [
   {
     icon: <PlugInIcon />,
     name: "Settings",
+    permission: PERMISSIONS.SETTINGS_VIEW,
     subItems: [
-      { name: "Company", path: "/dashboard/settings" },
-      { name: "Domains", path: "/dashboard/settings/domains", new: true },
-      { name: "Email Provider", path: "/dashboard/settings/email", pro: true },
-      { name: "Billing", path: "/dashboard/settings/billing" },
-      { name: "Portal", path: "/dashboard/settings/portal", new: true },
-      { name: "Dashboard", path: "/dashboard/settings/dashboard" },
-      { name: "API Keys", path: "/dashboard/settings/api" },
-      { name: "API Docs", path: "/dashboard/settings/docs" },
+      { name: "Company", path: "/dashboard/settings", permission: PERMISSIONS.SETTINGS_VIEW },
+      { name: "Domains", path: "/dashboard/settings/domains", new: true, permission: PERMISSIONS.SETTINGS_EDIT },
+      { name: "Email Provider", path: "/dashboard/settings/email", pro: true, permission: PERMISSIONS.SETTINGS_EDIT },
+      { name: "Billing", path: "/dashboard/settings/billing", permission: PERMISSIONS.SETTINGS_EDIT },
+      { name: "Portal", path: "/dashboard/settings/portal", new: true, permission: PERMISSIONS.SETTINGS_EDIT },
+      { name: "Dashboard", path: "/dashboard/settings/dashboard", permission: PERMISSIONS.SETTINGS_VIEW },
+      { name: "API Keys", path: "/dashboard/settings/api", permission: PERMISSIONS.SETTINGS_EDIT },
+      { name: "API Docs", path: "/dashboard/settings/docs", permission: PERMISSIONS.SETTINGS_VIEW },
     ],
   },
 ];
@@ -202,7 +227,38 @@ const settingsItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const { logoUrl: customLogoUrl, loading: tenantInfoLoading } = useTenantInfo();
+  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const pathname = usePathname();
+
+  // Helper to check if user has permission for an item
+  const checkPermission = useCallback((permission?: PermissionId | PermissionId[]): boolean => {
+    if (!permission) return true;
+    if (Array.isArray(permission)) {
+      return hasAnyPermission(permission);
+    }
+    return hasPermission(permission);
+  }, [hasPermission, hasAnyPermission]);
+
+  // Filter nav items based on permissions
+  const filterNavItems = useCallback((items: NavItem[]): NavItem[] => {
+    return items
+      .filter(item => checkPermission(item.permission))
+      .map(item => {
+        if (item.subItems) {
+          const filteredSubItems = item.subItems.filter(sub => checkPermission(sub.permission));
+          // Only include parent if it has visible sub-items
+          if (filteredSubItems.length === 0) return null;
+          return { ...item, subItems: filteredSubItems };
+        }
+        return item;
+      })
+      .filter((item): item is NavItem => item !== null);
+  }, [checkPermission]);
+
+  // Memoize filtered navigation items
+  const filteredNavItems = useMemo(() => filterNavItems(navItems), [filterNavItems]);
+  const filteredSecondaryItems = useMemo(() => filterNavItems(secondaryItems), [filterNavItems]);
+  const filteredSettingsItems = useMemo(() => filterNavItems(settingsItems), [filterNavItems]);
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "secondary" | "settings";
@@ -229,9 +285,9 @@ const AppSidebar: React.FC = () => {
   useEffect(() => {
     let submenuMatched = false;
     const menuGroups = [
-      { items: navItems, type: "main" as const },
-      { items: secondaryItems, type: "secondary" as const },
-      { items: settingsItems, type: "settings" as const },
+      { items: filteredNavItems, type: "main" as const },
+      { items: filteredSecondaryItems, type: "secondary" as const },
+      { items: filteredSettingsItems, type: "settings" as const },
     ];
 
     menuGroups.forEach(({ items, type }) => {
@@ -246,7 +302,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [pathname, isSubmenuActive]);
+  }, [pathname, isSubmenuActive, filteredNavItems, filteredSecondaryItems, filteredSettingsItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -484,49 +540,68 @@ const AppSidebar: React.FC = () => {
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar flex-1">
         <nav className="mb-6">
           <div className="flex flex-col gap-6">
+            {/* Loading skeleton while permissions load */}
+            {permissionsLoading && (
+              <div className="space-y-3 animate-pulse">
+                {[75, 85, 65, 90, 70].map((width, i) => (
+                  <div key={i} className={`flex items-center gap-3 px-3 py-2.5 ${!isExpanded && !isHovered ? "lg:justify-center" : ""}`}>
+                    <div className="w-6 h-6 rounded-lg bg-gray-200 dark:bg-gray-700" />
+                    {(isExpanded || isHovered || isMobileOpen) && (
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1" style={{ width: `${width}%` }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {/* Main Navigation */}
-            <div>
-              <h2
-                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
-                  !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? "Menu" : <HorizontaLDots />}
-              </h2>
-              {renderMenuItems(navItems, "main")}
-            </div>
+            {!permissionsLoading && filteredNavItems.length > 0 && (
+              <div>
+                <h2
+                  className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? "Menu" : <HorizontaLDots />}
+                </h2>
+                {renderMenuItems(filteredNavItems, "main")}
+              </div>
+            )}
 
             {/* Secondary Navigation */}
-            <div>
-              <h2
-                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
-                  !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Insights"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(secondaryItems, "secondary")}
-            </div>
+            {!permissionsLoading && filteredSecondaryItems.length > 0 && (
+              <div>
+                <h2
+                  className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "Insights"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(filteredSecondaryItems, "secondary")}
+              </div>
+            )}
 
             {/* Settings Navigation */}
-            <div>
-              <h2
-                className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
-                  !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "System"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(settingsItems, "settings")}
-            </div>
+            {!permissionsLoading && filteredSettingsItems.length > 0 && (
+              <div>
+                <h2
+                  className={`mb-2 text-xs font-semibold uppercase tracking-wider flex leading-[20px] text-gray-400/80 ${
+                    !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "System"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(filteredSettingsItems, "settings")}
+              </div>
+            )}
           </div>
         </nav>
       </div>

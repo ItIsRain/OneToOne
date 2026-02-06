@@ -2,24 +2,69 @@ import { z } from "zod";
 
 // ── Reusable primitives ──────────────────────────────────────────────
 
-const nonNegativeNumber = z.coerce.number().min(0, "Must be zero or positive");
+// Basic number coercion without refinements (for schemas that need .partial())
+const numberCoerce = z.coerce.number();
+const intCoerce = z.coerce.number().int();
+const nonNegInt = z.coerce.number().int().min(0);
+const nonNegNum = z.coerce.number().min(0);
+
+// Safe number coercion that rejects NaN and Infinity (use for create schemas, not partial-able base)
+const safeNumber = z.coerce.number().refine(
+  (val) => !isNaN(val) && isFinite(val),
+  { message: "Must be a valid number" }
+);
+
+// Safe integer coercion
+const safeInt = safeNumber.refine(
+  (val) => Number.isInteger(val),
+  { message: "Must be an integer" }
+);
+
+const nonNegativeInt = safeInt.refine(
+  (val) => val >= 0,
+  { message: "Must be a non-negative integer" }
+);
 
 const optionalUuid = z.union([z.string().uuid(), z.literal(""), z.null(), z.undefined()]);
 
 const optionalDate = z.union([z.string().date(), z.literal(""), z.null(), z.undefined()]);
 
+// ISO 4217 currency codes (common currencies + major world currencies)
+const VALID_CURRENCY_CODES = [
+  // Major currencies
+  "USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "HKD",
+  // Middle East
+  "AED", "SAR", "QAR", "KWD", "BHD", "OMR", "JOD", "EGP", "ILS", "TRY",
+  // Asia-Pacific
+  "INR", "PKR", "BDT", "SGD", "MYR", "THB", "IDR", "PHP", "VND", "KRW", "TWD",
+  // Europe
+  "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "RUB", "UAH",
+  // Americas
+  "MXN", "BRL", "ARS", "CLP", "COP", "PEN",
+  // Africa
+  "ZAR", "NGN", "KES", "GHS", "MAD",
+  // Others
+  "XOF", "XAF", "XCD",
+] as const;
+
+const currencyCode = z.string().refine(
+  (val) => VALID_CURRENCY_CODES.includes(val.toUpperCase() as typeof VALID_CURRENCY_CODES[number]),
+  { message: "Invalid currency code. Use ISO 4217 format (e.g., USD, EUR, GBP)" }
+).transform((val) => val.toUpperCase());
+
 // ── Invoice ──────────────────────────────────────────────────────────
 
-export const createInvoiceSchema = z.object({
+// Base schema without refinements (used for .partial())
+const invoiceBaseSchema = z.object({
   client_id: z.string().uuid("Invalid client ID").nullish(),
   project_id: optionalUuid,
   invoice_number: z.string().max(100).optional(),
-  subtotal: nonNegativeNumber.optional(),
-  amount: nonNegativeNumber.optional(),
+  subtotal: nonNegNum.optional(),
+  amount: nonNegNum.optional(),
   tax_rate: z.coerce.number().min(0).max(100).optional().default(0),
   discount_type: z.enum(["percentage", "fixed"]).optional().default("fixed"),
-  discount_value: z.coerce.number().min(0).optional().default(0),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  discount_value: nonNegNum.optional().default(0),
+  currency: currencyCode.optional().default("USD"),
   due_date: optionalDate,
   payment_terms: z.enum(["due_on_receipt", "net_7", "net_15", "net_30", "net_45", "net_60", "custom"]).optional().default("net_30"),
   notes: z.string().max(5000).nullish(),
@@ -28,24 +73,59 @@ export const createInvoiceSchema = z.object({
     .array(
       z.object({
         description: z.string().min(1, "Item description is required"),
-        quantity: z.coerce.number().min(0).default(1),
-        unit_price: nonNegativeNumber,
+        quantity: nonNegNum.default(1),
+        unit_price: nonNegNum,
         discount_type: z.enum(["percentage", "fixed"]).optional().default("fixed"),
-        discount_value: z.coerce.number().min(0).optional().default(0),
+        discount_value: nonNegNum.max(100).optional().default(0),
         tax_rate: z.coerce.number().min(0).max(100).optional().default(0),
       })
     )
     .optional(),
 });
 
+// Invoice validation refinement (for create operations)
+const invoiceRefinement = (data: z.infer<typeof invoiceBaseSchema>, ctx: z.RefinementCtx) => {
+  // Validate that percentage discount doesn't exceed 100%
+  if (data.discount_type === "percentage" && (data.discount_value ?? 0) > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Percentage discount cannot exceed 100%",
+      path: ["discount_value"],
+    });
+  }
+
+  // Calculate estimated total to ensure it won't be negative
+  const subtotal = data.subtotal ?? data.amount ?? 0;
+  if (subtotal > 0) {
+    const taxRate = data.tax_rate ?? 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    const discountValue = data.discount_value ?? 0;
+    const discountAmount = data.discount_type === "percentage"
+      ? subtotal * (discountValue / 100)
+      : discountValue;
+
+    const total = subtotal + taxAmount - discountAmount;
+    if (total < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Discount amount cannot exceed subtotal plus tax",
+        path: ["discount_value"],
+      });
+    }
+  }
+};
+
+export const createInvoiceSchema = invoiceBaseSchema.superRefine(invoiceRefinement);
+
 // ── Payment ──────────────────────────────────────────────────────────
 
-export const createPaymentSchema = z.object({
+// Base schema for payments (used for .partial())
+const paymentBaseSchema = z.object({
   invoice_id: optionalUuid,
   client_id: optionalUuid,
   client_name: z.string().max(255).nullish(),
-  amount: nonNegativeNumber,
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  amount: nonNegNum,
+  currency: currencyCode.optional().default("USD"),
   payment_date: optionalDate,
   payment_method: z.enum(["cash", "bank_transfer", "credit_card", "debit_card", "check", "paypal", "stripe", "other"]).nullish(),
   transaction_id: z.string().max(255).nullish(),
@@ -54,12 +134,15 @@ export const createPaymentSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
+export const createPaymentSchema = paymentBaseSchema;
+
 // ── Expense ──────────────────────────────────────────────────────────
 
-export const createExpenseSchema = z.object({
+// Base schema for expenses (used for .partial())
+const expenseBaseSchema = z.object({
   description: z.string().min(1, "Description is required").max(1000),
-  amount: nonNegativeNumber,
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  amount: nonNegNum,
+  currency: currencyCode.optional().default("USD"),
   expense_date: optionalDate,
   category: z.enum(["travel", "supplies", "equipment", "software", "marketing", "meals", "utilities", "rent", "salaries", "contractors", "insurance", "taxes", "entertainment", "professional_services", "other"]).nullish(),
   project_id: optionalUuid,
@@ -79,14 +162,17 @@ export const createExpenseSchema = z.object({
   tags: z.any().nullish(),
 });
 
+export const createExpenseSchema = expenseBaseSchema;
+
 // ── Budget ───────────────────────────────────────────────────────────
 
-export const createBudgetSchema = z.object({
+// Base schema for budgets (used for .partial())
+const budgetBaseSchema = z.object({
   name: z.string().min(1, "Budget name is required").max(255),
   description: z.string().max(2000).nullish(),
-  amount: nonNegativeNumber,
-  spent: nonNegativeNumber.optional().default(0),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  amount: nonNegNum,
+  spent: nonNegNum.optional().default(0),
+  currency: currencyCode.optional().default("USD"),
   period_type: z.enum(["monthly", "quarterly", "yearly", "project", "custom"]).optional().default("monthly"),
   start_date: z.string().date("Invalid start date"),
   end_date: optionalDate,
@@ -99,11 +185,13 @@ export const createBudgetSchema = z.object({
   notes: z.string().max(5000).nullish(),
   tags: z.any().nullish(),
   rollover_enabled: z.boolean().optional().default(false),
-  rollover_amount: nonNegativeNumber.optional().default(0),
+  rollover_amount: nonNegNum.optional().default(0),
   fiscal_year: z.coerce.number().int().min(2000).max(2100).optional(),
   is_recurring: z.boolean().optional().default(false),
   recurrence_interval: z.enum(["monthly", "quarterly", "yearly"]).nullish(),
 });
+
+export const createBudgetSchema = budgetBaseSchema;
 
 // ── Registration ─────────────────────────────────────────────────────
 
@@ -162,8 +250,8 @@ export const createEventSchema = z.object({
   is_published: z.boolean().optional().default(false),
   registration_required: z.boolean().optional().default(false),
   registration_deadline: optionalDatetime,
-  ticket_price: nonNegativeNumber.nullish(),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  ticket_price: nonNegNum.nullish(),
+  currency: currencyCode.optional().default("USD"),
   is_free: z.boolean().optional(),
   tags: z.array(z.string().max(100)).max(50).optional().default([]),
   notes: z.string().max(5000).nullish(),
@@ -250,7 +338,13 @@ export const publicRegistrationSchema = z.object({
 export const eventAuthSchema = z.object({
   action: z.enum(["register", "login"]),
   email: z.string().email("Invalid email address").max(255),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128)
+    .refine((val) => /[A-Z]/.test(val), "Password must contain at least one uppercase letter")
+    .refine((val) => /[a-z]/.test(val), "Password must contain at least one lowercase letter")
+    .refine((val) => /[0-9]/.test(val), "Password must contain at least one number")
+    .refine((val) => /[^A-Za-z0-9]/.test(val), "Password must contain at least one special character"),
   name: z.string().min(1).max(255).optional(),
   phone: optionalPhone,
   company: z.string().max(255).nullish(),
@@ -341,7 +435,7 @@ export const createLeadSchema = z.object({
   status: z.enum(["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]).optional().default("new"),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional().default("medium"),
   source: z.string().max(100).nullish(),
-  estimated_value: nonNegativeNumber.nullish(),
+  estimated_value: nonNegNum.nullish(),
   probability: z.coerce.number().min(0).max(100).nullish(),
   score: z.coerce.number().int().min(0).max(100).nullish(),
   industry: z.string().max(100).nullish(),
@@ -358,7 +452,7 @@ export const createLeadSchema = z.object({
   expected_close_date: optionalDate,
   assigned_to: optionalUuid,
   avatar_url: optionalUrl,
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  currency: currencyCode.optional().default("USD"),
   budget_range: z.string().max(100).nullish(),
   campaign: z.string().max(255).nullish(),
   referral_source: z.string().max(255).nullish(),
@@ -382,12 +476,12 @@ export const createProjectSchema = z.object({
   start_date: optionalDate,
   end_date: optionalDate,
   deadline: optionalDate,
-  budget: nonNegativeNumber.nullish(),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  budget: nonNegNum.nullish(),
+  currency: currencyCode.optional().default("USD"),
   billing_type: z.enum(["fixed_price", "hourly", "retainer", "milestone_based", "time_and_materials"]).nullish(),
-  hourly_rate: nonNegativeNumber.nullish(),
-  estimated_hours: nonNegativeNumber.nullish(),
-  estimated_cost: nonNegativeNumber.nullish(),
+  hourly_rate: nonNegNum.nullish(),
+  estimated_hours: nonNegNum.nullish(),
+  estimated_cost: nonNegNum.nullish(),
   client_id: optionalUuid,
   assigned_to: optionalUuid,
   color: z.string().max(20).nullish(),
@@ -404,7 +498,8 @@ export const updateProjectSchema = createProjectSchema.partial();
 
 // ── Task ────────────────────────────────────────────────────────────
 
-export const createTaskSchema = z.object({
+// Base schema without refinements (used for .partial())
+const taskBaseSchema = z.object({
   title: z.string().min(1, "Task title is required").max(500),
   description: z.string().max(5000).nullish(),
   status: z.enum(["backlog", "todo", "pending", "in_progress", "in_review", "blocked", "completed", "cancelled"]).optional().default("todo"),
@@ -415,15 +510,30 @@ export const createTaskSchema = z.object({
   swimlane: z.string().max(100).nullish(),
   start_date: optionalDate,
   due_date: optionalDate,
-  estimated_hours: nonNegativeNumber.nullish(),
-  actual_hours: nonNegativeNumber.nullish(),
+  estimated_hours: nonNegNum.nullish(),
+  actual_hours: nonNegNum.nullish(),
   tags: z.any().nullish(),
   notes: z.string().max(5000).nullish(),
   position: z.coerce.number().int().min(0).optional(),
   recurrence_pattern: z.string().max(100).nullish(),
 });
 
-export const updateTaskSchema = createTaskSchema.partial();
+export const createTaskSchema = taskBaseSchema.superRefine((data, ctx) => {
+  // Validate due_date >= start_date when both are provided
+  if (data.start_date && data.due_date) {
+    const startDate = new Date(data.start_date);
+    const dueDate = new Date(data.due_date);
+    if (dueDate < startDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Due date cannot be before start date",
+        path: ["due_date"],
+      });
+    }
+  }
+});
+
+export const updateTaskSchema = taskBaseSchema.partial();
 
 // ── Kanban Board ────────────────────────────────────────────────────
 
@@ -446,7 +556,7 @@ export const createVendorSchema = z.object({
   phone: optionalPhone,
   category: z.string().max(100).nullish(),
   services: z.any().nullish(),
-  hourly_rate: nonNegativeNumber.nullish(),
+  hourly_rate: nonNegNum.nullish(),
   rating: z.coerce.number().min(0, "Rating must be at least 0").max(5, "Rating must be at most 5").nullish(),
   status: z.enum(["active", "inactive", "archived"]).optional().default("active"),
   notes: z.string().max(5000).nullish(),
@@ -474,7 +584,7 @@ export const updateVendorCategorySchema = createVendorCategorySchema.partial();
 export const createVendorEventSchema = z.object({
   event_id: z.string().uuid("Invalid event ID"),
   role: z.string().max(100).nullish(),
-  agreed_rate: nonNegativeNumber.nullish(),
+  agreed_rate: nonNegNum.nullish(),
   status: z.enum(["pending", "confirmed", "declined", "completed"]).optional().default("pending"),
   notes: z.string().max(5000).nullish(),
 });
@@ -494,7 +604,7 @@ export const createBookingPageSchema = z.object({
   assigned_member_id: optionalUuid,
   location_type: z.enum(["video", "phone", "in_person", "custom"]).optional().default("video"),
   location_details: z.string().max(500).nullish(),
-  min_notice_hours: z.coerce.number().min(0).max(720).optional().default(1),
+  min_notice_hours: nonNegNum.max(720).optional().default(1),
   max_advance_days: z.coerce.number().int().min(1).max(365).optional().default(60),
   color: z.string().max(20).optional().default("#84cc16"),
   is_active: z.boolean().optional().default(true),
@@ -600,12 +710,24 @@ export const createBookingReminderSchema = z.object({
 
 // ── Public Booking Submit ──────────────────────────────────────────
 
+// ISO 8601 timestamp with explicit timezone (ends with Z or +/-HH:MM)
+// This prevents ambiguous timestamp parsing across timezones
+const isoTimestampWithTimezone = z.string()
+  .min(1)
+  .refine((val) => {
+    // Must be valid date and have explicit timezone
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return false;
+    // Check for Z suffix or timezone offset like +05:00 or -08:30
+    return /Z$|[+-]\d{2}:\d{2}$/.test(val);
+  }, "Timestamp must be ISO 8601 format with timezone (e.g., 2026-02-10T14:00:00Z or 2026-02-10T14:00:00+05:00)");
+
 export const publicBookingSubmitSchema = z.object({
   client_name: z.string().min(1, "Client name is required").max(255),
   client_email: z.string().email("Invalid email address").max(255),
   client_phone: optionalPhone,
-  start_time: z.string().min(1, "Start time is required"),
-  end_time: z.string().min(1, "End time is required"),
+  start_time: isoTimestampWithTimezone,
+  end_time: isoTimestampWithTimezone,
   notes: z.string().max(5000).nullish(),
   form_response_id: optionalUuid,
 }).refine((data) => {
@@ -614,13 +736,13 @@ export const publicBookingSubmitSchema = z.object({
 
 // ── Invoice Update ────────────────────────────────────────────────────
 
-export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
+export const updateInvoiceSchema = invoiceBaseSchema.partial().extend({
   title: z.string().max(500).nullish(),
   event_id: optionalUuid,
-  tax_amount: nonNegativeNumber.optional(),
-  discount_amount: nonNegativeNumber.optional(),
-  total: nonNegativeNumber.optional(),
-  amount_paid: nonNegativeNumber.optional(),
+  tax_amount: nonNegNum.optional(),
+  discount_amount: nonNegNum.optional(),
+  total: nonNegNum.optional(),
+  amount_paid: nonNegNum.optional(),
   issue_date: optionalDate,
   sent_date: optionalDate,
   paid_at: optionalDate,
@@ -639,11 +761,11 @@ export const updateInvoiceSchema = createInvoiceSchema.partial().extend({
 
 // ── Payment Update ────────────────────────────────────────────────────
 
-export const updatePaymentSchema = createPaymentSchema.partial();
+export const updatePaymentSchema = paymentBaseSchema.partial();
 
 // ── Expense Update ────────────────────────────────────────────────────
 
-export const updateExpenseSchema = createExpenseSchema.partial().extend({
+export const updateExpenseSchema = expenseBaseSchema.partial().extend({
   vendor_name: z.string().max(255).nullish(),
   payment_method: z.string().max(100).nullish(),
   is_reimbursable: z.boolean().optional(),
@@ -659,7 +781,7 @@ export const updateExpenseSchema = createExpenseSchema.partial().extend({
 
 // ── Budget Update ─────────────────────────────────────────────────────
 
-export const updateBudgetSchema = createBudgetSchema.partial().extend({
+export const updateBudgetSchema = budgetBaseSchema.partial().extend({
   alert_sent: z.boolean().optional(),
 });
 
@@ -677,7 +799,7 @@ export const createTeamMemberSchema = z.object({
   role: z.enum(["owner", "admin", "member"]).optional().default("member"),
   custom_role_id: optionalUuid,
   manager_id: optionalUuid,
-  hourly_rate: nonNegativeNumber.optional(),
+  hourly_rate: nonNegNum.optional(),
   skills: z.array(z.string().max(100)).optional().default([]),
   timezone: z.string().max(100).optional().default("UTC"),
   notes: z.string().max(5000).nullish(),
@@ -708,7 +830,7 @@ export const updateTeamMemberSchema = z.object({
   role: z.enum(["owner", "admin", "member"]).optional(),
   status: z.string().max(50).optional(),
   employment_type: z.enum(["full-time", "part-time", "contractor", "freelancer", "intern"]).optional(),
-  hourly_rate: nonNegativeNumber.optional(),
+  hourly_rate: nonNegNum.optional(),
   manager_id: optionalUuid,
   custom_role_id: optionalUuid,
   start_date: optionalDate,
@@ -736,25 +858,25 @@ export const createPayrollRunSchema = z.object({
   notes: z.string().max(5000).nullish(),
   employees: z.array(z.object({
     employee_id: z.string().uuid("Invalid employee ID"),
-    base_salary: nonNegativeNumber.optional(),
-    hourly_rate: nonNegativeNumber.optional(),
-    hours_worked: nonNegativeNumber.optional(),
-    overtime_hours: nonNegativeNumber.optional(),
-    overtime_rate: nonNegativeNumber.optional(),
-    bonus: nonNegativeNumber.optional(),
-    commission: nonNegativeNumber.optional(),
-    allowances: nonNegativeNumber.optional(),
-    reimbursements: nonNegativeNumber.optional(),
-    tax_federal: nonNegativeNumber.optional(),
-    tax_state: nonNegativeNumber.optional(),
-    tax_local: nonNegativeNumber.optional(),
-    social_security: nonNegativeNumber.optional(),
-    medicare: nonNegativeNumber.optional(),
-    health_insurance: nonNegativeNumber.optional(),
-    dental_insurance: nonNegativeNumber.optional(),
-    vision_insurance: nonNegativeNumber.optional(),
-    retirement_401k: nonNegativeNumber.optional(),
-    other_deductions: nonNegativeNumber.optional(),
+    base_salary: nonNegNum.optional(),
+    hourly_rate: nonNegNum.optional(),
+    hours_worked: nonNegNum.optional(),
+    overtime_hours: nonNegNum.optional(),
+    overtime_rate: nonNegNum.optional(),
+    bonus: nonNegNum.optional(),
+    commission: nonNegNum.optional(),
+    allowances: nonNegNum.optional(),
+    reimbursements: nonNegNum.optional(),
+    tax_federal: nonNegNum.optional(),
+    tax_state: nonNegNum.optional(),
+    tax_local: nonNegNum.optional(),
+    social_security: nonNegNum.optional(),
+    medicare: nonNegNum.optional(),
+    health_insurance: nonNegNum.optional(),
+    dental_insurance: nonNegNum.optional(),
+    vision_insurance: nonNegNum.optional(),
+    retirement_401k: nonNegNum.optional(),
+    other_deductions: nonNegNum.optional(),
     payment_method: z.string().max(50).optional(),
     notes: z.string().max(2000).nullish(),
   })).optional(),
@@ -774,7 +896,8 @@ export const updatePayrollRunSchema = z.object({
 
 const timeRegex = /^\d{2}:\d{2}(:\d{2})?$/;
 
-export const createTimeEntrySchema = z.object({
+// Base schema without refinements (used for .partial())
+const timeEntryBaseSchema = z.object({
   user_id: optionalUuid,
   project_id: optionalUuid,
   task_id: optionalUuid,
@@ -784,7 +907,7 @@ export const createTimeEntrySchema = z.object({
   duration_minutes: z.coerce.number().int().min(0).optional(),
   description: z.string().max(2000).nullish(),
   is_billable: z.boolean().optional().default(true),
-  hourly_rate: nonNegativeNumber.optional(),
+  hourly_rate: nonNegNum.optional(),
   status: z.enum(["draft", "submitted", "approved", "rejected", "invoiced"]).optional().default("draft"),
   break_minutes: z.coerce.number().int().min(0).optional().default(0),
   work_type: z.enum(["regular", "overtime", "holiday", "weekend", "on_call"]).optional().default("regular"),
@@ -793,7 +916,23 @@ export const createTimeEntrySchema = z.object({
   tags: z.array(z.string().max(100)).optional().default([]),
 });
 
-export const updateTimeEntrySchema = createTimeEntrySchema.partial().extend({
+export const createTimeEntrySchema = timeEntryBaseSchema.superRefine((data, ctx) => {
+  // Prevent time entries for future dates
+  if (data.date) {
+    const entryDate = new Date(data.date);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // End of today
+    if (entryDate > today) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Time entries cannot be logged for future dates",
+        path: ["date"],
+      });
+    }
+  }
+});
+
+export const updateTimeEntrySchema = timeEntryBaseSchema.partial().extend({
   approved_by: optionalUuid,
   approved_at: optionalDatetime,
   rejection_reason: z.string().max(1000).nullish(),
@@ -851,8 +990,8 @@ export const createGoalSchema = z.object({
   title: z.string().min(1, "Title is required").max(500),
   description: z.string().max(5000).nullish(),
   target_type: z.string().min(1, "target_type is required").max(100),
-  target_value: nonNegativeNumber.nullish(),
-  current_value: nonNegativeNumber.optional().default(0),
+  target_value: nonNegNum.nullish(),
+  current_value: nonNegNum.optional().default(0),
   unit: z.string().max(50).nullish(),
   auto_track: z.boolean().optional().default(false),
   track_entity: z.string().max(100).nullish(),
@@ -888,7 +1027,7 @@ export const createProposalSchema = z.object({
   template_id: optionalUuid,
   sections: z.any().optional(),
   pricing_items: z.any().optional(),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  currency: currencyCode.optional().default("USD"),
   valid_until: optionalDate,
   notes: z.string().max(10000).nullish(),
 });
@@ -902,11 +1041,11 @@ export const updateProposalSchema = z.object({
   lead_id: optionalUuid,
   sections: z.any().optional(),
   pricing_items: z.any().optional(),
-  subtotal: nonNegativeNumber.optional(),
+  subtotal: nonNegNum.optional(),
   discount_percent: z.coerce.number().min(0).max(100).optional(),
   tax_percent: z.coerce.number().min(0).max(100).optional(),
-  total: nonNegativeNumber.optional(),
-  currency: z.string().min(3).max(3).optional(),
+  total: nonNegNum.optional(),
+  currency: currencyCode.optional(),
   valid_until: optionalDate,
   notes: z.string().max(10000).nullish(),
   agency_signature_data: z.string().max(500000).nullish(),
@@ -924,8 +1063,8 @@ export const createContractSchema = z.object({
   type: z.string().max(100).optional().default("service_agreement"),
   start_date: optionalDate,
   end_date: optionalDate,
-  value: nonNegativeNumber.optional().default(0),
-  currency: z.string().min(3).max(3).optional().default("USD"),
+  value: nonNegNum.optional().default(0),
+  currency: currencyCode.optional().default("USD"),
   terms: z.string().max(50000).nullish(),
   payment_terms: z.string().max(5000).nullish(),
   notes: z.string().max(5000).nullish(),
@@ -942,8 +1081,8 @@ export const updateContractSchema = z.object({
   contract_type: z.string().max(100).optional(),
   start_date: optionalDate,
   end_date: optionalDate,
-  value: nonNegativeNumber.optional(),
-  currency: z.string().min(3).max(3).optional(),
+  value: nonNegNum.optional(),
+  currency: currencyCode.optional(),
   terms_and_conditions: z.string().max(50000).nullish(),
   payment_terms: z.string().max(5000).nullish(),
   internal_notes: z.string().max(5000).nullish(),
