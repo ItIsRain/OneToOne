@@ -28,6 +28,9 @@ export interface Goal {
 interface DashboardGoalsProps {
   onAdd?: () => void;
   onView?: (goal: Goal) => void;
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: Goal[];
+  isLoading?: boolean;
 }
 
 const listContainer = {
@@ -43,12 +46,21 @@ const listItem = {
 export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
   onAdd,
   onView,
+  data: propData,
+  isLoading: propLoading,
 }) => {
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(propData === undefined);
   const [error, setError] = useState("");
 
+  // Use prop data if available
+  const effectiveGoals = propData || goals;
+  const effectiveLoading = propLoading !== undefined ? propLoading : loading;
+
   const fetchGoals = useCallback(async () => {
+    // Skip fetch if data is provided via props
+    if (propData !== undefined) return;
+
     try {
       const res = await fetch("/api/goals?status=active");
 
@@ -67,11 +79,13 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [propData]);
 
   useEffect(() => {
-    fetchGoals();
-  }, [fetchGoals]);
+    if (propData === undefined) {
+      fetchGoals();
+    }
+  }, [fetchGoals, propData]);
 
   const getProgress = (goal: Goal) => {
     if (!goal.target_value || goal.target_value === 0) return 0;
@@ -102,7 +116,7 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
     return "bg-brand-500";
   };
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-5">
@@ -146,7 +160,7 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
         </div>
       )}
 
-      {goals.length === 0 ? (
+      {effectiveGoals.length === 0 ? (
         <div className="text-center py-8">
           <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,7 +184,7 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
           initial="hidden"
           animate="show"
         >
-          {goals.slice(0, 5).map((goal) => {
+          {effectiveGoals.slice(0, 5).map((goal) => {
             const progress = getProgress(goal);
             return (
               <motion.div
@@ -227,9 +241,9 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
             );
           })}
 
-          {goals.length > 5 && (
+          {effectiveGoals.length > 5 && (
             <button className="w-full text-center text-sm text-brand-500 hover:text-brand-600 font-medium py-2 transition-colors">
-              View all {goals.length} goals
+              View all {effectiveGoals.length} goals
             </button>
           )}
         </motion.div>
