@@ -157,7 +157,7 @@ export async function GET() {
       // Team members
       supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, role")
+        .select("id, first_name, last_name, avatar_url, role")
         .eq("tenant_id", tenantId),
     ]);
 

@@ -54,7 +54,7 @@ export async function GET() {
       // Today's appointments
       supabase
         .from("appointments")
-        .select("id, title, start_time, end_time, status, attendee_name, attendee_email")
+        .select("id, start_time, end_time, status, client_name, client_email")
         .eq("tenant_id", tenantId)
         .gte("start_time", startOfDay)
         .lt("start_time", endOfDay)
@@ -65,7 +65,7 @@ export async function GET() {
       // Overdue invoices with total amount
       supabase
         .from("invoices")
-        .select("id, title, invoice_number, total_amount, due_date, status, client_id")
+        .select("id, title, invoice_number, total, due_date, status, client_id")
         .eq("tenant_id", tenantId)
         .eq("status", "overdue")
         .order("due_date", { ascending: true })
@@ -130,7 +130,7 @@ export async function GET() {
 
     // Calculate overdue invoice total
     const overdueInvoiceTotal = (overdueInvoicesResult.data || []).reduce(
-      (sum, inv) => sum + (Number(inv.total_amount) || 0),
+      (sum, inv) => sum + (Number(inv.total) || 0),
       0
     );
 
@@ -151,11 +151,11 @@ export async function GET() {
         ...(todayAppointmentsResult.data || []).map((a) => ({
           id: a.id,
           type: "appointment" as const,
-          title: a.title || `Meeting with ${a.attendee_name}`,
+          title: a.client_name ? `Meeting with ${a.client_name}` : "Appointment",
           time: a.start_time,
           endTime: a.end_time,
-          attendeeName: a.attendee_name,
-          attendeeEmail: a.attendee_email,
+          attendeeName: a.client_name,
+          attendeeEmail: a.client_email,
           path: `/dashboard/booking/appointments`,
         })),
       ].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()),
@@ -166,7 +166,7 @@ export async function GET() {
         items: (overdueInvoicesResult.data || []).map((inv) => ({
           id: inv.id,
           title: inv.title || inv.invoice_number,
-          amount: Number(inv.total_amount) || 0,
+          amount: Number(inv.total) || 0,
           dueDate: inv.due_date,
           path: `/dashboard/finance/invoices/${inv.id}`,
         })),

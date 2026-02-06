@@ -100,7 +100,7 @@ export async function GET() {
     const [membersResult, tasksResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, role")
+        .select("id, first_name, last_name, avatar_url, role")
         .eq("tenant_id", tenantId),
       supabase
         .from("tasks")
@@ -146,7 +146,7 @@ export async function GET() {
 
       return {
         id: member.id,
-        name: member.full_name || "Unknown",
+        name: [member.first_name, member.last_name].filter(Boolean).join(" ") || "Unknown",
         avatar: member.avatar_url || null,
         role: member.role || "member",
         weeks: weekData,

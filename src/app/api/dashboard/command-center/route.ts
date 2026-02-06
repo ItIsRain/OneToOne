@@ -125,13 +125,13 @@ export async function GET() {
       // Team profiles
       supabase
         .from("profiles")
-        .select("id, full_name, avatar_url, role")
+        .select("id, first_name, last_name, avatar_url, role")
         .eq("tenant_id", tenantId),
 
       // Today's events
       supabase
         .from("events")
-        .select("id, name, start_date, end_date, event_type, status")
+        .select("id, title, start_date, end_date, event_type, status")
         .eq("tenant_id", tenantId)
         .gte("start_date", todayStart)
         .lt("start_date", todayEnd)
@@ -223,7 +223,7 @@ export async function GET() {
       const utilization = Math.min(Math.round((totalAssigned / 10) * 100), 100);
       return {
         id: member.id,
-        name: member.full_name || "Team Member",
+        name: [member.first_name, member.last_name].filter(Boolean).join(" ") || "Team Member",
         avatar: member.avatar_url,
         role: member.role,
         activeTasks,
@@ -258,7 +258,7 @@ export async function GET() {
       ...todayEvents.map((e) => ({
         id: e.id,
         type: "event" as const,
-        title: e.name,
+        title: e.title,
         time: e.start_date,
         priority: null,
         status: e.status,
