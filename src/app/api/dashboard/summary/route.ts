@@ -60,13 +60,9 @@ export async function GET() {
         .eq("tenant_id", tenantId)
         .eq("status", "sent"),
 
-      // Unread messages (for current user)
-      supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("is_read", false)
-        .neq("sender_id", user.id),
+      // Unread messages count - messages table doesn't have tenant_id or is_read
+      // TODO: Implement proper unread tracking via conversation_participants
+      Promise.resolve({ count: 0 }),
     ]);
 
     return NextResponse.json({
