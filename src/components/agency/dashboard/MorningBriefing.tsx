@@ -245,15 +245,25 @@ function InitialsAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md
 
 interface MorningBriefingProps {
   onDismiss?: () => void;
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: BriefingData | null;
+  isLoading?: boolean;
 }
 
-export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
+export function MorningBriefing({ onDismiss, data: propData, isLoading: propLoading }: MorningBriefingProps) {
   const [data, setData] = useState<BriefingData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(propData === undefined);
   const [dismissed, setDismissed] = useState(false);
   const [error, setError] = useState(false);
 
+  // Use prop data if available
+  const effectiveData = propData || data;
+  const effectiveLoading = propLoading !== undefined ? propLoading : loading;
+
   const fetchBriefing = useCallback(async () => {
+    // Skip fetch if data is provided via props
+    if (propData !== undefined) return;
+
     setLoading(true);
     setError(false);
     try {
@@ -266,7 +276,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [propData]);
 
   useEffect(() => {
     // Check if briefing was dismissed today
@@ -276,8 +286,11 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
       setLoading(false);
       return;
     }
-    fetchBriefing();
-  }, [fetchBriefing]);
+    // Only fetch if no prop data provided
+    if (propData === undefined) {
+      fetchBriefing();
+    }
+  }, [fetchBriefing, propData]);
 
   const handleDismiss = () => {
     sessionStorage.setItem("briefing-dismissed", new Date().toDateString());
@@ -290,7 +303,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
   };
 
   // Loading skeleton
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center justify-between mb-5">
@@ -337,7 +350,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
   }
 
   // Error state
-  if (error || !data) {
+  if (error || !effectiveData) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center justify-between">
@@ -354,15 +367,15 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
   }
 
   // Determine which sections have content
-  const hasSchedule = data.todaySchedule.length > 0;
-  const hasOverdueInvoices = data.overdueInvoices.count > 0;
-  const hasBlockedTasks = data.blockedTasks.length > 0;
-  const hasOverdueTasks = data.overdueTasks.length > 0;
-  const hasProposals = data.pipelineActivity.activeProposals.length > 0;
-  const hasLeads = data.pipelineActivity.recentLeads.length > 0;
+  const hasSchedule = effectiveData.todaySchedule.length > 0;
+  const hasOverdueInvoices = effectiveData.overdueInvoices.count > 0;
+  const hasBlockedTasks = effectiveData.blockedTasks.length > 0;
+  const hasOverdueTasks = effectiveData.overdueTasks.length > 0;
+  const hasProposals = effectiveData.pipelineActivity.activeProposals.length > 0;
+  const hasLeads = effectiveData.pipelineActivity.recentLeads.length > 0;
   const hasPipeline = hasProposals || hasLeads;
-  const hasDeadlines = data.upcomingDeadlines.length > 0;
-  const hasTeam = data.teamSnapshot.totalMembers > 1;
+  const hasDeadlines = effectiveData.upcomingDeadlines.length > 0;
+  const hasTeam = effectiveData.teamSnapshot.totalMembers > 1;
 
   const sectionCount = [hasSchedule, hasOverdueInvoices, hasBlockedTasks || hasOverdueTasks, hasPipeline, hasDeadlines, hasTeam].filter(Boolean).length;
 
@@ -444,7 +457,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {hasSchedule && (
               <SectionCard
                 title="Today's Schedule"
-                count={data.todaySchedule.length}
+                count={effectiveData.todaySchedule.length}
                 accentColor="bg-brand-100 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -455,7 +468,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                 linkLabel="View calendar"
               >
                 <div className="space-y-2">
-                  {data.todaySchedule.map((item) => (
+                  {effectiveData.todaySchedule.map((item) => (
                     <Link
                       key={`${item.type}-${item.id}`}
                       href={item.path}
@@ -490,7 +503,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {hasOverdueInvoices && (
               <SectionCard
                 title="Overdue Invoices"
-                count={data.overdueInvoices.count}
+                count={effectiveData.overdueInvoices.count}
                 accentColor="bg-error-100 text-error-600 dark:bg-error-500/15 dark:text-error-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -502,12 +515,12 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
               >
                 <div className="mb-2.5">
                   <span className="text-lg font-bold text-error-600 dark:text-error-400">
-                    {formatCurrency(data.overdueInvoices.totalAmount)}
+                    {formatCurrency(effectiveData.overdueInvoices.totalAmount)}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400 ml-1.5">total outstanding</span>
                 </div>
                 <div className="space-y-1.5">
-                  {data.overdueInvoices.items.slice(0, 4).map((inv) => (
+                  {effectiveData.overdueInvoices.items.slice(0, 4).map((inv) => (
                     <Link
                       key={inv.id}
                       href={inv.path}
@@ -532,7 +545,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {(hasBlockedTasks || hasOverdueTasks) && (
               <SectionCard
                 title="Tasks Needing Attention"
-                count={data.blockedTasks.length + data.overdueTasks.length}
+                count={effectiveData.blockedTasks.length + effectiveData.overdueTasks.length}
                 accentColor="bg-warning-100 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -543,7 +556,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                 linkLabel="View tasks"
               >
                 <div className="space-y-1.5">
-                  {data.blockedTasks.slice(0, 3).map((task) => (
+                  {effectiveData.blockedTasks.slice(0, 3).map((task) => (
                     <Link
                       key={task.id}
                       href={task.path}
@@ -557,7 +570,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                       </span>
                     </Link>
                   ))}
-                  {data.overdueTasks.slice(0, 3).map((task) => (
+                  {effectiveData.overdueTasks.slice(0, 3).map((task) => (
                     <Link
                       key={task.id}
                       href={task.path}
@@ -580,7 +593,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {hasPipeline && (
               <SectionCard
                 title="Pipeline Activity"
-                count={(data.pipelineActivity.activeProposals.length) + (data.pipelineActivity.recentLeads.length)}
+                count={(effectiveData.pipelineActivity.activeProposals.length) + (effectiveData.pipelineActivity.recentLeads.length)}
                 accentColor="bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -594,7 +607,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                   {hasProposals && (
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">Active Proposals</p>
-                      {data.pipelineActivity.activeProposals.slice(0, 3).map((p) => (
+                      {effectiveData.pipelineActivity.activeProposals.slice(0, 3).map((p) => (
                         <Link
                           key={p.id}
                           href={p.path}
@@ -613,7 +626,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                   {hasLeads && (
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1">New Leads</p>
-                      {data.pipelineActivity.recentLeads.slice(0, 3).map((l) => (
+                      {effectiveData.pipelineActivity.recentLeads.slice(0, 3).map((l) => (
                         <Link
                           key={l.id}
                           href={l.path}
@@ -642,7 +655,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {hasDeadlines && (
               <SectionCard
                 title="Upcoming Deadlines"
-                count={data.upcomingDeadlines.length}
+                count={effectiveData.upcomingDeadlines.length}
                 accentColor="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -653,7 +666,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                 linkLabel="View tasks"
               >
                 <div className="space-y-1.5">
-                  {data.upcomingDeadlines.slice(0, 5).map((d) => (
+                  {effectiveData.upcomingDeadlines.slice(0, 5).map((d) => (
                     <Link
                       key={d.id}
                       href={d.path}
@@ -678,7 +691,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
             {hasTeam && (
               <SectionCard
                 title="Team"
-                count={data.teamSnapshot.totalMembers}
+                count={effectiveData.teamSnapshot.totalMembers}
                 accentColor="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
                 icon={
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -689,7 +702,7 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                 linkLabel="View team"
               >
                 <div className="flex flex-wrap gap-2">
-                  {data.teamSnapshot.members.map((member) => (
+                  {effectiveData.teamSnapshot.members.map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 px-2.5 py-1.5"
@@ -710,10 +723,10 @@ export function MorningBriefing({ onDismiss }: MorningBriefingProps) {
                       </span>
                     </div>
                   ))}
-                  {data.teamSnapshot.totalMembers > 8 && (
+                  {effectiveData.teamSnapshot.totalMembers > 8 && (
                     <div className="flex items-center rounded-lg bg-gray-50 dark:bg-gray-800/50 px-2.5 py-1.5">
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        +{data.teamSnapshot.totalMembers - 8} more
+                        +{effectiveData.teamSnapshot.totalMembers - 8} more
                       </span>
                     </div>
                   )}
