@@ -7,6 +7,8 @@ import {
   FormBuilder,
   FormSubmissionsTable,
 } from "@/components/agency";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface SurveyMeta {
   id: string;
@@ -94,27 +96,32 @@ export default function SurveyDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500 dark:border-gray-700 dark:border-t-brand-400" />
-      </div>
+      <ProtectedPage permission={PERMISSIONS.FORMS_VIEW}>
+        <div className="flex items-center justify-center py-24">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500 dark:border-gray-700 dark:border-t-brand-400" />
+        </div>
+      </ProtectedPage>
     );
   }
 
   if (!survey) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center dark:border-gray-700 dark:bg-white/[0.03]">
-        <p className="text-gray-500 dark:text-gray-400">Survey not found.</p>
-        <Link href="/dashboard/surveys" className="mt-4 inline-block text-sm font-medium text-brand-500 hover:text-brand-600">
-          Back to Surveys
-        </Link>
-      </div>
+      <ProtectedPage permission={PERMISSIONS.FORMS_VIEW}>
+        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center dark:border-gray-700 dark:bg-white/[0.03]">
+          <p className="text-gray-500 dark:text-gray-400">Survey not found.</p>
+          <Link href="/dashboard/surveys" className="mt-4 inline-block text-sm font-medium text-brand-500 hover:text-brand-600">
+            Back to Surveys
+          </Link>
+        </div>
+      </ProtectedPage>
     );
   }
 
   const publicUrl = survey.form_slug ? `${typeof window !== "undefined" ? window.location.origin : ""}/form/${survey.form_slug}` : null;
 
   return (
-    <FeatureGate feature="surveys">
+    <ProtectedPage permission={PERMISSIONS.FORMS_VIEW}>
+      <FeatureGate feature="surveys">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -214,6 +221,7 @@ export default function SurveyDetailPage({
           </div>
         )}
       </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

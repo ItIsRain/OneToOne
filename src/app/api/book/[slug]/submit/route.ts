@@ -98,10 +98,21 @@ export async function POST(
 
     // Helper: get day of week (0=Sun..6=Sat) for a UTC date in a given timezone
     function getDayInTimezone(utcDate: Date, timezone: string): number {
-      const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).formatToParts(utcDate);
-      const weekday = parts.find((p) => p.type === "weekday")?.value;
-      const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-      return dayMap[weekday || ""] ?? utcDate.getDay();
+      // Use full weekday name for more reliable parsing
+      const formatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "long" });
+      const weekdayName = formatter.format(utcDate);
+      const dayMap: Record<string, number> = {
+        Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6
+      };
+      const dayNum = dayMap[weekdayName];
+      if (dayNum === undefined) {
+        // This should never happen, but log and use a safe calculation
+        console.error(`Unexpected weekday name: ${weekdayName} for timezone ${timezone}`);
+        // Calculate day in timezone using offset-aware approach
+        const tzDate = new Date(utcDate.toLocaleString("en-US", { timeZone: timezone }));
+        return tzDate.getDay();
+      }
+      return dayNum;
     }
 
     // First, fetch all availability for this member/tenant to determine timezone

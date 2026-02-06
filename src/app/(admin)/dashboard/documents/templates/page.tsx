@@ -4,6 +4,8 @@ import { TemplatesTable, TemplateDetailsSidebar } from "@/components/agency";
 import { UploadTemplateModal } from "@/components/agency/modals";
 import { FeatureGate } from "@/components/ui/FeatureGate";
 import type { TemplateRecord } from "@/components/agency/TemplatesTable";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function TemplatesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,9 +79,9 @@ export default function TemplatesPage() {
   };
 
   return (
-    <FeatureGate feature="document_templates">
-    <>
-      <div className="space-y-6">
+    <ProtectedPage permission={PERMISSIONS.DOCUMENTS_VIEW}>
+      <FeatureGate feature="document_templates">
+        <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Templates</h1>
@@ -127,7 +129,7 @@ export default function TemplatesPage() {
         onDelete={handleDeleteTemplate}
         onUse={handleUseTemplate}
       />
-    </>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

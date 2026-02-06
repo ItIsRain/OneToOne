@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Member {
@@ -191,6 +193,7 @@ export default function UtilizationPage() {
   });
 
   return (
+    <ProtectedPage permission={PERMISSIONS.TEAM_VIEW}>
     <FeatureGate feature="resource_utilization">
       <div className="space-y-6">
         {/* Header */}
@@ -467,6 +470,7 @@ export default function UtilizationPage() {
         </div>
       </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }
 

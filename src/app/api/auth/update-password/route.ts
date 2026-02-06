@@ -81,6 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Revoke all existing sessions for security (prevents session fixation attacks)
+    // If an attacker had access to a previous session, it will be invalidated
+    try {
+      await supabaseAdmin.auth.admin.signOut(user.id, "global");
+    } catch (signOutError) {
+      // Log but don't fail the password update - user can re-login
+      console.error("Failed to revoke sessions after password update:", signOutError);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Update password error:", error);

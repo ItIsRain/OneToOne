@@ -1,10 +1,13 @@
 "use client";
 import { PortalClientsTable } from "@/components/agency";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function PortalClientsPage() {
   return (
-    <FeatureGate feature="client_portal">
+    <ProtectedPage permission={PERMISSIONS.CLIENTS_VIEW}>
+      <FeatureGate feature="client_portal">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
@@ -16,6 +19,7 @@ export default function PortalClientsPage() {
         </div>
         <PortalClientsTable />
       </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

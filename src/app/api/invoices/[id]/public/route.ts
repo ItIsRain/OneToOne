@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // GET - Fetch invoice publicly (no auth required)
 // The invoice ID itself acts as an unguessable token (UUID)
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+
+    // Rate limit: 30 requests per IP per minute to prevent UUID enumeration
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit({
+      key: "public-invoice",
+      identifier: ip,
+      maxRequests: 30,
+      windowSeconds: 60,
+    });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.retryAfterSeconds!);
+    }
 
     // Validate UUID format to avoid unnecessary DB queries
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

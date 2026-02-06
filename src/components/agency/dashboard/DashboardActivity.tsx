@@ -12,6 +12,12 @@ interface Activity {
   created_at: string;
 }
 
+interface DashboardActivityProps {
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: Activity[];
+  isLoading?: boolean;
+}
+
 const typeConfig: Record<string, { bg: string; color: string; icon: React.ReactNode }> = {
   client: {
     bg: "bg-brand-100 dark:bg-brand-500/15",
@@ -107,12 +113,24 @@ const listItem = {
   show: { opacity: 1, x: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
 };
 
-export const DashboardActivity: React.FC = () => {
+export const DashboardActivity: React.FC<DashboardActivityProps> = ({ data: propData, isLoading: propLoading }) => {
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Determine if we should use props or fetch ourselves
+  // If propLoading is provided (even if false), parent is managing data
+  const parentManagesData = propLoading !== undefined;
+
+  // Use prop data if available
+  const effectiveActivities = propData || activities;
+  const effectiveLoading = parentManagesData ? (propLoading || false) : loading;
+
   const fetchActivities = useCallback(async () => {
+    // Skip fetch if parent is managing data
+    if (parentManagesData) return;
+
+    setLoading(true);
     try {
       const res = await fetch("/api/dashboard/activity?limit=10");
 
@@ -131,11 +149,13 @@ export const DashboardActivity: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [parentManagesData]);
 
   useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+    if (!parentManagesData) {
+      fetchActivities();
+    }
+  }, [fetchActivities, parentManagesData]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -172,7 +192,7 @@ export const DashboardActivity: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-5">
@@ -194,7 +214,7 @@ export const DashboardActivity: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && effectiveActivities.length === 0) {
     return (
       <div className="rounded-xl border border-error-200 bg-error-50 p-5 dark:border-error-800 dark:bg-error-900/20">
         <p className="text-error-600 dark:text-error-400 text-sm">{error}</p>
@@ -219,7 +239,7 @@ export const DashboardActivity: React.FC = () => {
         </button>
       </div>
 
-      {activities.length === 0 ? (
+      {effectiveActivities.length === 0 ? (
         <div className="text-center py-8">
           <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +258,7 @@ export const DashboardActivity: React.FC = () => {
           initial="hidden"
           animate="show"
         >
-          {activities.map((activity) => {
+          {effectiveActivities.map((activity) => {
             const config = typeConfig[activity.entity_type] || defaultConfig;
             return (
               <motion.div

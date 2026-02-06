@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     // Task must be completed
-    if (task.status !== "completed" && task.status !== "done") {
+    if (task.status !== "completed") {
       return NextResponse.json(
         { error: "Milestone task must be completed before generating an invoice" },
         { status: 400 }

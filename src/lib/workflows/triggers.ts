@@ -2,20 +2,35 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { executeWorkflow } from "./engine";
 
 const MAX_TRIGGER_DEPTH = 5;
-let currentTriggerDepth = 0;
 
+/**
+ * Check and execute workflows matching the given trigger.
+ *
+ * @param triggerType - The type of trigger (e.g., "task_created")
+ * @param triggerData - Data associated with the trigger event
+ * @param supabase - Supabase client instance
+ * @param tenantId - Tenant ID for isolation
+ * @param userId - User ID who triggered the event
+ * @param currentDepth - Current recursion depth (default 0). Pass this through when
+ *                       workflows trigger other events to prevent infinite loops.
+ */
 export async function checkTriggers(
   triggerType: string,
   triggerData: Record<string, unknown>,
   supabase: SupabaseClient,
   tenantId: string,
-  userId: string
+  userId: string,
+  currentDepth: number = 0
 ): Promise<void> {
-  // Prevent infinite workflow loops
-  if (currentTriggerDepth >= MAX_TRIGGER_DEPTH) {
+  // Prevent infinite workflow loops - depth is passed through the call chain
+  // This is thread-safe as each workflow chain tracks its own depth
+  if (currentDepth >= MAX_TRIGGER_DEPTH) {
     console.warn(`[TRIGGER] Max trigger depth (${MAX_TRIGGER_DEPTH}) reached for ${triggerType}, skipping to prevent infinite loop`);
     return;
   }
+
+  // Store depth in triggerData so nested workflows can access it
+  const dataWithDepth = { ...triggerData, __workflowDepth: currentDepth + 1 };
   // Query active workflows matching the trigger type and tenant
   const { data: workflows, error } = await supabase
     .from("workflows")
@@ -29,8 +44,6 @@ export async function checkTriggers(
     return;
   }
 
-  currentTriggerDepth++;
-  try {
   for (const workflow of workflows) {
     try {
       const triggerConfig = workflow.trigger_config as Record<string, unknown> | null;
@@ -188,15 +201,12 @@ export async function checkTriggers(
         if (skip) continue;
       }
 
-      await executeWorkflow(workflow.id, triggerData, supabase, userId, tenantId);
+      await executeWorkflow(workflow.id, dataWithDepth, supabase, userId, tenantId);
     } catch (err) {
       console.error(
         `[TRIGGER] Failed to execute workflow ${workflow.id} for trigger ${triggerType}:`,
         err instanceof Error ? err.message : String(err)
       );
     }
-  }
-  } finally {
-    currentTriggerDepth--;
   }
 }

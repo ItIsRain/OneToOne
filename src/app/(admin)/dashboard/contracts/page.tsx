@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { ContractsTable } from "@/components/agency";
 import { CreateContractModal } from "@/components/agency/modals";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function ContractsPage() {
   const router = useRouter();
@@ -11,7 +13,8 @@ export default function ContractsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <FeatureGate feature="contracts">
+    <ProtectedPage permission={PERMISSIONS.CONTRACTS_VIEW}>
+      <FeatureGate feature="contracts">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
@@ -39,6 +42,7 @@ export default function ContractsPage() {
           router.push(`/dashboard/contracts/${contractId}`);
         }}
       />
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

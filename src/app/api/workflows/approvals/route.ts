@@ -55,6 +55,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
+    const tenantId = profile.tenant_id;
 
     const body = await request.json();
     const { approval_id, status, comment } = body;
@@ -72,11 +73,13 @@ export async function PATCH(request: NextRequest) {
       updateData.comment = comment;
     }
 
+    // Security: Enforce tenant isolation to prevent cross-tenant approval manipulation
     const { data: approval, error: approvalError } = await supabase
       .from("workflow_approvals")
       .update(updateData)
       .eq("id", approval_id)
       .eq("requested_from", user.id)
+      .eq("tenant_id", tenantId)
       .select("*, step_execution:step_execution_id(id, run_id)")
       .single();
 

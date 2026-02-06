@@ -9,6 +9,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { NewBookingModal } from "@/components/agency/modals";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const bookings = [
   { id: 1, event: "Product Launch", venue: "Grand Ballroom", client: "TechStart", date: "Feb 15, 2025", time: "10:00 AM - 4:00 PM", status: "Confirmed", amount: "$3,000" },
@@ -22,7 +24,7 @@ export default function BookingsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <>
+    <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -75,6 +77,6 @@ export default function BookingsPage() {
       </div>
 
       <NewBookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </>
+    </ProtectedPage>
   );
 }

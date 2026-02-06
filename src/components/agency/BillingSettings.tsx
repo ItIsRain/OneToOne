@@ -102,6 +102,9 @@ interface Subscription {
   price: number;
   is_trialing?: boolean;
   next_billing_date?: string | null;
+  subscription_type?: "free" | "trial" | "paid" | "granted";
+  is_granted?: boolean;
+  grant_reason?: string | null;
 }
 
 interface PaymentMethod {
@@ -656,13 +659,31 @@ export const BillingSettings = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400">Manage your subscription</p>
                 </div>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                subscription?.status === "active"
-                  ? "bg-success-100 text-success-700 dark:bg-success-500/20 dark:text-success-400"
-                  : "bg-warning-100 text-warning-700 dark:bg-warning-500/20 dark:text-warning-400"
-              }`}>
-                {subscription?.status?.charAt(0).toUpperCase()}{subscription?.status?.slice(1)}
-              </span>
+              <div className="flex items-center gap-2">
+                {subscription?.is_granted && (
+                  <span className="rounded-full px-3 py-1 text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                    Granted
+                  </span>
+                )}
+                {subscription?.is_trialing && !subscription?.is_granted && (
+                  <span className="rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Trial
+                  </span>
+                )}
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  subscription?.status === "active"
+                    ? "bg-success-100 text-success-700 dark:bg-success-500/20 dark:text-success-400"
+                    : "bg-warning-100 text-warning-700 dark:bg-warning-500/20 dark:text-warning-400"
+                }`}>
+                  {subscription?.status?.charAt(0).toUpperCase()}{subscription?.status?.slice(1)}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-4 mb-6">

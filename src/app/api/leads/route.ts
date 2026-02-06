@@ -143,16 +143,46 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Validate input
+    // Validate input with enum validation for status and priority
     const validation = validateBody(createLeadSchema, body);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const v = validation.data;
+
+    // Deduplication check: warn if lead with same email exists (unless force is set)
+    if (!body.force && v.email) {
+      const { data: potentialDuplicates } = await supabase
+        .from("leads")
+        .select("id, name, email, company, status")
+        .eq("tenant_id", profile.tenant_id)
+        .eq("email", v.email.toLowerCase())
+        .limit(3);
+
+      if (potentialDuplicates && potentialDuplicates.length > 0) {
+        const dupInfo = potentialDuplicates.map((d) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          company: d.company,
+          status: d.status,
+        }));
+        return NextResponse.json(
+          {
+            error: "Potential duplicate lead found",
+            code: "DUPLICATE_WARNING",
+            duplicates: dupInfo,
+            message: `A lead with email "${v.email}" already exists. Add "force: true" to create anyway.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // Validate FK references belong to the same tenant
-    if (body.assigned_to) {
+    if (v.assigned_to) {
       const { data: assignee } = await supabase
-        .from("profiles").select("id").eq("id", body.assigned_to).eq("tenant_id", profile.tenant_id).single();
+        .from("profiles").select("id").eq("id", v.assigned_to).eq("tenant_id", profile.tenant_id).single();
       if (!assignee) {
         return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 404 });
       }
@@ -166,42 +196,42 @@ export async function POST(request: Request) {
       tenant_id: profile.tenant_id,
       created_by: user.id,
       // Contact Information
-      name: body.name.slice(0, 200),
-      email: body.email || null,
-      phone: body.phone || null,
-      company: body.company || null,
-      job_title: body.job_title || null,
-      website: body.website || null,
-      address: body.address || null,
-      city: body.city || null,
-      country: body.country || null,
+      name: v.name.slice(0, 200),
+      email: v.email || null,
+      phone: v.phone || null,
+      company: v.company || null,
+      job_title: v.job_title || null,
+      website: v.website || null,
+      address: v.address || null,
+      city: v.city || null,
+      country: v.country || null,
       // Sales Pipeline
-      status: body.status || "new",
-      estimated_value: Math.max(0, parseFloat(body.estimated_value) || 0),
-      probability: Math.min(100, Math.max(0, parseFloat(body.probability) || 0)),
-      priority: body.priority || "medium",
-      score: Math.min(100, Math.max(0, parseInt(body.score) || 0)),
+      status: v.status,
+      estimated_value: v.estimated_value ?? 0,
+      probability: v.probability ?? 0,
+      priority: v.priority,
+      score: v.score ?? 0,
       // Source & Attribution
-      source: body.source || null,
-      campaign: body.campaign || null,
-      referral_source: body.referral_source || null,
+      source: v.source || null,
+      campaign: v.campaign || null,
+      referral_source: v.referral_source || null,
       // Industry & Company Info
-      industry: body.industry || null,
-      company_size: body.company_size || null,
-      budget_range: body.budget_range || null,
+      industry: v.industry || null,
+      company_size: v.company_size || null,
+      budget_range: v.budget_range || null,
       // Timeline
-      next_follow_up: body.next_follow_up || null,
-      last_contacted: body.last_contacted || null,
-      expected_close_date: body.expected_close_date || null,
+      next_follow_up: v.next_follow_up || null,
+      last_contacted: v.last_contacted || null,
+      expected_close_date: v.expected_close_date || null,
       // Assignment
-      assigned_to: body.assigned_to || null,
+      assigned_to: v.assigned_to || null,
       // Notes & Requirements
-      notes: truncate(body.notes, 5000),
+      notes: truncate(v.notes, 5000),
       requirements: truncate(body.requirements, 5000),
       pain_points: truncate(body.pain_points, 5000),
       competitor_info: truncate(body.competitor_info, 5000),
       // Categorization
-      tags: body.tags || null,
+      tags: v.tags || null,
       services_interested: body.services_interested || null,
     };
 

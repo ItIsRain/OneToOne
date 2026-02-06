@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Indicator {
@@ -152,30 +154,34 @@ export default function ScopeCreepPage() {
 
   if (loading) {
     return (
-      <FeatureGate feature="projects">
-        <div className="space-y-6">
-          <div className="animate-pulse">
-            <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded mb-6" />
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-              ))}
+      <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
+        <FeatureGate feature="projects">
+          <div className="space-y-6">
+            <div className="animate-pulse">
+              <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded mb-6" />
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                ))}
+              </div>
+              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-xl" />
             </div>
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-xl" />
           </div>
-        </div>
-      </FeatureGate>
+        </FeatureGate>
+      </ProtectedPage>
     );
   }
 
   if (error) {
     return (
-      <FeatureGate feature="projects">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-          <p className="text-error-500">{error}</p>
-          <button onClick={fetchData} className="mt-2 text-brand-500 hover:text-brand-600">Try again</button>
-        </div>
-      </FeatureGate>
+      <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
+        <FeatureGate feature="projects">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+            <p className="text-error-500">{error}</p>
+            <button onClick={fetchData} className="mt-2 text-brand-500 hover:text-brand-600">Try again</button>
+          </div>
+        </FeatureGate>
+      </ProtectedPage>
     );
   }
 
@@ -185,7 +191,8 @@ export default function ScopeCreepPage() {
   const filtered = riskFilter === "all" ? analyses : analyses.filter((a) => a.risk_level === riskFilter);
 
   return (
-    <FeatureGate feature="projects">
+    <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
+      <FeatureGate feature="projects">
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -464,7 +471,8 @@ export default function ScopeCreepPage() {
           </p>
         </div>
       </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }
 

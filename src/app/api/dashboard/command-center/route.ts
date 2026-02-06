@@ -207,7 +207,7 @@ export async function GET() {
       (t) => t.status === "todo" || t.status === "in_progress" || t.status === "review"
     ).length;
     const overdueTasks = allTasks.filter(
-      (t) => t.due_date && new Date(t.due_date) < new Date() && t.status !== "completed" && t.status !== "done"
+      (t) => t.due_date && new Date(t.due_date) < new Date() && !["completed", "cancelled"].includes(t.status)
     ).length;
 
     // Team utilization: tasks per member
@@ -217,7 +217,7 @@ export async function GET() {
         (t) => t.status === "in_progress" || t.status === "review"
       ).length;
       const totalAssigned = memberTasks.filter(
-        (t) => t.status !== "completed" && t.status !== "done"
+        (t) => !["completed", "cancelled"].includes(t.status)
       ).length;
       // Assume max capacity of 10 tasks per person
       const utilization = Math.min(Math.round((totalAssigned / 10) * 100), 100);

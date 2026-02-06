@@ -112,6 +112,15 @@ export async function POST(request: Request) {
     }
     const v = validation.data;
 
+    // Validate payment amount is positive (applies to all payments)
+    const paymentAmount = parseFloat(String(v.amount));
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      return NextResponse.json(
+        { error: "Payment amount must be greater than zero" },
+        { status: 400 }
+      );
+    }
+
     // If payment is linked to an invoice and completed, validate before insert
     if (v.invoice_id && v.status === "completed") {
       const { data: invoice } = await supabase
@@ -133,8 +142,8 @@ export async function POST(request: Request) {
         );
       }
 
-      // Don't allow payments on cancelled/void/refunded invoices
-      const nonPayableStatuses = ["cancelled", "void", "refunded"];
+      // Don't allow payments on cancelled/refunded invoices
+      const nonPayableStatuses = ["cancelled", "refunded"];
       if (nonPayableStatuses.includes(invoice.status)) {
         return NextResponse.json(
           { error: `Cannot add payment to ${invoice.status} invoice` },
@@ -143,7 +152,6 @@ export async function POST(request: Request) {
       }
 
       // Validate: prevent overpayment
-      const paymentAmount = parseFloat(String(v.amount));
       const currentPaid = invoice.amount_paid || 0;
       const invoiceTotal = invoice.total || invoice.amount || 0;
 

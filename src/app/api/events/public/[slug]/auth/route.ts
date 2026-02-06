@@ -6,23 +6,30 @@ import { SignJWT, jwtVerify } from "jose";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { validateBody, eventAuthSchema } from "@/lib/validations";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.ATTENDEE_JWT_SECRET || "fallback-secret-for-build-only"
-);
+// JWT secret - throws at runtime if not configured (fallback only for build-time type checking)
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.ATTENDEE_JWT_SECRET;
+  if (!secret) {
+    throw new Error("ATTENDEE_JWT_SECRET environment variable is not configured");
+  }
+  return new TextEncoder().encode(secret);
+}
 
 // Helper to create JWT token
 async function createToken(attendeeId: string, eventId: string) {
+  const jwtSecret = getJwtSecret();
   return await new SignJWT({ attendeeId, eventId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(JWT_SECRET);
+    .setExpirationTime("24h") // Reduced from 7d for better security
+    .sign(jwtSecret);
 }
 
 // Verify JWT token
 export async function verifyToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const jwtSecret = getJwtSecret();
+    const { payload } = await jwtVerify(token, jwtSecret);
     return payload as { attendeeId: string; eventId: string };
   } catch {
     return null;

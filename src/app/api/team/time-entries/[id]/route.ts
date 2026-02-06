@@ -181,6 +181,25 @@ export async function PATCH(
     });
 
     if (isAdmin) {
+      // Validate status transitions before allowing update
+      if (body.status && body.status !== existingEntry.status) {
+        const validTransitions: Record<string, string[]> = {
+          draft: ["submitted", "approved", "rejected"], // Admin can skip submission
+          submitted: ["approved", "rejected", "draft"], // Can return to draft for revision
+          approved: ["invoiced", "rejected"], // Can only move forward or reject
+          rejected: ["draft"], // Can only return to draft for resubmission
+          invoiced: [], // Final state - cannot be changed
+        };
+
+        const allowed = validTransitions[existingEntry.status] || [];
+        if (!allowed.includes(body.status)) {
+          return NextResponse.json(
+            { error: `Cannot transition time entry from "${existingEntry.status}" to "${body.status}"` },
+            { status: 400 }
+          );
+        }
+      }
+
       adminFields.forEach((field) => {
         if (body[field] !== undefined) {
           updates[field] = body[field];

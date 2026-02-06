@@ -166,10 +166,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's profile with tenant_id and hourly_rate
+    // Get user's profile with tenant_id, hourly_rate, and role
     const { data: currentProfile } = await supabase
       .from("profiles")
-      .select("tenant_id, hourly_rate")
+      .select("tenant_id, hourly_rate, role")
       .eq("id", user.id)
       .single();
 
@@ -210,13 +210,44 @@ export async function POST(request: Request) {
     if (body.start_time && body.end_time && !body.duration_minutes) {
       const [startH, startM] = body.start_time.split(":").map(Number);
       const [endH, endM] = body.end_time.split(":").map(Number);
-      durationMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-      if (durationMinutes < 0) durationMinutes += 24 * 60; // Handle overnight
-      durationMinutes -= body.break_minutes || 0;
+      let rawDuration = (endH * 60 + endM) - (startH * 60 + startM);
+      if (rawDuration < 0) rawDuration += 24 * 60; // Handle overnight
+
+      const breakMins = body.break_minutes || 0;
+
+      // Validate break_minutes doesn't exceed total work time
+      if (breakMins > rawDuration) {
+        return NextResponse.json(
+          { error: `Break time (${breakMins} min) cannot exceed total time (${rawDuration} min)` },
+          { status: 400 }
+        );
+      }
+
+      durationMinutes = rawDuration - breakMins;
+    }
+
+    // Also validate break_minutes when duration is provided directly
+    if (body.duration_minutes && body.break_minutes) {
+      if (body.break_minutes > body.duration_minutes) {
+        return NextResponse.json(
+          { error: `Break time (${body.break_minutes} min) cannot exceed duration (${body.duration_minutes} min)` },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate user_id belongs to same tenant (if explicitly provided)
+    // Only owners and admins can create time entries for other users
     if (body.user_id && body.user_id !== user.id) {
+      // Check if current user has permission to log time for others
+      const allowedRoles = ["owner", "admin"];
+      if (!currentProfile.role || !allowedRoles.includes(currentProfile.role)) {
+        return NextResponse.json(
+          { error: "You don't have permission to log time for other users" },
+          { status: 403 }
+        );
+      }
+
       const { data: targetUser } = await supabase
         .from("profiles")
         .select("id")
@@ -257,6 +288,70 @@ export async function POST(request: Request) {
       }
     }
 
+    // Check for overlapping time entries if start/end times are provided
+    if (body.start_time && body.end_time && body.date) {
+      const entryUserId = body.user_id || user.id;
+
+      // Fetch existing time entries for this user on this date
+      const { data: existingEntries } = await supabase
+        .from("time_entries")
+        .select("id, start_time, end_time")
+        .eq("user_id", entryUserId)
+        .eq("date", body.date)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .not("start_time", "is", null)
+        .not("end_time", "is", null);
+
+      if (existingEntries && existingEntries.length > 0) {
+        const newStart = body.start_time;
+        const newEnd = body.end_time;
+
+        // Convert times to minutes for easier comparison
+        const toMinutes = (time: string) => {
+          const [h, m] = time.split(":").map(Number);
+          return h * 60 + m;
+        };
+
+        const newStartMins = toMinutes(newStart);
+        let newEndMins = toMinutes(newEnd);
+        // Handle overnight entries
+        if (newEndMins <= newStartMins) newEndMins += 24 * 60;
+
+        for (const entry of existingEntries) {
+          const existingStartMins = toMinutes(entry.start_time);
+          let existingEndMins = toMinutes(entry.end_time);
+          if (existingEndMins <= existingStartMins) existingEndMins += 24 * 60;
+
+          // Check for overlap: start1 < end2 AND end1 > start2
+          const overlaps = newStartMins < existingEndMins && newEndMins > existingStartMins;
+          if (overlaps) {
+            return NextResponse.json(
+              { error: `Time entry overlaps with existing entry (${entry.start_time}-${entry.end_time})` },
+              { status: 409 }
+            );
+          }
+        }
+      }
+    }
+
+    // Calculate hourly rate
+    const hourlyRate = body.hourly_rate ?? currentProfile.hourly_rate ?? 0;
+    const isBillable = body.is_billable ?? true;
+
+    // Warn if billable entry has zero rate (unless force is set)
+    if (!body.force && isBillable && hourlyRate === 0 && durationMinutes > 0) {
+      return NextResponse.json(
+        {
+          error: "Billable time entry has zero hourly rate",
+          code: "ZERO_RATE_WARNING",
+          message: "This billable time entry has no hourly rate set. Set \"is_billable: false\" to log non-billable time, set an hourly rate, or add \"force: true\" to create anyway.",
+          duration_minutes: durationMinutes,
+          calculated_value: 0,
+        },
+        { status: 409 }
+      );
+    }
+
     const timeEntryData = {
       tenant_id: currentProfile.tenant_id,
       user_id: body.user_id || user.id,
@@ -267,8 +362,8 @@ export async function POST(request: Request) {
       end_time: body.end_time || null,
       duration_minutes: durationMinutes,
       description: body.description || null,
-      is_billable: body.is_billable ?? true,
-      hourly_rate: body.hourly_rate ?? currentProfile.hourly_rate ?? 0,
+      is_billable: isBillable,
+      hourly_rate: hourlyRate,
       status: body.status || "draft",
       break_minutes: body.break_minutes || 0,
       work_type: body.work_type || "regular",

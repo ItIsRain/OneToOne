@@ -21,6 +21,21 @@ import type {
 } from "@/types/portal";
 
 /* ------------------------------------------------------------------ */
+/*  URL Safety Check - prevents XSS and open redirects                  */
+/* ------------------------------------------------------------------ */
+function isSafeUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  // Allow relative paths (but not protocol-relative URLs like //evil.com)
+  const isRelativePath = trimmed.startsWith("/") && !trimmed.startsWith("//");
+  // Allow HTTPS URLs only (not http:// or other protocols)
+  const isHttps = trimmed.startsWith("https://");
+  // Block dangerous protocols
+  const hasDangerousProtocol = /^(javascript|data|vbscript|file):/i.test(trimmed);
+  return (isRelativePath || isHttps) && !hasDangerousProtocol;
+}
+
+/* ------------------------------------------------------------------ */
 /*  ScrollReveal – fade-in on scroll using IntersectionObserver        */
 /* ------------------------------------------------------------------ */
 function ScrollReveal({
@@ -253,17 +268,19 @@ export default function TenantPortalLanding({
                 <img
                   src={logoUrl}
                   alt={tenantName}
-                  className="h-8 w-auto object-contain"
+                  className="h-10 max-w-[180px] object-contain"
                 />
               ) : (
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-extrabold"
-                  style={{ backgroundColor: color }}
-                >
-                  {tenantName.charAt(0).toUpperCase()}
-                </div>
+                <>
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-extrabold"
+                    style={{ backgroundColor: color }}
+                  >
+                    {tenantName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden sm:inline">{tenantName}</span>
+                </>
               )}
-              <span className="hidden sm:inline">{tenantName}</span>
             </button>
 
             {/* Section links */}
@@ -425,9 +442,8 @@ export default function TenantPortalLanding({
               borderRadius="16px"
               className="px-10 py-4.5 text-base font-semibold shadow-2xl shadow-black/20"
               onClick={() => {
-                if (!previewMode) {
-                  const isSafe = ctaUrl.startsWith("/") && !ctaUrl.startsWith("//") || ctaUrl.startsWith("https://");
-                  if (isSafe) window.location.href = ctaUrl;
+                if (!previewMode && isSafeUrl(ctaUrl)) {
+                  window.location.href = ctaUrl;
                 }
               }}
             >
@@ -436,7 +452,7 @@ export default function TenantPortalLanding({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </ShimmerButton>
-            {secondaryCtaText && secondaryCtaUrl && (secondaryCtaUrl.startsWith("/") && !secondaryCtaUrl.startsWith("//") || secondaryCtaUrl.startsWith("https://")) && (
+            {secondaryCtaText && secondaryCtaUrl && isSafeUrl(secondaryCtaUrl) && (
               <Link
                 href={secondaryCtaUrl}
                 className="inline-flex items-center px-10 py-4.5 font-semibold rounded-2xl border border-white/20 text-white/90 hover:bg-white/10 hover:border-white/30 transition-all duration-300 hover:-translate-y-0.5 backdrop-blur-sm"
@@ -876,7 +892,7 @@ export default function TenantPortalLanding({
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
               {testimonials.map((t, i) => (
-                <TestimonialCard key={i} t={t} />
+                <TestimonialCard key={`testimonial-${i}-${t.name || ''}-${t.role || ''}`} t={t} />
               ))}
             </div>
           </div>
@@ -903,7 +919,7 @@ export default function TenantPortalLanding({
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {testimonials.map((t, i) => (
-              <TestimonialCard key={i} t={t} />
+              <TestimonialCard key={`testimonial-${i}-${t.name || ''}-${t.role || ''}`} t={t} />
             ))}
           </div>
         </div>
@@ -955,7 +971,7 @@ export default function TenantPortalLanding({
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {services.map((service, i) => (
               <div
-                key={i}
+                key={`service-${i}-${service.title || ''}`}
                 className="group relative rounded-2xl border border-gray-200/60 dark:border-gray-800/60 bg-white dark:bg-gray-900 p-7 transition-all duration-300 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-xl hover:-translate-y-1 overflow-hidden"
               >
                 {/* Hover glow */}
@@ -1008,7 +1024,7 @@ export default function TenantPortalLanding({
               const isOpen = openFaqIndex === i;
               return (
                 <div
-                  key={i}
+                  key={`faq-${i}-${(item.question || '').slice(0, 30)}`}
                   className={`rounded-xl overflow-hidden transition-all duration-300 ${isOpen ? "shadow-sm" : ""}`}
                 >
                   <div className={`border rounded-xl overflow-hidden transition-colors duration-300 bg-white dark:bg-gray-900 ${isOpen ? "border-gray-200 dark:border-gray-700" : "border-gray-200/60 dark:border-gray-800/60"}`}>
@@ -1159,7 +1175,7 @@ export default function TenantPortalLanding({
 
               return (
                 <div
-                  key={i}
+                  key={`stat-${i}-${stat.label || ''}`}
                   className="group relative rounded-2xl p-8 text-center overflow-hidden border border-gray-200/60 dark:border-gray-800/60 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl transition-all duration-300 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-700"
                 >
                   {/* Subtle gradient on hover */}
@@ -1212,7 +1228,7 @@ export default function TenantPortalLanding({
           <div className="flex flex-wrap items-center justify-center gap-6 lg:gap-10">
             {partners.map((partner, i) => (
               <a
-                key={i}
+                key={`partner-${i}-${partner.name || ''}`}
                 href={partner.url || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1277,18 +1293,20 @@ export default function TenantPortalLanding({
               <div className="flex items-center gap-2.5 mb-4">
                 {logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoUrl} alt={tenantName} className="h-8 w-auto object-contain" />
+                  <img src={logoUrl} alt={tenantName} className="h-10 max-w-[180px] object-contain" />
                 ) : (
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-extrabold"
-                    style={{ backgroundColor: color }}
-                  >
-                    {tenantName.charAt(0).toUpperCase()}
-                  </div>
+                  <>
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-extrabold"
+                      style={{ backgroundColor: color }}
+                    >
+                      {tenantName.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
+                      {tenantName}
+                    </span>
+                  </>
                 )}
-                <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
-                  {tenantName}
-                </span>
               </div>
               {footerText && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">

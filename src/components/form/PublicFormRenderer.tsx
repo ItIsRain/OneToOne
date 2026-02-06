@@ -130,11 +130,16 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
 
       if (field.type === "number" && val !== undefined && val !== "") {
         const numVal = Number(val);
-        if (field.validation?.min !== undefined && numVal < (field.validation.min as number)) {
-          newErrors[field.id] = `Minimum value is ${field.validation.min}`;
-        }
-        if (field.validation?.max !== undefined && numVal > (field.validation.max as number)) {
-          newErrors[field.id] = `Maximum value is ${field.validation.max}`;
+        // Check for NaN first - Number("abc") returns NaN which fails comparison checks
+        if (isNaN(numVal)) {
+          newErrors[field.id] = `${field.label} must be a valid number`;
+        } else {
+          if (field.validation?.min !== undefined && numVal < (field.validation.min as number)) {
+            newErrors[field.id] = `Minimum value is ${field.validation.min}`;
+          }
+          if (field.validation?.max !== undefined && numVal > (field.validation.max as number)) {
+            newErrors[field.id] = `Maximum value is ${field.validation.max}`;
+          }
         }
       }
     }
@@ -145,6 +150,9 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent double-submission
+    if (submitting) return;
 
     if (!validate()) return;
 
@@ -158,10 +166,16 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
         body: JSON.stringify({ data: values }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || "Failed to submit form");
+        // Try to parse JSON error, but handle non-JSON responses gracefully
+        let errorMessage = "Failed to submit form";
+        try {
+          const data = await res.json();
+          errorMessage = data.error || errorMessage;
+        } catch {
+          // Response wasn't JSON (e.g., server error page)
+        }
+        throw new Error(errorMessage);
       }
 
       setSubmitted(true);
@@ -170,10 +184,19 @@ export const PublicFormRenderer: React.FC<PublicFormRendererProps> = ({
       if (form.thank_you_redirect_url) {
         // Validate redirect URL to prevent XSS and open redirect attacks
         const redirectUrl = form.thank_you_redirect_url.trim();
+        // Only allow relative paths (not protocol-relative) to prevent open redirects
         const isRelativePath = redirectUrl.startsWith("/") && !redirectUrl.startsWith("//");
-        const isHttps = redirectUrl.startsWith("https://");
-        const hasDangerousProtocol = /^[a-z]+:/i.test(redirectUrl) && !isHttps;
-        const isSafe = (isRelativePath || isHttps) && !hasDangerousProtocol;
+        // For HTTPS URLs, only allow same-origin to prevent open redirect to attacker sites
+        let isSameOriginHttps = false;
+        if (redirectUrl.startsWith("https://") && typeof window !== "undefined") {
+          try {
+            const redirectOrigin = new URL(redirectUrl).origin;
+            isSameOriginHttps = redirectOrigin === window.location.origin;
+          } catch {
+            // Invalid URL - don't allow
+          }
+        }
+        const isSafe = isRelativePath || isSameOriginHttps;
         if (isSafe) {
           setTimeout(() => {
             window.location.href = redirectUrl;

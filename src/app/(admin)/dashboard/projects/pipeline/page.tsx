@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface Proposal {
   id: string;
@@ -397,8 +399,7 @@ function PipelineContent() {
                       const isPaymentMilestone =
                         Array.isArray(ms.tags) &&
                         ms.tags.includes("pipeline:payment");
-                      const isCompleted =
-                        ms.status === "completed" || ms.status === "done";
+                      const isCompleted = ms.status === "completed";
 
                       return (
                         <tr
@@ -548,8 +549,10 @@ function PipelineContent() {
 
 export default function PipelinePage() {
   return (
-    <FeatureGate feature="sow_pipeline">
-      <PipelineContent />
-    </FeatureGate>
+    <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
+      <FeatureGate feature="sow_pipeline">
+        <PipelineContent />
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

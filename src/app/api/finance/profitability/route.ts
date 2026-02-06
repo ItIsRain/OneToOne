@@ -47,17 +47,20 @@ export async function GET() {
         .eq("tenant_id", tenantId)
         .not("status", "in", '("draft","cancelled","refunded")'),
 
+      // Only include approved/invoiced time entries for accurate financial calculations
+      // Draft and submitted entries haven't been verified yet
       supabase
         .from("time_entries")
         .select("id, project_id, user_id, duration_minutes, hourly_rate, is_billable, date, status")
         .eq("tenant_id", tenantId)
-        .not("status", "eq", "rejected"),
+        .in("status", ["approved", "invoiced"]),
 
+      // Only include approved expenses for accurate financial calculations
       supabase
         .from("expenses")
         .select("id, project_id, amount, category, status, expense_date, description, is_billable")
         .eq("tenant_id", tenantId)
-        .not("status", "eq", "rejected"),
+        .eq("status", "approved"),
 
       // Member hourly rates as fallback for time entries without rates
       supabase

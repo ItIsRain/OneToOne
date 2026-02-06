@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { scanFileForMalware, calculateFileHash, checkFileHash } from "@/lib/virustotal";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -200,6 +201,18 @@ export async function GET(request: Request) {
 // POST - Upload a new file
 export async function POST(request: Request) {
   try {
+    // Rate limit: 20 uploads per user per hour
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "document-upload",
+      identifier: ip,
+      maxRequests: 20,
+      windowSeconds: 3600, // 1 hour
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
+
     const supabase = await getSupabaseClient();
 
     const {
@@ -237,13 +250,13 @@ export async function POST(request: Request) {
     const fileBuffer = Buffer.from(base64Data, "base64");
     const fileSize = fileBuffer.length;
 
-    // Validate file size (50MB limit)
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    // Validate file size (25MB limit - reduced from 50MB for security)
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
     if (fileSize > MAX_FILE_SIZE) {
       const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
       return NextResponse.json(
         {
-          error: `File size (${fileSizeMB}MB) exceeds the 50MB limit. Please upload a smaller file.`,
+          error: `File size (${fileSizeMB}MB) exceeds the 25MB limit. Please upload a smaller file.`,
           code: "FILE_TOO_LARGE"
         },
         { status: 400 }

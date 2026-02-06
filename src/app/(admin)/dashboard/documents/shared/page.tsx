@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { SharedFilesTable, ShareDetailsSidebar } from "@/components/agency";
 import { ShareFileModal } from "@/components/agency/modals";
 import type { FileShareRecord } from "@/components/agency/SharedFilesTable";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function SharedPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,7 +87,7 @@ export default function SharedPage() {
   };
 
   return (
-    <>
+    <ProtectedPage permission={PERMISSIONS.DOCUMENTS_VIEW}>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -124,6 +126,6 @@ export default function SharedPage() {
         onReactivate={handleReactivateShare}
         onDelete={handleDeleteShare}
       />
-    </>
+    </ProtectedPage>
   );
 }

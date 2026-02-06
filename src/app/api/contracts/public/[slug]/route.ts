@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 // GET - Public contract view (NO AUTH)
@@ -18,18 +19,35 @@ export async function GET(
 
     const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: contract, error } = await serviceClient
+    // Get tenant context from middleware (if accessed via tenant subdomain)
+    const headersList = await headers();
+    const requestTenantId = headersList.get("x-tenant-id");
+
+    // Build query with optional tenant filter for security
+    let query = serviceClient
       .from("contracts")
       .select(`
         *,
         client:clients(id, name)
       `)
       .eq("slug", slug)
-      .in("status", ["draft", "sent", "viewed", "active", "pending_signature", "declined", "signed"])
-      .single();
+      .in("status", ["draft", "sent", "viewed", "active", "pending_signature", "declined", "signed"]);
+
+    // If accessed from a tenant subdomain, enforce tenant isolation
+    if (requestTenantId) {
+      query = query.eq("tenant_id", requestTenantId);
+    }
+
+    const { data: contract, error } = await query.single();
 
     if (error || !contract) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    // Additional security: If no tenant context, verify slug is sufficiently random
+    // (contracts should only be accessible via their unique slug)
+    if (!requestTenantId && contract.slug.length < 20) {
+      console.warn(`Contract ${contract.id} has short slug - potential security risk`);
     }
 
     // Fetch tenant branding info

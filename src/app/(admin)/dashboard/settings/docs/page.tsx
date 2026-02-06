@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -922,7 +924,7 @@ const data = await response.json();`;
   );
 };
 
-export default function ApiDocsPage() {
+function ApiDocsContent() {
   const [activeCategory, setActiveCategory] = useState(apiCategories[0].name);
   const [baseUrl, setBaseUrl] = useState(API_BASE_URL);
 
@@ -1143,5 +1145,13 @@ export default function ApiDocsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ApiDocsPage() {
+  return (
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_VIEW}>
+      <ApiDocsContent />
+    </ProtectedPage>
   );
 }

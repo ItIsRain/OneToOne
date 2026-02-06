@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useCallback, useEffect, Suspense } from "react";
+import React, { useState, useCallback, useMemo, Suspense } from "react";
 import { motion } from "framer-motion";
 import {
   DashboardMetrics,
@@ -25,18 +25,7 @@ import {
 import { DashboardCustomizePanel, type DashboardSettings } from "@/components/agency/dashboard/DashboardCustomizePanel";
 import { widgetRegistry } from "@/lib/dashboard/widgetRegistry";
 import { DashboardBanner } from "@/components/agency/BannerDisplay";
-
-interface Bookmark {
-  id: string;
-  entity_type: string;
-  entity_id: string | null;
-  entity_name: string;
-  url: string | null;
-  icon: string | null;
-  color: string | null;
-  folder: string | null;
-  notes: string | null;
-}
+import { DashboardProvider, useDashboard } from "@/context/DashboardContext";
 
 const defaultSettings: DashboardSettings = {
   show_greeting: true,
@@ -67,15 +56,37 @@ const sectionVariants = {
 
 const staggerContainer = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.1 } },
+  show: { transition: { staggerChildren: 0.08 } },
 };
 
-export default function Dashboard() {
-  // Dashboard settings
-  const [dashSettings, setDashSettings] = useState<DashboardSettings>(defaultSettings);
+function DashboardContent() {
+  const { data, isLoading, error, refresh } = useDashboard();
+
+  // Dashboard settings - use from context or defaults
+  const dashSettings = useMemo(() => {
+    if (data?.settings) {
+      const saved = data.settings;
+      const merged = { ...defaultSettings, ...saved };
+      // Ensure any new widgets missing from saved widget_order are appended
+      const savedOrder: string[] = saved.widget_order || [];
+      const allKeys = defaultSettings.widget_order;
+      const missingKeys = allKeys.filter((k: string) => !savedOrder.includes(k));
+      if (missingKeys.length > 0) {
+        merged.widget_order = [...savedOrder, ...missingKeys];
+      }
+      return merged;
+    }
+    return defaultSettings;
+  }, [data?.settings]);
+
+  const [localSettings, setLocalSettings] = useState<DashboardSettings | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [commandCenterOpen, setCommandCenterOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // Use local settings if available (after save), otherwise use context settings
+  const activeSettings = localSettings || dashSettings;
 
   // Announcement state
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
@@ -92,33 +103,12 @@ export default function Dashboard() {
   // Bookmark state
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
 
-  // Refresh key for components
+  // Refresh key for components that need independent refresh
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // Fetch dashboard settings
-  useEffect(() => {
-    fetch("/api/settings/dashboard")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.settings) {
-          // Merge saved settings with defaults so new widgets are included
-          const saved = data.settings;
-          const merged = { ...defaultSettings, ...saved };
-          // Ensure any new widgets missing from saved widget_order are appended
-          const savedOrder: string[] = saved.widget_order || [];
-          const allKeys = defaultSettings.widget_order;
-          const missingKeys = allKeys.filter((k: string) => !savedOrder.includes(k));
-          if (missingKeys.length > 0) {
-            merged.widget_order = [...savedOrder, ...missingKeys];
-          }
-          setDashSettings(merged);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   const handleSaveSettings = useCallback(async (newSettings: DashboardSettings) => {
     setSavingSettings(true);
+    setSettingsError(null);
     try {
       const res = await fetch("/api/settings/dashboard", {
         method: "POST",
@@ -126,20 +116,26 @@ export default function Dashboard() {
         body: JSON.stringify(newSettings),
       });
       if (res.ok) {
-        const data = await res.json();
-        setDashSettings(data.settings);
+        const result = await res.json();
+        setLocalSettings(result.settings);
         setCustomizeOpen(false);
+        // Refresh dashboard data to get updated settings
+        refresh();
+      } else {
+        setSettingsError("Failed to save dashboard settings. Please try again.");
       }
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error("Dashboard settings save error:", err);
+      setSettingsError("Failed to save dashboard settings. Please try again.");
     } finally {
       setSavingSettings(false);
     }
-  }, []);
+  }, [refresh]);
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
-  }, []);
+    refresh();
+  }, [refresh]);
 
   // Announcement handlers
   const handleAddAnnouncement = useCallback(() => {
@@ -208,37 +204,37 @@ export default function Dashboard() {
   }, [handleRefresh]);
 
   // Determine visibility
-  const isVisible = (key: string) => {
+  const isVisible = useCallback((key: string) => {
     const visMap: Record<string, boolean> = {
-      greeting: dashSettings.show_greeting,
-      briefing: dashSettings.show_briefing,
-      metrics: dashSettings.show_metrics,
-      quick_actions: dashSettings.show_quick_actions,
-      onboarding: dashSettings.show_onboarding,
-      activity: dashSettings.show_activity,
-      upcoming: dashSettings.show_upcoming,
-      announcements: dashSettings.show_announcements,
-      goals: dashSettings.show_goals,
-      bookmarks: dashSettings.show_bookmarks,
-      scope_creep: dashSettings.show_scope_creep,
-      client_health: dashSettings.show_client_health,
-      resource_heatmap: dashSettings.show_resource_heatmap,
-      client_journey: dashSettings.show_client_journey,
-      business_health: dashSettings.show_business_health,
+      greeting: activeSettings.show_greeting,
+      briefing: activeSettings.show_briefing,
+      metrics: activeSettings.show_metrics,
+      quick_actions: activeSettings.show_quick_actions,
+      onboarding: activeSettings.show_onboarding,
+      activity: activeSettings.show_activity,
+      upcoming: activeSettings.show_upcoming,
+      announcements: activeSettings.show_announcements,
+      goals: activeSettings.show_goals,
+      bookmarks: activeSettings.show_bookmarks,
+      scope_creep: activeSettings.show_scope_creep,
+      client_health: activeSettings.show_client_health,
+      resource_heatmap: activeSettings.show_resource_heatmap,
+      client_journey: activeSettings.show_client_journey,
+      business_health: activeSettings.show_business_health,
     };
     return visMap[key] !== false;
-  };
+  }, [activeSettings]);
 
-  // Render a widget by key
-  const renderWidget = (key: string) => {
+  // Render a widget by key - pass data from context where available
+  const renderWidget = useCallback((key: string) => {
     if (!isVisible(key)) return null;
     switch (key) {
       case "greeting":
-        return <DashboardGreeting key="greeting" />;
+        return <DashboardGreeting key="greeting" firstName={data?.user?.firstName} />;
       case "briefing":
-        return <MorningBriefing key={`briefing-${refreshKey}`} />;
+        return <MorningBriefing key={`briefing-${refreshKey}`} data={data?.briefing} isLoading={isLoading} />;
       case "metrics":
-        return <DashboardMetrics key={`metrics-${refreshKey}`} />;
+        return <DashboardMetrics key={`metrics-${refreshKey}`} data={data?.metrics} isLoading={isLoading} />;
       case "quick_actions":
         return <DashboardQuickActions key="quick_actions" />;
       case "onboarding":
@@ -252,43 +248,48 @@ export default function Dashboard() {
       default:
         return null;
     }
-  };
+  }, [isVisible, data, isLoading, refreshKey]);
 
   // Separate widgets by column for grid rendering
-  const fullWidgets = dashSettings.widget_order.filter((k) => {
-    const w = widgetRegistry.find((r) => r.key === k);
-    return w?.column === "full" && isVisible(k);
-  });
+  const fullWidgets = useMemo(() =>
+    activeSettings.widget_order.filter((k) => {
+      const w = widgetRegistry.find((r) => r.key === k);
+      return w?.column === "full" && isVisible(k);
+    }), [activeSettings.widget_order, isVisible]);
 
-  const leftWidgets = dashSettings.widget_order.filter((k) => {
-    const w = widgetRegistry.find((r) => r.key === k);
-    return w?.column === "left" && isVisible(k);
-  });
+  const leftWidgets = useMemo(() =>
+    activeSettings.widget_order.filter((k) => {
+      const w = widgetRegistry.find((r) => r.key === k);
+      return w?.column === "left" && isVisible(k);
+    }), [activeSettings.widget_order, isVisible]);
 
-  const rightWidgets = dashSettings.widget_order.filter((k) => {
-    const w = widgetRegistry.find((r) => r.key === k);
-    return w?.column === "right" && isVisible(k);
-  });
+  const rightWidgets = useMemo(() =>
+    activeSettings.widget_order.filter((k) => {
+      const w = widgetRegistry.find((r) => r.key === k);
+      return w?.column === "right" && isVisible(k);
+    }), [activeSettings.widget_order, isVisible]);
 
-  const renderLeftWidget = (key: string) => {
+  const renderLeftWidget = useCallback((key: string) => {
     switch (key) {
       case "activity":
-        return <DashboardActivity key={`activity-${refreshKey}`} />;
+        return <DashboardActivity key={`activity-${refreshKey}`} data={data?.activity} isLoading={isLoading} />;
       case "upcoming":
-        return <DashboardUpcoming key={`upcoming-${refreshKey}`} />;
+        return <DashboardUpcoming key={`upcoming-${refreshKey}`} data={data?.upcoming} isLoading={isLoading} />;
       case "client_health":
         return <ClientHealthWidget key={`client_health-${refreshKey}`} />;
       default:
         return null;
     }
-  };
+  }, [data, isLoading, refreshKey]);
 
-  const renderRightWidget = (key: string) => {
+  const renderRightWidget = useCallback((key: string) => {
     switch (key) {
       case "announcements":
         return (
           <DashboardAnnouncements
             key={`announcements-${refreshKey}`}
+            data={data?.announcements}
+            isLoading={isLoading}
             onAdd={handleAddAnnouncement}
             onView={handleViewAnnouncement}
           />
@@ -297,6 +298,8 @@ export default function Dashboard() {
         return (
           <DashboardGoals
             key={`goals-${refreshKey}`}
+            data={data?.goals}
+            isLoading={isLoading}
             onAdd={handleAddGoal}
             onView={handleViewGoal}
           />
@@ -305,6 +308,8 @@ export default function Dashboard() {
         return (
           <DashboardBookmarks
             key={`bookmarks-${refreshKey}`}
+            data={data?.bookmarks}
+            isLoading={isLoading}
             onAdd={handleAddBookmark}
           />
         );
@@ -313,7 +318,31 @@ export default function Dashboard() {
       default:
         return null;
     }
-  };
+  }, [data, isLoading, refreshKey, handleAddAnnouncement, handleViewAnnouncement, handleAddGoal, handleViewGoal, handleAddBookmark]);
+
+  // Show global error if data fetch failed
+  if (error && !data) {
+    return (
+      <div className="rounded-xl border border-error-200 bg-error-50 p-6 dark:border-error-800 dark:bg-error-900/20">
+        <div className="flex items-start gap-3">
+          <svg className="w-5 h-5 text-error-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-error-800 dark:text-error-200">
+              {error.message || "Failed to load dashboard"}
+            </p>
+            <button
+              onClick={() => refresh()}
+              className="mt-2 text-sm text-brand-500 hover:text-brand-600 font-medium"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -346,12 +375,39 @@ export default function Dashboard() {
           </button>
         </motion.div>
 
+        {/* Settings Error Alert */}
+        {settingsError && (
+          <motion.div
+            variants={sectionVariants}
+            className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4"
+          >
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {settingsError}
+                </p>
+              </div>
+              <button
+                onClick={() => setSettingsError(null)}
+                className="text-amber-500 hover:text-amber-700 dark:hover:text-amber-300"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* Banner */}
-        {dashSettings.banner_message && (
+        {activeSettings.banner_message && (
           <motion.div variants={sectionVariants}>
             <DashboardBanner
-              message={dashSettings.banner_message}
-              imageUrl={dashSettings.banner_image_url}
+              message={activeSettings.banner_message}
+              imageUrl={activeSettings.banner_image_url}
             />
           </motion.div>
         )}
@@ -387,7 +443,7 @@ export default function Dashboard() {
       <DashboardCustomizePanel
         isOpen={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
-        settings={dashSettings}
+        settings={activeSettings}
         onSave={handleSaveSettings}
         saving={savingSettings}
       />
@@ -451,5 +507,13 @@ export default function Dashboard() {
         onClose={() => setCommandCenterOpen(false)}
       />
     </>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <DashboardProvider>
+      <DashboardContent />
+    </DashboardProvider>
   );
 }

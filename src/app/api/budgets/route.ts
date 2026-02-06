@@ -134,9 +134,9 @@ export async function POST(request: Request) {
           endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).toISOString().split("T")[0];
           break;
         case "quarterly": {
-          const quarterEnd = new Date(startDate);
-          quarterEnd.setMonth(quarterEnd.getMonth() + 3);
-          quarterEnd.setDate(0); // last day of the previous month (i.e. end of 3-month span)
+          // Get the last day of the month that is 2 months from start (3-month span)
+          // E.g., Jan -> last day of March, Apr -> last day of June
+          const quarterEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0);
           endDate = quarterEnd.toISOString().split("T")[0];
           break;
         }

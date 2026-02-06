@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { validateBody, createWorkflowSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,29 +56,33 @@ export async function POST(request: NextRequest) {
     const tenantId = profile.tenant_id;
 
     const planInfo = await getUserPlanInfo(supabase, user.id);
-    if (!planInfo) return NextResponse.json({ error: "No plan info" }, { status: 400 });
+    if (!planInfo) {
+      return NextResponse.json(
+        { error: "No active subscription found", upgrade_required: true },
+        { status: 403 }
+      );
+    }
     const access = checkFeatureAccess(planInfo.planType, "workflows");
     if (!access.allowed) return NextResponse.json({ error: access.reason, upgrade_required: true }, { status: 403 });
 
     const body = await request.json();
-    const { name, description, trigger_type, trigger_config, steps } = body;
 
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return NextResponse.json({ error: "Workflow name is required" }, { status: 400 });
+    // Validate input with enum validation for trigger_type and step_type
+    const validation = validateBody(createWorkflowSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    if (!trigger_type || typeof trigger_type !== "string") {
-      return NextResponse.json({ error: "Trigger type is required" }, { status: 400 });
-    }
+    const v = validation.data;
 
     const { data: workflow, error: workflowError } = await supabase
       .from("workflows")
       .insert({
         tenant_id: tenantId,
         created_by: user.id,
-        name,
-        description,
-        trigger_type,
-        trigger_config,
+        name: v.name,
+        description: v.description || null,
+        trigger_type: v.trigger_type,
+        trigger_config: v.trigger_config,
       })
       .select()
       .single();
@@ -86,8 +91,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: workflowError.message }, { status: 500 });
     }
 
-    if (steps && Array.isArray(steps) && steps.length > 0) {
-      const stepRows = steps.map((step: { step_order: number; step_type: string; config: Record<string, unknown> }) => ({
+    if (v.steps && v.steps.length > 0) {
+      const stepRows = v.steps.map((step) => ({
         workflow_id: workflow.id,
         step_order: step.step_order,
         step_type: step.step_type,

@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
+"use client";
 import { MessagesChat } from "@/components/agency";
-
-export const metadata: Metadata = {
-  title: "Messages | Inbox",
-  description: "Manage your team messages",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function InboxPage() {
-  return <MessagesChat />;
+  return (
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_VIEW}>
+      <MessagesChat />
+    </ProtectedPage>
+  );
 }

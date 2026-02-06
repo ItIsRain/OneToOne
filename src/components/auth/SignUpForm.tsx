@@ -164,21 +164,35 @@ export default function SignUpForm() {
     setSubdomainStatus("checking");
     setSubdomainError("");
 
+    // Store the subdomain we're checking to prevent stale responses from updating state
+    const checkingSubdomain = subdomain;
+
     subdomainTimerRef.current = setTimeout(async () => {
       try {
         const res = await fetch("/api/auth/check-subdomain", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subdomain }),
+          body: JSON.stringify({ subdomain: checkingSubdomain }),
         });
         const data = await res.json();
-        if (data.available) {
-          setSubdomainStatus("available");
-          setSubdomainError("");
-        } else {
-          setSubdomainStatus("unavailable");
-          setSubdomainError(data.error || "Not available");
-        }
+
+        // Only update state if subdomain hasn't changed while request was in flight
+        // Access formData.subdomain directly to get current value
+        setFormData((current) => {
+          if (current.subdomain !== checkingSubdomain) {
+            // Subdomain changed while request was in flight - ignore response
+            return current;
+          }
+          // Update status outside setFormData since we need to update sibling state
+          if (data.available) {
+            setSubdomainStatus("available");
+            setSubdomainError("");
+          } else {
+            setSubdomainStatus("unavailable");
+            setSubdomainError(data.error || "Not available");
+          }
+          return current;
+        });
       } catch {
         setSubdomainStatus("unavailable");
         setSubdomainError("Unable to verify");

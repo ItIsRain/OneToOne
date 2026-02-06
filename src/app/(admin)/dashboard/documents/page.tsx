@@ -4,6 +4,8 @@ import { UploadFileModal } from "@/components/agency/modals";
 import { CreateFolderModal } from "@/components/agency/modals/CreateFolderModal";
 import { FilesTable, FileRecord } from "@/components/agency/FilesTable";
 import { FileDetailsSidebar } from "@/components/agency/sidebars/FileDetailsSidebar";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function DocumentsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -44,6 +46,7 @@ export default function DocumentsPage() {
   }, []);
 
   return (
+    <ProtectedPage permission={PERMISSIONS.DOCUMENTS_VIEW}>
     <>
       <div className="space-y-6">
         {/* Header */}
@@ -136,5 +139,6 @@ export default function DocumentsPage() {
         onUpdate={handleFileUpdate}
       />
     </>
+    </ProtectedPage>
   );
 }

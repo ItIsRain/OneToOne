@@ -1,14 +1,12 @@
-import type { Metadata } from "next";
+"use client";
 import { EmailBroadcast } from "@/components/agency";
-
-export const metadata: Metadata = {
-  title: "Email Broadcast | Inbox",
-  description: "Send broadcast emails to your contacts",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function EmailPage() {
   return (
-    <div className="space-y-6">
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_VIEW}>
+      <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
           Email Broadcast
@@ -18,6 +16,7 @@ export default function EmailPage() {
         </p>
       </div>
       <EmailBroadcast />
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

@@ -64,3 +64,28 @@ import { IconName } from "@/icons";
 ### Sidebar Navigation
 
 Navigation items are defined in `src/layout/AppSidebar.tsx` via `navItems` and `othersItems` arrays. Each item can have nested `subItems` for dropdown menus.
+
+## Post-Edit Quality Protocol
+
+After every code edit, when you see the "SEQUENTIAL THINKING REVIEW REQUIRED" hook message, you MUST call `mcp__sequential-thinking__sequentialthinking` and perform a multi-step analysis:
+
+1. **Intent** — What was the purpose of this change?
+2. **Logic trace** — Walk through the code path. Does it handle all input scenarios?
+3. **Edge cases** — null, undefined, empty arrays, 0, empty strings, race conditions
+4. **Error handling** — What happens when things fail? Are errors caught or silently swallowed?
+5. **Type safety** — Any implicit `any` types, missing generics, or unsafe casts?
+6. **Regressions** — Could this change break existing functionality elsewhere?
+7. **Verdict** — PASS or FAIL with clear reasoning
+
+**Rules:**
+- If FAIL → fix the issues immediately before moving on
+- If PASS → continue to the next task
+- Do NOT skip this step
+- Do NOT collapse the analysis into a single sentence
+- Use sequential thinking for genuine multi-step reasoning, not a summary
+
+## Communication Style
+
+- Be direct. No filler phrases like "You're right" or "Great question"
+- Focus on the solution, not the explanation of what you're about to do
+- If editing code, verify it compiles before reporting success

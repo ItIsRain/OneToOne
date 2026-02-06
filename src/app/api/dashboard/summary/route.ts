@@ -37,13 +37,13 @@ export async function GET() {
       unpaidInvoicesResult,
       unreadMessagesResult,
     ] = await Promise.all([
-      // Overdue tasks: due_date < today AND status not 'completed'/'done'
+      // Overdue tasks: due_date < today AND status not completed/cancelled
       supabase
         .from("tasks")
         .select("id", { count: "exact", head: true })
         .eq("tenant_id", tenantId)
         .lt("due_date", startOfDay)
-        .not("status", "in", '("completed","done")'),
+        .not("status", "in", '("completed","cancelled")'),
 
       // Events happening today
       supabase

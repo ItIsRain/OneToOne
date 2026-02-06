@@ -62,24 +62,51 @@ interface AttentionItem {
   icon: React.ReactNode;
 }
 
-export function DashboardGreeting() {
+interface DashboardGreetingProps {
+  // Optional: pre-loaded firstName from parent
+  firstName?: string;
+}
+
+export function DashboardGreeting({ firstName: propFirstName }: DashboardGreetingProps) {
   const [data, setData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch("/api/dashboard/summary")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((d) => {
-        if (d) setData(d);
+    const abortController = new AbortController();
+
+    fetch("/api/dashboard/summary", { signal: abortController.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (!abortController.signal.aborted && d) {
+          setData(d);
+        }
+      })
+      .catch((err) => {
+        if (!abortController.signal.aborted && err.name !== "AbortError") {
+          setError(true);
+        }
+      })
+      .finally(() => {
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => abortController.abort();
   }, []);
+
+  // Use prop firstName if provided, otherwise fall back to data
+  const effectiveFirstName = propFirstName || data?.firstName || "";
 
   const greeting = getGreeting();
   const dateStr = formatDate();
 
-  if (loading) {
+  // Show skeleton only if loading and no firstName provided
+  if (loading && !propFirstName) {
     return (
       <div>
         <div className="mb-2 h-9 w-72 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
@@ -88,7 +115,27 @@ export function DashboardGreeting() {
     );
   }
 
-  const name = data?.firstName || "";
+  // On error, still show greeting but without attention items
+  if (error && !data) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" as const }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          {getTimeIcon()}
+          <span className="text-sm font-medium text-gray-400 dark:text-gray-500">{dateStr}</span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+          {greeting}{propFirstName ? ", " : ""}
+          {propFirstName && <span className="text-brand-500">{propFirstName}</span>}
+        </h1>
+      </motion.div>
+    );
+  }
+
+  const name = effectiveFirstName;
 
   const items: AttentionItem[] = [];
   if (data) {

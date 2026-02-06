@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
@@ -10,6 +11,8 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+    const headersList = await headers();
+    const tenantId = headersList.get("x-tenant-id");
 
     // Rate limit: 5 sign attempts per IP per minute
     const ip = getClientIp(request);
@@ -74,6 +77,12 @@ export async function POST(
       .single();
 
     if (fetchError || !contract) {
+      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    // If accessed from within platform (has tenant header), validate tenant matches
+    // This prevents cross-tenant contract signing from within the platform
+    if (tenantId && contract.tenant_id !== tenantId) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 

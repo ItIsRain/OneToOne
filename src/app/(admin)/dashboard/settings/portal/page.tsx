@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
+"use client";
 import PortalSettingsClient from "./PortalSettingsClient";
 import FeatureGate from "@/components/ui/FeatureGate";
-
-export const metadata: Metadata = {
-  title: "Portal Settings",
-  description: "Customize your public portal landing page",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function PortalSettingsPage() {
   return (
-    <FeatureGate feature="client_portal">
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_EDIT}>
+      <FeatureGate feature="client_portal">
       <div>
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
@@ -21,6 +19,7 @@ export default function PortalSettingsPage() {
         </div>
         <PortalSettingsClient />
       </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

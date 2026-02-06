@@ -30,6 +30,9 @@ interface DashboardMetricsData {
 
 interface DashboardMetricsProps {
   onDataLoaded?: (data: DashboardMetricsData) => void;
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: DashboardMetricsData | null;
+  isLoading?: boolean;
 }
 
 const container = {
@@ -50,12 +53,19 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0 }: { val
   return <>{prefix}{formatted}{suffix}</>;
 }
 
-export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded }) => {
+export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded, data: propData, isLoading: propLoading }) => {
   const [metrics, setMetrics] = useState<DashboardMetricsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(propData === undefined);
   const [error, setError] = useState("");
 
+  // Use prop data if available
+  const effectiveMetrics = propData || metrics;
+  const effectiveLoading = propLoading !== undefined ? propLoading : loading;
+
   const fetchMetrics = useCallback(async () => {
+    // Skip fetch if data is provided via props
+    if (propData !== undefined) return;
+
     try {
       const res = await fetch("/api/dashboard/stats");
 
@@ -78,13 +88,16 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
     } finally {
       setLoading(false);
     }
-  }, [onDataLoaded]);
+  }, [onDataLoaded, propData]);
 
   useEffect(() => {
-    fetchMetrics();
-  }, [fetchMetrics]);
+    // Only fetch if no prop data provided
+    if (propData === undefined) {
+      fetchMetrics();
+    }
+  }, [fetchMetrics, propData]);
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-5">
         {[1, 2, 3, 4].map((i) => (
@@ -104,7 +117,7 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
     );
   }
 
-  if (error) {
+  if (error && !effectiveMetrics) {
     return (
       <div className="rounded-xl border border-error-200 bg-error-50 p-6 dark:border-error-800 dark:bg-error-900/20">
         <p className="text-error-600 dark:text-error-400">{error}</p>
@@ -118,60 +131,60 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
     );
   }
 
-  if (!metrics) return null;
+  if (!effectiveMetrics) return null;
 
   const cards = [
     {
       label: "Active Clients",
-      value: metrics.activeClients,
+      value: effectiveMetrics.activeClients,
       icon: <GroupIcon className="size-5" />,
       iconBg: "bg-brand-100 dark:bg-brand-500/15",
       iconColor: "text-brand-600 dark:text-brand-400",
       badge: (
-        <Badge color={metrics.clientsGrowth > 0 ? "success" : "light"}>
-          {metrics.clientsGrowth > 0 && <ArrowUpIcon />}
-          +{metrics.clientsGrowth} this month
+        <Badge color={effectiveMetrics.clientsGrowth > 0 ? "success" : "light"}>
+          {effectiveMetrics.clientsGrowth > 0 && <ArrowUpIcon />}
+          +{effectiveMetrics.clientsGrowth} this month
         </Badge>
       ),
     },
     {
       label: "Upcoming Events",
-      value: metrics.upcomingEvents,
+      value: effectiveMetrics.upcomingEvents,
       icon: <CalenderIcon className="size-5" />,
       iconBg: "bg-amber-100 dark:bg-amber-500/15",
       iconColor: "text-amber-600 dark:text-amber-400",
       badge: (
         <Badge color="warning">
           <ArrowUpIcon />
-          {metrics.eventsThisWeek} this week
+          {effectiveMetrics.eventsThisWeek} this week
         </Badge>
       ),
     },
     {
       label: "Monthly Revenue",
-      value: metrics.monthlyRevenue,
+      value: effectiveMetrics.monthlyRevenue,
       prefix: "$",
       decimals: 2,
       icon: <DollarLineIcon className="size-5" />,
       iconBg: "bg-emerald-100 dark:bg-emerald-500/15",
       iconColor: "text-emerald-600 dark:text-emerald-400",
       badge: (
-        <Badge color={metrics.revenueGrowth >= 0 ? "success" : "error"}>
-          {metrics.revenueGrowth >= 0 ? <ArrowUpIcon /> : <ArrowDownIcon className="text-error-500" />}
-          {Math.abs(metrics.revenueGrowth)}%
+        <Badge color={effectiveMetrics.revenueGrowth >= 0 ? "success" : "error"}>
+          {effectiveMetrics.revenueGrowth >= 0 ? <ArrowUpIcon /> : <ArrowDownIcon className="text-error-500" />}
+          {Math.abs(effectiveMetrics.revenueGrowth)}%
         </Badge>
       ),
     },
     {
       label: "Pending Tasks",
-      value: metrics.pendingTasks,
+      value: effectiveMetrics.pendingTasks,
       icon: <TaskIcon className="size-5" />,
       iconBg: "bg-blue-100 dark:bg-blue-500/15",
       iconColor: "text-blue-600 dark:text-blue-400",
       badge: (
-        <Badge color={metrics.overdueTasks > 0 ? "error" : "success"}>
-          {metrics.overdueTasks > 0 && <ArrowDownIcon className="text-error-500" />}
-          {metrics.overdueTasks} overdue
+        <Badge color={effectiveMetrics.overdueTasks > 0 ? "error" : "success"}>
+          {effectiveMetrics.overdueTasks > 0 && <ArrowDownIcon className="text-error-500" />}
+          {effectiveMetrics.overdueTasks} overdue
         </Badge>
       ),
     },

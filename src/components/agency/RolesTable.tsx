@@ -3,6 +3,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import Badge from "../ui/badge/Badge";
 import { CreateRoleModal } from "./modals";
 import { RoleDetailsSidebar } from "./sidebars";
+import {
+  PERMISSION_GROUPS,
+  ALL_PERMISSION_IDS,
+  getPermissionLabel,
+  getPermissionGroup,
+} from "@/lib/permissions";
 
 export interface Role {
   id: string;
@@ -29,116 +35,10 @@ export interface Role {
   }>;
 }
 
-// Permission groups for display
-export const permissionGroups = [
-  {
-    name: "Projects",
-    key: "projects",
-    permissions: [
-      { id: "projects-view", label: "View projects" },
-      { id: "projects-create", label: "Create projects" },
-      { id: "projects-edit", label: "Edit projects" },
-      { id: "projects-delete", label: "Delete projects" },
-      { id: "projects-archive", label: "Archive projects" },
-    ],
-  },
-  {
-    name: "Tasks",
-    key: "tasks",
-    permissions: [
-      { id: "tasks-view", label: "View tasks" },
-      { id: "tasks-create", label: "Create tasks" },
-      { id: "tasks-edit", label: "Edit tasks" },
-      { id: "tasks-delete", label: "Delete tasks" },
-      { id: "tasks-assign", label: "Assign tasks" },
-    ],
-  },
-  {
-    name: "Clients",
-    key: "clients",
-    permissions: [
-      { id: "clients-view", label: "View clients" },
-      { id: "clients-create", label: "Create clients" },
-      { id: "clients-edit", label: "Edit clients" },
-      { id: "clients-delete", label: "Delete clients" },
-    ],
-  },
-  {
-    name: "Finance",
-    key: "finance",
-    permissions: [
-      { id: "finance-view", label: "View financial data" },
-      { id: "invoices-create", label: "Create invoices" },
-      { id: "invoices-edit", label: "Edit invoices" },
-      { id: "invoices-send", label: "Send invoices" },
-      { id: "payments-record", label: "Record payments" },
-      { id: "expenses-view", label: "View expenses" },
-      { id: "expenses-approve", label: "Approve expenses" },
-      { id: "budgets-manage", label: "Manage budgets" },
-    ],
-  },
-  {
-    name: "Team",
-    key: "team",
-    permissions: [
-      { id: "team-view", label: "View team members" },
-      { id: "team-invite", label: "Invite members" },
-      { id: "team-edit", label: "Edit members" },
-      { id: "team-remove", label: "Remove members" },
-      { id: "roles-manage", label: "Manage roles" },
-    ],
-  },
-  {
-    name: "Events",
-    key: "events",
-    permissions: [
-      { id: "events-view", label: "View events" },
-      { id: "events-create", label: "Create events" },
-      { id: "events-edit", label: "Edit events" },
-      { id: "events-delete", label: "Delete events" },
-    ],
-  },
-  {
-    name: "Reports",
-    key: "reports",
-    permissions: [
-      { id: "reports-view", label: "View reports" },
-      { id: "reports-export", label: "Export reports" },
-      { id: "reports-create", label: "Create custom reports" },
-    ],
-  },
-  {
-    name: "Settings",
-    key: "settings",
-    permissions: [
-      { id: "settings-view", label: "View settings" },
-      { id: "settings-edit", label: "Edit settings" },
-      { id: "integrations-manage", label: "Manage integrations" },
-    ],
-  },
-];
-
-// Get all permission IDs
-export const allPermissionIds = permissionGroups.flatMap(g => g.permissions.map(p => p.id));
-
-// Get permission label by ID
-export const getPermissionLabel = (permissionId: string): string => {
-  for (const group of permissionGroups) {
-    const perm = group.permissions.find(p => p.id === permissionId);
-    if (perm) return perm.label;
-  }
-  return permissionId;
-};
-
-// Get permission group by permission ID
-export const getPermissionGroup = (permissionId: string): string => {
-  for (const group of permissionGroups) {
-    if (group.permissions.some(p => p.id === permissionId)) {
-      return group.name;
-    }
-  }
-  return "Other";
-};
+// Re-export from centralized permissions for backwards compatibility
+export const permissionGroups = PERMISSION_GROUPS;
+export const allPermissionIds = ALL_PERMISSION_IDS;
+export { getPermissionLabel, getPermissionGroup };
 
 export const RolesTable = () => {
   const [roles, setRoles] = useState<Role[]>([]);

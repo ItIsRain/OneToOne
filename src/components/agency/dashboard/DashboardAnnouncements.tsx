@@ -24,6 +24,9 @@ export interface Announcement {
 interface DashboardAnnouncementsProps {
   onAdd?: () => void;
   onView?: (announcement: Announcement) => void;
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: Announcement[];
+  isLoading?: boolean;
 }
 
 const categoryColors: Record<string, "success" | "warning" | "error" | "primary" | "light"> = {
@@ -55,12 +58,26 @@ const listItem = {
 export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
   onAdd,
   onView,
+  data: propData,
+  isLoading: propLoading,
 }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Determine if we should use props or fetch ourselves
+  // If propLoading is provided (even if false), parent is managing data
+  const parentManagesData = propLoading !== undefined;
+
+  // Use prop data if available
+  const effectiveAnnouncements = propData || announcements;
+  const effectiveLoading = parentManagesData ? (propLoading || false) : loading;
+
   const fetchAnnouncements = useCallback(async () => {
+    // Skip fetch if parent is managing data
+    if (parentManagesData) return;
+
+    setLoading(true);
     try {
       const res = await fetch("/api/announcements?limit=5");
 
@@ -79,11 +96,13 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [parentManagesData]);
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+    if (!parentManagesData) {
+      fetchAnnouncements();
+    }
+  }, [fetchAnnouncements, parentManagesData]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -96,7 +115,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-5">
@@ -140,7 +159,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
         </div>
       )}
 
-      {announcements.length === 0 ? (
+      {effectiveAnnouncements.length === 0 ? (
         <div className="text-center py-8">
           <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +183,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
           initial="hidden"
           animate="show"
         >
-          {announcements.map((announcement) => (
+          {effectiveAnnouncements.map((announcement) => (
             <motion.div
               key={announcement.id}
               variants={listItem}

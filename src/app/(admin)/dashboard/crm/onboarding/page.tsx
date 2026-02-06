@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { FeatureGate } from "@/components/ui/FeatureGate";
 import { Modal } from "@/components/ui/modal";
 import Badge from "@/components/ui/badge/Badge";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -37,6 +39,7 @@ const STEP_TYPES = [
 export default function OnboardingTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [saving, setSaving] = useState(false);
@@ -53,13 +56,16 @@ export default function OnboardingTemplatesPage() {
 
   const fetchTemplates = useCallback(async () => {
     try {
+      setFetchError(null);
       const res = await fetch("/api/onboarding/templates");
-      if (res.ok) {
-        const data = await res.json();
-        setTemplates(data.templates || []);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to load templates");
       }
-    } catch {
-      // Silent
+      const data = await res.json();
+      setTemplates(data.templates || []);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Failed to load templates");
     } finally {
       setLoading(false);
     }
@@ -189,6 +195,7 @@ export default function OnboardingTemplatesPage() {
     "h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800";
 
   return (
+    <ProtectedPage permission={PERMISSIONS.CRM_VIEW}>
     <FeatureGate feature="crm">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -220,6 +227,24 @@ export default function OnboardingTemplatesPage() {
                 <div className="h-3 w-64 bg-gray-50 dark:bg-gray-800/50 rounded" />
               </div>
             ))}
+          </div>
+        ) : fetchError ? (
+          <div className="rounded-xl border border-error-200 bg-error-50 p-6 text-center dark:border-error-800 dark:bg-error-900/20">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-error-100 dark:bg-error-500/20">
+              <svg className="h-6 w-6 text-error-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-error-700 dark:text-error-400 mb-3">{fetchError}</p>
+            <button
+              onClick={fetchTemplates}
+              className="inline-flex items-center gap-2 rounded-lg bg-error-500 px-4 py-2 text-sm font-medium text-white hover:bg-error-600 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              Retry
+            </button>
           </div>
         ) : templates.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-900">
@@ -485,5 +510,6 @@ export default function OnboardingTemplatesPage() {
         </div>
       </Modal>
     </FeatureGate>
+    </ProtectedPage>
   );
 }

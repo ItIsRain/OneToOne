@@ -1124,10 +1124,9 @@ export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string 
             <div>
               <h4 className="font-semibold mb-4 text-white">Product</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li><a href="#features" className="hover:text-lime-400 transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-lime-400 transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Integrations</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Changelog</a></li>
+                <li><Link href="/features" className="hover:text-lime-400 transition-colors">Features</Link></li>
+                <li><Link href="/pricing" className="hover:text-lime-400 transition-colors">Pricing</Link></li>
+                <li><Link href="/changelog" className="hover:text-lime-400 transition-colors">Changelog</Link></li>
               </ul>
             </div>
 
@@ -1135,10 +1134,10 @@ export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string 
             <div>
               <h4 className="font-semibold mb-4 text-white">Company</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-lime-400 transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Contact</a></li>
+                <li><Link href="/about" className="hover:text-lime-400 transition-colors">About</Link></li>
+                <li><Link href="/blog" className="hover:text-lime-400 transition-colors">Blog</Link></li>
+                <li><Link href="/careers" className="hover:text-lime-400 transition-colors">Careers</Link></li>
+                <li><Link href="/contact" className="hover:text-lime-400 transition-colors">Contact</Link></li>
               </ul>
             </div>
 
@@ -1146,10 +1145,10 @@ export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string 
             <div>
               <h4 className="font-semibold mb-4 text-white">Resources</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Status</a></li>
+                <li><Link href="/help" className="hover:text-lime-400 transition-colors">Help Center</Link></li>
+                <li><Link href="/docs" className="hover:text-lime-400 transition-colors">Documentation</Link></li>
+                <li><Link href="/api" className="hover:text-lime-400 transition-colors">API Reference</Link></li>
+                <li><Link href="/status" className="hover:text-lime-400 transition-colors">Status</Link></li>
               </ul>
             </div>
 
@@ -1157,10 +1156,10 @@ export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string 
             <div>
               <h4 className="font-semibold mb-4 text-white">Legal</h4>
               <ul className="space-y-3 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Cookie Policy</a></li>
-                <li><a href="#" className="hover:text-lime-400 transition-colors">Security</a></li>
+                <li><Link href="/privacy" className="hover:text-lime-400 transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-lime-400 transition-colors">Terms of Service</Link></li>
+                <li><Link href="/cookies" className="hover:text-lime-400 transition-colors">Cookie Policy</Link></li>
+                <li><Link href="/security" className="hover:text-lime-400 transition-colors">Security</Link></li>
               </ul>
             </div>
           </div>
@@ -1168,7 +1167,7 @@ export default function MarketingPage({ dashboardUrl }: { dashboardUrl?: string 
           {/* Bottom Bar */}
           <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-gray-500">
-              © 2025 One To One (1i1.ae) by Lunar Limited. All rights reserved.
+              © {new Date().getFullYear()} One To One (1i1.ae) by Lunar Limited. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
               <span className="text-xs text-gray-600">Made with</span>

@@ -17,6 +17,7 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
   error,
 }) => {
   const [ratingHover, setRatingHover] = useState<number>(0);
+  const [fileError, setFileError] = useState<string>("");
 
   const baseInputClass =
     "w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 transition focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:bg-gray-800 dark:text-white";
@@ -248,11 +249,12 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
                 }
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  setFileError(""); // Clear previous error
                   if (file) {
                     const maxSizeMB = (field.validation?.maxSizeMB as number) || 10;
                     const maxSize = maxSizeMB * 1024 * 1024;
                     if (file.size > maxSize) {
-                      alert(`File size exceeds ${Math.round(maxSize / 1024 / 1024)}MB limit`);
+                      setFileError(`File size exceeds ${maxSizeMB}MB limit`);
                       e.target.value = "";
                       return;
                     }
@@ -261,6 +263,9 @@ export const FormFieldRenderer: React.FC<FormFieldRendererProps> = ({
                 }}
               />
             </label>
+            {fileError && (
+              <p className="mt-1 text-sm text-red-500">{fileError}</p>
+            )}
           </div>
         );
 

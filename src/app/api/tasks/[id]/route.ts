@@ -146,7 +146,7 @@ export async function PATCH(
       }
     }
 
-    // Validate parent_task_id and prevent circular references
+    // Validate parent_task_id and prevent circular references (deep check)
     if (updates.parent_task_id) {
       if (updates.parent_task_id === id) {
         return NextResponse.json({ error: "Task cannot be its own parent" }, { status: 400 });
@@ -163,14 +163,133 @@ export async function PATCH(
         return NextResponse.json({ error: "Parent task not found" }, { status: 400 });
       }
 
-      // Check one level up to prevent simple circular chains
-      if (parentTask.parent_task_id === id) {
-        return NextResponse.json({ error: "Circular task dependency detected" }, { status: 400 });
+      // Deep circular reference check: traverse up the parent chain
+      // Limit depth to prevent infinite loops in case of data corruption
+      const MAX_DEPTH = 20;
+      const visited = new Set<string>([id]); // Include current task
+      let currentParentId: string | null = parentTask.parent_task_id;
+      let depth = 0;
+
+      while (currentParentId && depth < MAX_DEPTH) {
+        if (visited.has(currentParentId)) {
+          return NextResponse.json({ error: "Circular task dependency detected" }, { status: 400 });
+        }
+        visited.add(currentParentId);
+
+        // Fetch the next parent
+        const { data: ancestor } = await supabase
+          .from("tasks")
+          .select("parent_task_id")
+          .eq("id", currentParentId)
+          .eq("tenant_id", profile.tenant_id)
+          .single();
+
+        currentParentId = ancestor?.parent_task_id || null;
+        depth++;
+      }
+
+      if (depth >= MAX_DEPTH) {
+        return NextResponse.json({ error: "Task hierarchy too deep (max 20 levels)" }, { status: 400 });
+      }
+    }
+
+    // Validate kanban swimlane matches board columns
+    if (updates.kanban_board_id || updates.swimlane) {
+      // Get the board to check (either from updates or existing task)
+      const boardIdToCheck = updates.kanban_board_id as string | undefined;
+
+      if (boardIdToCheck && updates.swimlane) {
+        const { data: board } = await supabase
+          .from("kanban_boards")
+          .select("columns")
+          .eq("id", boardIdToCheck)
+          .eq("tenant_id", profile.tenant_id)
+          .single();
+
+        if (!board) {
+          return NextResponse.json({ error: "Kanban board not found" }, { status: 404 });
+        }
+
+        // Check if swimlane is a valid column name
+        const columns = board.columns as Array<{ name: string }> | string[];
+        if (columns && Array.isArray(columns)) {
+          const validColumnNames = columns.map((col) =>
+            typeof col === "string" ? col : col.name
+          );
+
+          if (!validColumnNames.includes(updates.swimlane as string)) {
+            return NextResponse.json(
+              {
+                error: "Invalid swimlane for this board",
+                valid_columns: validColumnNames,
+              },
+              { status: 400 }
+            );
+          }
+        }
+      } else if (updates.swimlane && !boardIdToCheck) {
+        // Setting swimlane without specifying board - check current task's board
+        const { data: currentTask } = await supabase
+          .from("tasks")
+          .select("kanban_board_id")
+          .eq("id", id)
+          .eq("tenant_id", profile.tenant_id)
+          .single();
+
+        if (currentTask?.kanban_board_id) {
+          const { data: board } = await supabase
+            .from("kanban_boards")
+            .select("columns")
+            .eq("id", currentTask.kanban_board_id)
+            .eq("tenant_id", profile.tenant_id)
+            .single();
+
+          if (board) {
+            const columns = board.columns as Array<{ name: string }> | string[];
+            if (columns && Array.isArray(columns)) {
+              const validColumnNames = columns.map((col) =>
+                typeof col === "string" ? col : col.name
+              );
+
+              if (!validColumnNames.includes(updates.swimlane as string)) {
+                return NextResponse.json(
+                  {
+                    error: "Invalid swimlane for this board",
+                    valid_columns: validColumnNames,
+                  },
+                  { status: 400 }
+                );
+              }
+            }
+          }
+        }
       }
     }
 
     // Fetch old task for status change trigger
     const { data: oldTask } = await supabase.from("tasks").select("status, tenant_id").eq("id", id).eq("tenant_id", profile.tenant_id).single();
+
+    // Validate status transitions
+    if (body.status && oldTask && body.status !== oldTask.status) {
+      const validTransitions: Record<string, string[]> = {
+        backlog: ["todo", "in_progress", "cancelled"],
+        todo: ["backlog", "pending", "in_progress", "cancelled"],
+        pending: ["todo", "in_progress", "blocked", "cancelled"],
+        in_progress: ["pending", "in_review", "blocked", "completed", "cancelled"],
+        in_review: ["in_progress", "completed", "cancelled"],
+        blocked: ["pending", "in_progress", "cancelled"],
+        completed: ["in_progress"], // Can reopen to in_progress
+        cancelled: ["backlog", "todo"], // Can restore to backlog/todo
+      };
+
+      const allowed = validTransitions[oldTask.status] || [];
+      if (!allowed.includes(body.status)) {
+        return NextResponse.json(
+          { error: `Cannot transition task from "${oldTask.status}" to "${body.status}"` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Auto-set timestamps based on status changes
     if (body.status === "in_progress" && !body.started_at) {

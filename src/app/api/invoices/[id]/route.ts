@@ -164,11 +164,42 @@ export async function PATCH(
       }
     });
 
-    // Auto-compute subtotal from items if items provided but subtotal is not
-    if (body.items && Array.isArray(body.items) && body.items.length > 0 && body.subtotal === undefined) {
-      body.subtotal = body.items.reduce((sum: number, item: Record<string, unknown>) => {
-        return sum + (parseFloat(item.quantity as string) || 1) * (parseFloat(item.unit_price as string) || 0);
+    // Reconcile subtotal with items if both are provided
+    if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+      const itemsSubtotal = body.items.reduce((sum: number, item: Record<string, unknown>) => {
+        const qty = parseFloat(item.quantity as string) || 1;
+        const unitPrice = parseFloat(item.unit_price as string) || 0;
+        const itemDiscountType = (item.discount_type as string) || 'fixed';
+        const itemDiscountValue = parseFloat(item.discount_value as string) || 0;
+        const itemAmount = qty * unitPrice;
+        const itemDiscount = itemDiscountType === 'percentage'
+          ? itemAmount * (itemDiscountValue / 100)
+          : itemDiscountValue;
+        return sum + (itemAmount - itemDiscount);
       }, 0);
+
+      const roundedItemsSubtotal = Math.round(itemsSubtotal * 100) / 100;
+
+      // If subtotal is provided and differs significantly from items calculation, warn
+      if (body.subtotal !== undefined) {
+        const providedSubtotal = parseFloat(body.subtotal) || 0;
+        if (Math.abs(providedSubtotal - roundedItemsSubtotal) > 0.01) {
+          return NextResponse.json(
+            {
+              error: "Invoice subtotal does not match line items total",
+              code: "SUBTOTAL_MISMATCH",
+              provided_subtotal: providedSubtotal,
+              calculated_subtotal: roundedItemsSubtotal,
+              message: `Provided subtotal (${providedSubtotal}) differs from calculated items total (${roundedItemsSubtotal}). Please reconcile.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Use items-calculated subtotal
+      body.subtotal = roundedItemsSubtotal;
+      updates.subtotal = roundedItemsSubtotal;
     }
 
     // Recalculate totals if financial fields changed
@@ -214,23 +245,50 @@ export async function PATCH(
       }
     }
 
+    // Validate dates: due_date must be >= issue_date
+    if (updates.due_date || updates.issue_date) {
+      // Fetch current invoice dates if needed
+      const { data: currentDates } = await supabase
+        .from("invoices")
+        .select("issue_date, due_date")
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      const issueDate = new Date((updates.issue_date as string) || currentDates?.issue_date);
+      const dueDate = new Date((updates.due_date as string) || currentDates?.due_date);
+
+      if (issueDate && dueDate && dueDate < issueDate) {
+        return NextResponse.json(
+          { error: "Due date cannot be before issue date" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate status transitions
     if (updates.status) {
-      const { data: currentInvoice } = await supabase
+      const { data: currentInvoice, error: statusError } = await supabase
         .from("invoices")
         .select("status")
         .eq("id", id)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
+      if (statusError) {
+        // If we can't verify the current status, don't allow status changes
+        return NextResponse.json({ error: "Could not verify invoice status" }, { status: 500 });
+      }
+
       if (currentInvoice) {
         const validTransitions: Record<string, string[]> = {
           draft: ["sent", "cancelled"],
-          sent: ["paid", "partially_paid", "overdue", "cancelled", "draft"],
-          overdue: ["paid", "partially_paid", "cancelled", "sent"],
+          sent: ["viewed", "paid", "partially_paid", "overdue", "cancelled"],
+          viewed: ["paid", "partially_paid", "overdue", "cancelled"],
+          overdue: ["paid", "partially_paid", "cancelled"],
           partially_paid: ["paid", "overdue", "cancelled"],
           paid: ["refunded"],
-          cancelled: ["draft"],
+          cancelled: [], // Cancelled invoices cannot be reactivated - create a new invoice instead
           refunded: [],
         };
         const allowed = validTransitions[currentInvoice.status] || [];
@@ -290,16 +348,14 @@ export async function PATCH(
           notes: item.notes || null,
         }));
 
-        // Delete existing items then insert new ones
-        const { error: deleteError } = await supabase
+        // Get existing item IDs for safe deletion after insert
+        const { data: existingItems } = await supabase
           .from("invoice_items")
-          .delete()
+          .select("id")
           .eq("invoice_id", id);
+        const existingIds = existingItems?.map(i => i.id) || [];
 
-        if (deleteError) {
-          console.error("Failed to delete old invoice items:", deleteError);
-        }
-
+        // Insert new items first - if this fails, we keep old items
         const { error: insertError } = await supabase.from("invoice_items").insert(itemsData);
         if (insertError) {
           console.error("Failed to insert invoice items:", insertError);
@@ -308,12 +364,29 @@ export async function PATCH(
             { status: 207 }
           );
         }
+
+        // Only delete old items after insert succeeds (prevents data loss)
+        if (existingIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from("invoice_items")
+            .delete()
+            .in("id", existingIds);
+
+          if (deleteError) {
+            console.error("Failed to delete old invoice items:", deleteError);
+            // Non-critical: new items are in, old ones may remain as orphans
+          }
+        }
       } else {
         // If items array is empty, delete all items
-        await supabase
+        const { error: deleteError } = await supabase
           .from("invoice_items")
           .delete()
           .eq("invoice_id", id);
+
+        if (deleteError) {
+          console.error("Failed to delete invoice items:", deleteError);
+        }
       }
     }
 
@@ -378,6 +451,14 @@ export async function DELETE(
       .from("invoice_items")
       .delete()
       .eq("invoice_id", id);
+
+    // Unlink any payments from this invoice to prevent orphaned references
+    // (Payments are preserved for audit trail but invoice_id is set to null)
+    await supabase
+      .from("payments")
+      .update({ invoice_id: null, updated_at: new Date().toISOString() })
+      .eq("invoice_id", id)
+      .eq("tenant_id", profile.tenant_id);
 
     // Delete the invoice
     const { error } = await supabase

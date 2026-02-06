@@ -318,13 +318,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Determine subscription type for display
+    let subscriptionType: "free" | "trial" | "paid" | "granted" = "free";
+    if (subscription) {
+      if (subscription.granted_by) {
+        subscriptionType = "granted";
+      } else if (subscription.is_trial || (isTrialing && !subscription.stripe_subscription_id)) {
+        subscriptionType = "trial";
+      } else if (subscription.stripe_subscription_id) {
+        subscriptionType = "paid";
+      } else if (subscription.plan_type !== "free") {
+        subscriptionType = "trial";
+      }
+    }
+
     return NextResponse.json({
       subscription: {
         ...subscription,
         price,
         billing_interval: billingInterval,
-        is_trialing: isTrialing,
-        next_billing_date: nextBillingDate || subscription?.current_period_end || null,
+        is_trialing: isTrialing || subscription?.is_trial || false,
+        next_billing_date: nextBillingDate || subscription?.trial_ends_at || subscription?.current_period_end || null,
+        subscription_type: subscriptionType,
+        is_granted: !!subscription?.granted_by,
+        grant_reason: subscription?.grant_reason || null,
       },
       paymentMethods: paymentMethods || [],
       usage,

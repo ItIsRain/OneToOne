@@ -153,6 +153,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
+    // Deduplication check: warn if contact with same email exists (unless force is set)
+    if (!body.force && body.email) {
+      const { data: potentialDuplicates } = await supabase
+        .from("contacts")
+        .select("id, first_name, last_name, email, company, client_id")
+        .eq("tenant_id", profile.tenant_id)
+        .eq("email", body.email.toLowerCase())
+        .limit(3);
+
+      if (potentialDuplicates && potentialDuplicates.length > 0) {
+        const dupInfo = potentialDuplicates.map((d) => ({
+          id: d.id,
+          name: `${d.first_name || ""} ${d.last_name || ""}`.trim(),
+          email: d.email,
+          company: d.company,
+          client_id: d.client_id,
+        }));
+        return NextResponse.json(
+          {
+            error: "Potential duplicate contact found",
+            code: "DUPLICATE_WARNING",
+            duplicates: dupInfo,
+            message: `A contact with email "${body.email}" already exists. Add "force: true" to create anyway.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // Validate FK references belong to the same tenant
     if (body.client_id) {
       const { data: client } = await supabase

@@ -4,6 +4,8 @@ import { ContractsTable, ContractDetailsSidebar } from "@/components/agency";
 import { NewContractModal } from "@/components/agency/modals";
 import FeatureGate from "@/components/ui/FeatureGate";
 import type { ContractRecord } from "@/components/agency/ContractsTable";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function ContractsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,8 +114,8 @@ export default function ContractsPage() {
   };
 
   return (
-    <FeatureGate feature="document_templates">
-      <>
+    <ProtectedPage permission={PERMISSIONS.DOCUMENTS_VIEW}>
+      <FeatureGate feature="document_templates">
         <div className="space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -149,7 +151,7 @@ export default function ContractsPage() {
           onStatusChange={handleStatusChange}
           onSign={handleSign}
         />
-      </>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

@@ -48,9 +48,15 @@ export function verifyPassword(password: string, storedHash: string): boolean {
     const derived = crypto.scryptSync(password, salt, 64).toString("hex");
     return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(derived, "hex"));
   }
-  // Legacy SHA-256 format (no colon separator)
+  // Legacy SHA-256 format (no colon separator) - use constant-time comparison
   const legacyHash = crypto.createHash("sha256").update(password).digest("hex");
-  return legacyHash === storedHash;
+  // Ensure both buffers are same length before comparison to prevent timing attacks
+  const storedBuffer = Buffer.from(storedHash, "hex");
+  const legacyBuffer = Buffer.from(legacyHash, "hex");
+  if (storedBuffer.length !== legacyBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(storedBuffer, legacyBuffer);
 }
 
 // GET - Fetch all file shares
@@ -242,11 +248,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Update file's is_shared status
+    // Update file's is_shared status (include tenant_id for defense-in-depth)
     await supabase
       .from("files")
       .update({ is_shared: true })
-      .eq("id", body.file_id);
+      .eq("id", body.file_id)
+      .eq("tenant_id", profile.tenant_id);
 
     return NextResponse.json({ share }, { status: 201 });
   } catch (error) {

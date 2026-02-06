@@ -31,10 +31,21 @@ async function getSupabaseClient() {
   );
 }
 
-// GET - Fetch all contracts for the user's tenant
-export async function GET() {
+// GET - Fetch contracts for the user's tenant with pagination
+export async function GET(request: Request) {
   try {
     const supabase = await getSupabaseClient();
+    const { searchParams } = new URL(request.url);
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+
+    // Filter parameters
+    const status = searchParams.get("status");
+    const clientId = searchParams.get("client_id");
+    const search = searchParams.get("search");
 
     const {
       data: { user },
@@ -75,17 +86,53 @@ export async function GET() {
       );
     }
 
-    const { data: contracts, error } = await supabase
+    // Build query with filters
+    let countQuery = supabase
+      .from("contracts")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", profile.tenant_id);
+
+    let dataQuery = supabase
       .from("contracts")
       .select('*, client:clients(id, name, company, email)')
-      .eq("tenant_id", profile.tenant_id)
-      .order("created_at", { ascending: false });
+      .eq("tenant_id", profile.tenant_id);
+
+    // Apply filters to both queries
+    if (status) {
+      countQuery = countQuery.eq("status", status);
+      dataQuery = dataQuery.eq("status", status);
+    }
+    if (clientId) {
+      countQuery = countQuery.eq("client_id", clientId);
+      dataQuery = dataQuery.eq("client_id", clientId);
+    }
+    if (search) {
+      const searchFilter = `name.ilike.%${search}%`;
+      countQuery = countQuery.or(searchFilter);
+      dataQuery = dataQuery.or(searchFilter);
+    }
+
+    // Get total count
+    const { count: totalCount } = await countQuery;
+
+    // Get paginated data
+    const { data: contracts, error } = await dataQuery
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ contracts });
+    return NextResponse.json({
+      contracts,
+      pagination: {
+        page,
+        limit,
+        total: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+      },
+    });
   } catch (error) {
     console.error("Get contracts error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
@@ -167,9 +214,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Auto-generate slug from title
+    // Auto-generate slug from title with high-entropy suffix for security
     const baseSlug = body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const randomSuffix = crypto.randomUUID().substring(0, 8);
+    // Use 24 chars from UUID (removes hyphens) for ~2^96 combinations - practically unguessable
+    const randomSuffix = crypto.randomUUID().replace(/-/g, '').substring(0, 24);
     const slug = `${baseSlug}-${randomSuffix}`;
 
     const contractData = {

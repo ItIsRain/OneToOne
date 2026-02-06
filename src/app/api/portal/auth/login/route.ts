@@ -49,30 +49,15 @@ export async function POST(request: Request) {
 
     // Magic link token login
     if (token) {
-      const { data: portalClient, error: clientError } = await supabase
-        .from("portal_clients")
-        .select("*")
-        .eq("magic_link_token", token)
-        .eq("tenant_id", tenant.id)
-        .eq("is_active", true)
-        .single();
-
-      if (clientError || !portalClient) {
-        return NextResponse.json({ error: "Invalid or expired magic link" }, { status: 401 });
-      }
-
-      // Check if magic link has expired
-      if (portalClient.magic_link_expires_at && new Date(portalClient.magic_link_expires_at) < new Date()) {
-        return NextResponse.json({ error: "Magic link has expired" }, { status: 401 });
-      }
-
       // Generate session token for secure subsequent requests
+      // Session expires in 4 hours (reduced from 24h for security)
       const sessionToken = crypto.randomUUID();
       const sessionTokenHash = hashSessionToken(sessionToken);
+      const sessionExpiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
-      // Clear the magic link token after use and update last_login_at
-      const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await supabase
+      // Atomically clear the magic link token AND retrieve the client in one operation
+      // This prevents race conditions where two requests with the same token both succeed
+      const { data: portalClient, error: clientError } = await supabase
         .from("portal_clients")
         .update({
           magic_link_token: null,
@@ -81,7 +66,16 @@ export async function POST(request: Request) {
           session_token: sessionTokenHash,
           session_token_expires_at: sessionExpiresAt,
         })
-        .eq("id", portalClient.id);
+        .eq("magic_link_token", token)
+        .eq("tenant_id", tenant.id)
+        .eq("is_active", true)
+        .gt("magic_link_expires_at", new Date().toISOString()) // Check expiry atomically
+        .select("*")
+        .single();
+
+      if (clientError || !portalClient) {
+        return NextResponse.json({ error: "Invalid or expired magic link" }, { status: 401 });
+      }
 
       // Trigger workflow
       try {
@@ -148,11 +142,10 @@ export async function POST(request: Request) {
     }
 
     // Generate session token for secure subsequent requests
+    // Session expires in 4 hours (reduced from 24h for security)
     const sessionToken = crypto.randomUUID();
     const sessionTokenHash = hashSessionToken(sessionToken);
-
-    // Update last_login_at and store session token with 24h expiry
-    const sessionExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const sessionExpiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
     await supabase
       .from("portal_clients")
       .update({

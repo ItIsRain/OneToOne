@@ -148,6 +148,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
+    // Deduplication check: warn if client with same email or company already exists
+    // Skip if user explicitly sets force: true
+    if (!body.force && (body.email || body.company)) {
+      let dupQuery = supabase
+        .from("clients")
+        .select("id, name, email, company")
+        .eq("tenant_id", profile.tenant_id);
+
+      if (body.email) {
+        dupQuery = dupQuery.eq("email", body.email.toLowerCase());
+      } else if (body.company) {
+        dupQuery = dupQuery.ilike("company", body.company);
+      }
+
+      const { data: potentialDuplicates } = await dupQuery.limit(3);
+
+      if (potentialDuplicates && potentialDuplicates.length > 0) {
+        // Return warning with existing records for user decision
+        const dupInfo = potentialDuplicates.map((d) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          company: d.company,
+        }));
+        return NextResponse.json(
+          {
+            error: "Potential duplicate client found",
+            code: "DUPLICATE_WARNING",
+            duplicates: dupInfo,
+            message: `A client with ${body.email ? `email "${body.email}"` : `company "${body.company}"`} already exists. Add "force: true" to create anyway.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const clientData = {
       tenant_id: profile.tenant_id,
       name: body.name.slice(0, 200),

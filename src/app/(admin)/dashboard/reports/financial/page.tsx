@@ -1,6 +1,8 @@
 "use client";
 import React from "react";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const financialData = {
   revenue: { current: 124500, previous: 108000 },
@@ -19,8 +21,9 @@ const expenseBreakdown = [
 
 export default function FinancialReportsPage() {
   return (
-    <FeatureGate feature="advanced_analytics">
-    <div className="space-y-6">
+    <ProtectedPage permission={PERMISSIONS.REPORTS_VIEW}>
+      <FeatureGate feature="advanced_analytics">
+        <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Financial Reports</h1>
@@ -89,8 +92,9 @@ export default function FinancialReportsPage() {
             })}
           </div>
         </div>
-      </div>
-    </div>
-    </FeatureGate>
+        </div>
+        </div>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

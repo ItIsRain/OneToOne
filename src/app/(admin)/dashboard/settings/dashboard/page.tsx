@@ -1,8 +1,12 @@
+"use client";
 import DashboardSettingsClient from "./DashboardSettingsClient";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function DashboardSettingsPage() {
   return (
-    <div>
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_VIEW}>
+      <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
           Dashboard Settings
@@ -14,6 +18,7 @@ export default function DashboardSettingsPage() {
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <DashboardSettingsClient />
       </div>
-    </div>
+      </div>
+    </ProtectedPage>
   );
 }

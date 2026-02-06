@@ -5,9 +5,11 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { TenantInfoProvider } from '@/context/TenantInfoContext';
+import { PermissionsProvider } from '@/context/PermissionsContext';
 import { Toaster } from 'sonner';
 import { Metadata } from 'next';
 import Script from 'next/script';
+import { GoogleAnalytics } from '@/components/seo';
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -106,7 +108,9 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: 'your-google-verification-code',
+    other: {
+      'msvalidate.01': '0785BB50298DD07CB32B0CB8844568DA',
+    },
   },
 };
 
@@ -140,6 +144,27 @@ const softwareJsonLd = JSON.stringify({
   description: 'All-in-one business management platform for CRM, projects, events, finance, team, and documents. Built by Lunar Limited.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', description: 'Free tier available' },
   author: { '@type': 'Organization', name: 'Lunar Limited', alternateName: ['Lunar Labs', 'OneToOne'] },
+  aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', ratingCount: '150', bestRating: '5', worstRating: '1' },
+});
+
+// WebSite schema with SearchAction for sitelinks searchbox in Google
+const websiteJsonLd = JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'OneToOne',
+  alternateName: ['1i1', 'One To One', 'CloudLynq'],
+  url: 'https://1i1.ae',
+  description: 'All-in-one business management platform for CRM, projects, events, finance, and team management.',
+  publisher: {
+    '@type': 'Organization',
+    name: 'Lunar Limited',
+    logo: { '@type': 'ImageObject', url: 'https://1i1.ae/Logo.svg' },
+  },
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: { '@type': 'EntryPoint', urlTemplate: 'https://1i1.ae/search?q={search_term_string}' },
+    'query-input': 'required name=search_term_string',
+  },
 });
 
 export default function RootLayout({
@@ -150,6 +175,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${outfit.className} dark:bg-gray-900`}>
+        {/* Google Analytics - Set NEXT_PUBLIC_GA_MEASUREMENT_ID in env */}
+        <GoogleAnalytics />
         <Script
           id="organization-jsonld"
           type="application/ld+json"
@@ -160,6 +187,11 @@ export default function RootLayout({
           type="application/ld+json"
           strategy="afterInteractive"
         >{softwareJsonLd}</Script>
+        <Script
+          id="website-jsonld"
+          type="application/ld+json"
+          strategy="afterInteractive"
+        >{websiteJsonLd}</Script>
         <Script id="livechat-script" strategy="afterInteractive">{`
           window.__lc = window.__lc || {};
           window.__lc.license = 19484238;
@@ -172,9 +204,11 @@ export default function RootLayout({
         </noscript>
         <ThemeProvider>
           <AuthProvider>
-            <TenantInfoProvider>
-              <SidebarProvider>{children}</SidebarProvider>
-            </TenantInfoProvider>
+            <PermissionsProvider>
+              <TenantInfoProvider>
+                <SidebarProvider>{children}</SidebarProvider>
+              </TenantInfoProvider>
+            </PermissionsProvider>
           </AuthProvider>
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>

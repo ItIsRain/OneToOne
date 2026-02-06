@@ -466,7 +466,7 @@ export async function GET(request: Request) {
           .slice(0, 5),
         events: eventsThisWeek.slice(0, 5).map((e) => ({
           id: e.id,
-          name: e.title,
+          title: e.title,
           start_date: e.start_date,
           end_date: e.end_date,
           status: e.status,

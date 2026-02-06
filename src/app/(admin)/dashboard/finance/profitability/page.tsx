@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -243,6 +245,7 @@ export default function ProfitabilityPage() {
   const uniqueStatuses = [...new Set(projects.map((p) => p.status))];
 
   return (
+    <ProtectedPage permission={PERMISSIONS.FINANCE_VIEW}>
     <FeatureGate feature="finance">
       <div className="space-y-6">
         {/* Header */}
@@ -482,6 +485,7 @@ export default function ProfitabilityPage() {
         </div>
       </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }
 

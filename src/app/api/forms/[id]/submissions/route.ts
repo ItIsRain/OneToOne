@@ -90,10 +90,12 @@ export async function GET(
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
+    // Defense in depth: filter by both form_id and tenant_id
     const { data: submissions, error } = await supabase
       .from("form_submissions")
       .select("*")
       .eq("form_id", id)
+      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 
     if (error) {

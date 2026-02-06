@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Input from "./input/InputField";
 import TextArea from "./input/TextArea";
 import Select from "./Select";
@@ -21,15 +21,37 @@ const SortableList: React.FC<{
   placeholder?: string;
 }> = ({ value = [], onChange, placeholder }) => {
   const [newItem, setNewItem] = useState("");
+  const idCounter = useRef(0);
+  const itemIds = useRef<Map<number, string>>(new Map());
+
+  // Generate stable IDs for items - track by original insertion order
+  const getItemId = (index: number) => {
+    if (!itemIds.current.has(index)) {
+      itemIds.current.set(index, `sortable-${idCounter.current++}`);
+    }
+    return itemIds.current.get(index)!;
+  };
 
   const addItem = () => {
     if (newItem.trim()) {
+      // Assign a new ID for the new item
+      const newIndex = value.length;
+      itemIds.current.set(newIndex, `sortable-${idCounter.current++}`);
       onChange([...value, newItem.trim()]);
       setNewItem("");
     }
   };
 
   const removeItem = (index: number) => {
+    // Rebuild ID map after removal
+    const newIds = new Map<number, string>();
+    let newIdx = 0;
+    value.forEach((_, i) => {
+      if (i !== index) {
+        newIds.set(newIdx++, itemIds.current.get(i) || `sortable-${idCounter.current++}`);
+      }
+    });
+    itemIds.current = newIds;
     onChange(value.filter((_, i) => i !== index));
   };
 
@@ -37,6 +59,15 @@ const SortableList: React.FC<{
     const newList = [...value];
     const [item] = newList.splice(from, 1);
     newList.splice(to, 0, item);
+
+    // Rebuild ID map to match new order
+    const oldIds = Array.from({ length: value.length }, (_, i) => itemIds.current.get(i));
+    const [movedId] = oldIds.splice(from, 1);
+    oldIds.splice(to, 0, movedId);
+    const newIds = new Map<number, string>();
+    oldIds.forEach((id, i) => newIds.set(i, id || `sortable-${idCounter.current++}`));
+    itemIds.current = newIds;
+
     onChange(newList);
   };
 
@@ -63,7 +94,7 @@ const SortableList: React.FC<{
         <ul className="space-y-1">
           {value.map((item, index) => (
             <li
-              key={index}
+              key={getItemId(index)}
               className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 group"
             >
               <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">{item}</span>
@@ -117,9 +148,20 @@ const KeyValueList: React.FC<{
 }> = ({ value = [], onChange, keyPlaceholder = "Name", valuePlaceholder = "Value" }) => {
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
+  const idCounter = useRef(0);
+  const itemIds = useRef<Map<number, string>>(new Map());
+
+  const getItemId = (index: number) => {
+    if (!itemIds.current.has(index)) {
+      itemIds.current.set(index, `kv-${idCounter.current++}`);
+    }
+    return itemIds.current.get(index)!;
+  };
 
   const addItem = () => {
     if (newKey.trim()) {
+      const newIndex = value.length;
+      itemIds.current.set(newIndex, `kv-${idCounter.current++}`);
       onChange([...value, { key: newKey.trim(), value: newValue.trim() }]);
       setNewKey("");
       setNewValue("");
@@ -127,6 +169,14 @@ const KeyValueList: React.FC<{
   };
 
   const removeItem = (index: number) => {
+    const newIds = new Map<number, string>();
+    let newIdx = 0;
+    value.forEach((_, i) => {
+      if (i !== index) {
+        newIds.set(newIdx++, itemIds.current.get(i) || `kv-${idCounter.current++}`);
+      }
+    });
+    itemIds.current = newIds;
     onChange(value.filter((_, i) => i !== index));
   };
 
@@ -160,7 +210,7 @@ const KeyValueList: React.FC<{
         <ul className="space-y-1">
           {value.map((item, index) => (
             <li
-              key={index}
+              key={getItemId(index)}
               className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 group"
             >
               <span className="font-medium text-sm text-gray-800 dark:text-white">{item.key}</span>
@@ -194,9 +244,20 @@ const PersonList: React.FC<{
 }> = ({ value = [], onChange }) => {
   const [showForm, setShowForm] = useState(false);
   const [newPerson, setNewPerson] = useState({ name: "", title: "", company: "", bio: "" });
+  const idCounter = useRef(0);
+  const itemIds = useRef<Map<number, string>>(new Map());
+
+  const getItemId = (index: number) => {
+    if (!itemIds.current.has(index)) {
+      itemIds.current.set(index, `person-${idCounter.current++}`);
+    }
+    return itemIds.current.get(index)!;
+  };
 
   const addPerson = () => {
     if (newPerson.name.trim()) {
+      const newIndex = value.length;
+      itemIds.current.set(newIndex, `person-${idCounter.current++}`);
       onChange([...value, { ...newPerson, name: newPerson.name.trim() }]);
       setNewPerson({ name: "", title: "", company: "", bio: "" });
       setShowForm(false);
@@ -204,6 +265,14 @@ const PersonList: React.FC<{
   };
 
   const removePerson = (index: number) => {
+    const newIds = new Map<number, string>();
+    let newIdx = 0;
+    value.forEach((_, i) => {
+      if (i !== index) {
+        newIds.set(newIdx++, itemIds.current.get(i) || `person-${idCounter.current++}`);
+      }
+    });
+    itemIds.current = newIds;
     onChange(value.filter((_, i) => i !== index));
   };
 
@@ -213,7 +282,7 @@ const PersonList: React.FC<{
         <div className="space-y-2">
           {value.map((person, index) => (
             <div
-              key={index}
+              key={getItemId(index)}
               className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 group"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400 font-medium flex-shrink-0">
@@ -316,9 +385,20 @@ const Checklist: React.FC<{
   onChange: (value: { text: string; completed: boolean }[]) => void;
 }> = ({ value = [], onChange }) => {
   const [newItem, setNewItem] = useState("");
+  const idCounter = useRef(0);
+  const itemIds = useRef<Map<number, string>>(new Map());
+
+  const getItemId = (index: number) => {
+    if (!itemIds.current.has(index)) {
+      itemIds.current.set(index, `check-${idCounter.current++}`);
+    }
+    return itemIds.current.get(index)!;
+  };
 
   const addItem = () => {
     if (newItem.trim()) {
+      const newIndex = value.length;
+      itemIds.current.set(newIndex, `check-${idCounter.current++}`);
       onChange([...value, { text: newItem.trim(), completed: false }]);
       setNewItem("");
     }
@@ -331,6 +411,14 @@ const Checklist: React.FC<{
   };
 
   const removeItem = (index: number) => {
+    const newIds = new Map<number, string>();
+    let newIdx = 0;
+    value.forEach((_, i) => {
+      if (i !== index) {
+        newIds.set(newIdx++, itemIds.current.get(i) || `check-${idCounter.current++}`);
+      }
+    });
+    itemIds.current = newIds;
     onChange(value.filter((_, i) => i !== index));
   };
 
@@ -357,7 +445,7 @@ const Checklist: React.FC<{
         <ul className="space-y-1">
           {value.map((item, index) => (
             <li
-              key={index}
+              key={getItemId(index)}
               className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800 group"
             >
               <button
@@ -659,12 +747,26 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {field.validation?.fileTypes
-                    ? `Accepted: ${field.validation.fileTypes.join(", ")}`
-                    : "Click to upload"}
+                  {value
+                    ? (value as string)
+                    : field.validation?.fileTypes
+                      ? `Accepted: ${field.validation.fileTypes.join(", ")}`
+                      : "Click to upload"}
                 </p>
               </div>
-              <input type="file" className="hidden" disabled={disabled} />
+              <input
+                type="file"
+                className="hidden"
+                disabled={disabled}
+                accept={field.validation?.fileTypes?.map(t => `.${t}`).join(",")}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // Store the file name - the actual file handling is done by the form's submit handler
+                    handleChange(file.name);
+                  }
+                }}
+              />
             </label>
           </div>
         );

@@ -4,6 +4,61 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl, isLocalDev } from "@/lib/url";
 
+// ── Subscription cache token helpers ──
+// Uses HMAC to sign the token so it can't be forged by clients
+async function createSubCacheToken(userId: string, tenantId: string, secret: string): Promise<string> {
+  const expiresAt = Date.now() + 300000; // 5 minutes
+  const payload = `${userId}:${tenantId}:${expiresAt}`;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  const sigHex = Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `${payload}:${sigHex}`;
+}
+
+async function verifySubCacheToken(
+  token: string,
+  userId: string,
+  secret: string
+): Promise<{ valid: boolean; tenantId?: string }> {
+  try {
+    const parts = token.split(":");
+    if (parts.length !== 4) return { valid: false };
+    const [tokenUserId, tokenTenantId, expiresAtStr, sigHex] = parts;
+
+    // Verify user matches (tenant is verified via signature)
+    if (tokenUserId !== userId) return { valid: false };
+
+    // Check expiration
+    const expiresAt = parseInt(expiresAtStr, 10);
+    if (isNaN(expiresAt) || Date.now() > expiresAt) return { valid: false };
+
+    // Verify signature
+    const payload = `${tokenUserId}:${tokenTenantId}:${expiresAtStr}`;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map((byte) => parseInt(byte, 16)));
+    const isValid = await crypto.subtle.verify("HMAC", key, sigBytes, encoder.encode(payload));
+    return isValid ? { valid: true, tenantId: tokenTenantId } : { valid: false };
+  } catch {
+    return { valid: false };
+  }
+}
+
 // Public routes that NEVER require authentication.
 // Checked early so we skip all auth work for these paths.
 const PUBLIC_PREFIXES = [
@@ -112,7 +167,18 @@ export async function middleware(request: NextRequest) {
   const { isMainDomain, subdomain, isCustomDomain } = parseHostname(hostname);
 
   // ── CSRF: Origin/Referer check for state-changing requests ──
-  const CSRF_EXEMPT = ["/api/stripe/webhook", "/api/cron", "/api/portal/auth"];
+  // Exempt webhooks, cron jobs, and public endpoints that accept cross-origin requests
+  // Public endpoints are protected by rate limiting instead
+  const CSRF_EXEMPT = [
+    "/api/stripe/webhook",
+    "/api/cron",
+    "/api/portal/auth",
+    "/api/forms/public",    // Public form submissions (rate limited)
+    "/api/book",            // Booking submissions (rate limited)
+    "/api/events/public",   // Event registration (rate limited)
+    "/api/contracts/public", // Contract viewing/signing (rate limited)
+    "/api/proposals/public", // Proposal viewing (rate limited)
+  ];
   if (
     ["POST", "PUT", "PATCH", "DELETE"].includes(request.method) &&
     pathname.startsWith("/api/") &&
@@ -241,8 +307,19 @@ export async function middleware(request: NextRequest) {
               .eq("id", prof.tenant_id)
               .single();
             if (t?.subdomain && !isLocalDev()) {
-              const url = new URL(request.url);
-              dashboardUrl = new URL(`${url.protocol}//${t.subdomain}.${url.host.split(":")[0]}${url.port ? ":" + url.port : ""}/dashboard`);
+              // Check if user is trying to access a different tenant's subdomain
+              if (subdomain && subdomain !== t.subdomain) {
+                // User is on wrong tenant subdomain - redirect to their own tenant with a hint
+                const url = new URL(request.url);
+                const redirectUrl = new URL(
+                  `${url.protocol}//${t.subdomain}.${url.host.split(":")[0].replace(`${subdomain}.`, "")}${url.port ? ":" + url.port : ""}/dashboard`
+                );
+                redirectUrl.searchParams.set("from_tenant", subdomain);
+                dashboardUrl = redirectUrl;
+              } else {
+                const url = new URL(request.url);
+                dashboardUrl = new URL(`${url.protocol}//${t.subdomain}.${url.host.split(":")[0]}${url.port ? ":" + url.port : ""}/dashboard`);
+              }
             }
           }
         } catch {
@@ -353,7 +430,11 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(apiResponse);
     }
     const signinUrl = new URL("/signin", request.url);
-    signinUrl.searchParams.set("redirect", pathname);
+    // Preserve full path including query params so user returns to exact location
+    const redirectPath = request.nextUrl.search
+      ? `${pathname}${request.nextUrl.search}`
+      : pathname;
+    signinUrl.searchParams.set("redirect", redirectPath);
     const redirectResponse = NextResponse.redirect(signinUrl);
     response.cookies.getAll().forEach((c) =>
       redirectResponse.cookies.set(c.name, c.value, {
@@ -365,59 +446,73 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Step 6: Subscription check (only for dashboard pages, not every API call) ──
-  // Uses a short-lived cookie cache to avoid querying the DB on every request
+  // Uses a short-lived signed cookie cache to avoid querying the DB on every request
   // (including RSC data fetches), which can cause a redirect/refresh loop when
   // the auth token refresh sets new cookies and invalidates the Router Cache.
+  // The cookie is HMAC-signed to prevent client-side forgery.
   if (pathname.startsWith("/dashboard") && !isBypassSubscription(pathname)) {
     const subCacheCookie = request.cookies.get("1i1_sub_ok");
-    const subCacheValid = subCacheCookie?.value === "1";
 
-    if (!subCacheValid) {
-      try {
-        // Use service role client for subscription check to bypass RLS
-        const serviceClient = isSupabaseConfigured
-          ? createClient(supabaseUrl!, supabaseServiceKey!)
-          : null;
-        const queryClient = serviceClient || supabase;
+    // Try to verify the cached token first (no DB call needed if valid)
+    if (subCacheCookie?.value && supabaseServiceKey) {
+      const tokenResult = await verifySubCacheToken(
+        subCacheCookie.value,
+        user.id,
+        supabaseServiceKey
+      );
+      if (tokenResult.valid) {
+        // Token is valid and not expired - subscription was recently verified
+        return applySecurityHeaders(response);
+      }
+    }
 
-        const { data: profile } = await queryClient
-          .from("profiles")
-          .select("tenant_id")
-          .eq("id", user.id)
-          .single();
+    // Token missing, invalid, or expired - verify subscription from DB
+    try {
+      const serviceClient = isSupabaseConfigured
+        ? createClient(supabaseUrl!, supabaseServiceKey!)
+        : null;
+      const queryClient = serviceClient || supabase;
 
-        if (profile?.tenant_id) {
-          const { data: subscription } = await queryClient
-            .from("tenant_subscriptions")
-            .select("plan_type, status")
-            .eq("tenant_id", profile.tenant_id)
-            .single();
+      const { data: profile } = await queryClient
+        .from("profiles")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .single();
 
-          if (!subscription || subscription.status !== "active") {
-            const subscribeUrl = new URL("/subscribe", request.url);
-            const redirectResponse = NextResponse.redirect(subscribeUrl);
-            response.cookies.getAll().forEach((c) =>
-              redirectResponse.cookies.set(c.name, c.value, {
-                domain: cookieDomain ?? undefined,
-                path: "/",
-              })
-            );
-            return applySecurityHeaders(redirectResponse);
-          }
-        } else {
-          const subscribeUrl = new URL("/subscribe", request.url);
-          const redirectResponse = NextResponse.redirect(subscribeUrl);
-          response.cookies.getAll().forEach((c) =>
-            redirectResponse.cookies.set(c.name, c.value, {
-              domain: cookieDomain ?? undefined,
-              path: "/",
-            })
-          );
-          return applySecurityHeaders(redirectResponse);
-        }
+      if (!profile?.tenant_id) {
+        const subscribeUrl = new URL("/subscribe", request.url);
+        const redirectResponse = NextResponse.redirect(subscribeUrl);
+        response.cookies.getAll().forEach((c) =>
+          redirectResponse.cookies.set(c.name, c.value, {
+            domain: cookieDomain ?? undefined,
+            path: "/",
+          })
+        );
+        return applySecurityHeaders(redirectResponse);
+      }
 
-        // Subscription is valid — cache for 5 minutes to prevent re-querying
-        response.cookies.set("1i1_sub_ok", "1", {
+      const { data: subscription } = await queryClient
+        .from("tenant_subscriptions")
+        .select("plan_type, status")
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (!subscription || subscription.status !== "active") {
+        const subscribeUrl = new URL("/subscribe", request.url);
+        const redirectResponse = NextResponse.redirect(subscribeUrl);
+        response.cookies.getAll().forEach((c) =>
+          redirectResponse.cookies.set(c.name, c.value, {
+            domain: cookieDomain ?? undefined,
+            path: "/",
+          })
+        );
+        return applySecurityHeaders(redirectResponse);
+      }
+
+      // Subscription is valid — create signed cache token
+      if (supabaseServiceKey) {
+        const signedToken = await createSubCacheToken(user.id, profile.tenant_id, supabaseServiceKey);
+        response.cookies.set("1i1_sub_ok", signedToken, {
           path: "/",
           httpOnly: true,
           sameSite: "lax",
@@ -425,10 +520,10 @@ export async function middleware(request: NextRequest) {
           maxAge: 300, // 5 minutes
           ...(cookieDomain ? { domain: cookieDomain } : {}),
         });
-      } catch (error) {
-        console.error("Middleware subscription check error:", error);
-        // On error, allow through but don't cache — will retry next request
       }
+    } catch (error) {
+      console.error("Middleware subscription check error:", error);
+      // On error, allow through but don't cache — will retry next request
     }
   }
 

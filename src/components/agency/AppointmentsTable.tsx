@@ -90,12 +90,14 @@ export const AppointmentsTable = () => {
       }
 
       const res = await fetch(url);
-      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch appointments");
+        // Try to parse error message, fallback to status text
+        const errorData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errorData.error || "Failed to fetch appointments");
       }
 
+      const data = await res.json();
       setAppointments(data.appointments || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch appointments");

@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { KanbanBoard } from "@/components/agency/KanbanBoard";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface Project {
   id: string;
@@ -31,6 +33,7 @@ export default function KanbanPage() {
   }, []);
 
   return (
+    <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
     <FeatureGate feature="kanban">
     <div className="space-y-6">
       {/* Page Header */}
@@ -130,5 +133,6 @@ export default function KanbanPage() {
       <KanbanBoard projectId={selectedProject || undefined} />
     </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }

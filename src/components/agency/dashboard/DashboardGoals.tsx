@@ -50,17 +50,22 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
   isLoading: propLoading,
 }) => {
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(propData === undefined);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Determine if we should use props or fetch ourselves
+  // If propLoading is provided (even if false), parent is managing data
+  const parentManagesData = propLoading !== undefined;
 
   // Use prop data if available
   const effectiveGoals = propData || goals;
-  const effectiveLoading = propLoading !== undefined ? propLoading : loading;
+  const effectiveLoading = parentManagesData ? (propLoading || false) : loading;
 
   const fetchGoals = useCallback(async () => {
-    // Skip fetch if data is provided via props
-    if (propData !== undefined) return;
+    // Skip fetch if parent is managing data
+    if (parentManagesData) return;
 
+    setLoading(true);
     try {
       const res = await fetch("/api/goals?status=active");
 
@@ -79,13 +84,13 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [propData]);
+  }, [parentManagesData]);
 
   useEffect(() => {
-    if (propData === undefined) {
+    if (!parentManagesData) {
       fetchGoals();
     }
-  }, [fetchGoals, propData]);
+  }, [fetchGoals, parentManagesData]);
 
   const getProgress = (goal: Goal) => {
     if (!goal.target_value || goal.target_value === 0) return 0;

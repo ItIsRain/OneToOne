@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-interface Bookmark {
+export interface Bookmark {
   id: string;
   entity_type: string;
   entity_id: string | null;
@@ -16,6 +16,9 @@ interface Bookmark {
 
 interface DashboardBookmarksProps {
   onAdd?: () => void;
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: Bookmark[];
+  isLoading?: boolean;
 }
 
 const entityTypeIcons: Record<string, React.ReactNode> = {
@@ -86,11 +89,27 @@ const gridItem = {
   show: { opacity: 1, scale: 1, transition: { duration: 0.25, ease: "easeOut" as const } },
 };
 
-export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd }) => {
+export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({
+  onAdd,
+  data: propData,
+  isLoading: propLoading,
+}) => {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  // Determine if we should use props or fetch ourselves
+  // If propLoading is provided (even if false), parent is managing data
+  const parentManagesData = propLoading !== undefined;
+
+  // Use prop data if available
+  const effectiveBookmarks = propData || bookmarks;
+  const effectiveLoading = parentManagesData ? (propLoading || false) : loading;
 
   const fetchBookmarks = useCallback(async () => {
+    // Skip fetch if parent is managing data
+    if (parentManagesData) return;
+
+    setLoading(true);
     try {
       const res = await fetch("/api/bookmarks");
       if (!res.ok) return;
@@ -101,11 +120,13 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [parentManagesData]);
 
   useEffect(() => {
-    fetchBookmarks();
-  }, [fetchBookmarks]);
+    if (!parentManagesData) {
+      fetchBookmarks();
+    }
+  }, [fetchBookmarks, parentManagesData]);
 
   const handleRemoveBookmark = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -129,7 +150,7 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
     return "#";
   };
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-4">
@@ -166,7 +187,7 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
         )}
       </div>
 
-      {bookmarks.length === 0 ? (
+      {effectiveBookmarks.length === 0 ? (
         <div className="text-center py-6">
           <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,7 +211,7 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
           initial="hidden"
           animate="show"
         >
-          {bookmarks.slice(0, 8).map((bookmark) => (
+          {effectiveBookmarks.slice(0, 8).map((bookmark) => (
             <motion.div key={bookmark.id} variants={gridItem}>
               <Link
                 href={getBookmarkUrl(bookmark)}
@@ -230,9 +251,9 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({ onAdd })
         </motion.div>
       )}
 
-      {bookmarks.length > 8 && (
+      {effectiveBookmarks.length > 8 && (
         <button className="w-full mt-3 text-center text-sm text-brand-500 hover:text-brand-600 font-medium py-1 transition-colors">
-          View all {bookmarks.length} bookmarks
+          View all {effectiveBookmarks.length} bookmarks
         </button>
       )}
     </div>

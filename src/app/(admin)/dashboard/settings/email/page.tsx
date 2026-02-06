@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
+"use client";
 import EmailSettingsClient from "./EmailSettingsClient";
 import { FeatureGate } from "@/components/ui/FeatureGate";
-
-export const metadata: Metadata = {
-  title: "Email Provider | Settings",
-  description: "Configure your custom email provider",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function EmailSettingsPage() {
   return (
-    <FeatureGate feature="email_provider">
+    <ProtectedPage permission={PERMISSIONS.SETTINGS_EDIT}>
+      <FeatureGate feature="email_provider">
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">
@@ -23,6 +21,7 @@ export default function EmailSettingsPage() {
           <EmailSettingsClient />
         </div>
       </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

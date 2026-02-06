@@ -577,7 +577,7 @@ export function MorningBriefing({ onDismiss, data: propData, isLoading: propLoad
                       className="flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
                     >
                       <span className="flex h-5 items-center rounded bg-warning-100 px-1.5 text-[10px] font-semibold text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
-                        {daysOverdue(task.dueDate!)}d LATE
+                        {task.dueDate ? `${daysOverdue(task.dueDate)}d LATE` : "OVERDUE"}
                       </span>
                       <span className="text-sm text-gray-700 dark:text-gray-300 truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                         {task.title}
@@ -712,14 +712,14 @@ export function MorningBriefing({ onDismiss, data: propData, isLoading: propLoad
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={member.avatarUrl}
-                          alt={member.name}
+                          alt={member.name || "Team member"}
                           className="h-6 w-6 rounded-full object-cover"
                         />
                       ) : (
-                        <InitialsAvatar name={member.name} />
+                        <InitialsAvatar name={member.name || "Team"} />
                       )}
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {member.name.split(" ")[0]}
+                        {member.name?.split(" ")[0] || "Team"}
                       </span>
                     </div>
                   ))}

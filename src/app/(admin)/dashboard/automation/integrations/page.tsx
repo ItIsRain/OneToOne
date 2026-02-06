@@ -1,15 +1,15 @@
-import { Metadata } from "next";
+"use client";
 import { IntegrationsSettings } from "@/components/agency/IntegrationsSettings";
 import FeatureGate from "@/components/ui/FeatureGate";
-
-export const metadata: Metadata = {
-  title: "Integrations | Automation",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function IntegrationsPage() {
   return (
-    <FeatureGate feature="workflows">
-      <IntegrationsSettings />
-    </FeatureGate>
+    <ProtectedPage permission={PERMISSIONS.INTEGRATIONS_MANAGE}>
+      <FeatureGate feature="workflows">
+        <IntegrationsSettings />
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

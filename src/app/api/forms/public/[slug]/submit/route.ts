@@ -3,6 +3,76 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
+// Payload limits to prevent DoS attacks
+const MAX_PAYLOAD_SIZE = 1 * 1024 * 1024; // 1MB
+const MAX_JSON_DEPTH = 10;
+
+/** Check depth of nested object to prevent deeply nested payloads */
+function getJsonDepth(obj: unknown, currentDepth = 0): number {
+  if (currentDepth > MAX_JSON_DEPTH) return currentDepth;
+  if (obj === null || typeof obj !== "object") return currentDepth;
+
+  let maxDepth = currentDepth;
+  const values = Array.isArray(obj) ? obj : Object.values(obj);
+  for (const value of values) {
+    const depth = getJsonDepth(value, currentDepth + 1);
+    if (depth > maxDepth) maxDepth = depth;
+    if (maxDepth > MAX_JSON_DEPTH) break; // Early exit
+  }
+  return maxDepth;
+}
+
+// Allowed fields for auto-create lead/contact with their expected types
+const ALLOWED_LEAD_FIELDS: Record<string, "string" | "number" | "email"> = {
+  name: "string",
+  email: "email",
+  phone: "string",
+  company: "string",
+  title: "string",
+  notes: "string",
+  value: "number",
+  priority: "string",
+};
+
+const ALLOWED_CONTACT_FIELDS: Record<string, "string" | "number" | "email"> = {
+  first_name: "string",
+  last_name: "string",
+  email: "email",
+  phone: "string",
+  company: "string",
+  job_title: "string",
+  notes: "string",
+};
+
+// Sanitize and validate a field value based on expected type
+function sanitizeFieldValue(value: unknown, expectedType: "string" | "number" | "email"): unknown | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (expectedType === "string") {
+    if (typeof value !== "string") return null;
+    // Trim and limit length to prevent abuse
+    return value.trim().slice(0, 1000);
+  }
+
+  if (expectedType === "email") {
+    if (typeof value !== "string") return null;
+    const email = value.trim().toLowerCase();
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+    return email.slice(0, 255);
+  }
+
+  if (expectedType === "number") {
+    const num = Number(value);
+    if (isNaN(num) || !isFinite(num)) return null;
+    return num;
+  }
+
+  return null;
+}
+
 // POST - Submit a form (NO AUTH REQUIRED)
 export async function POST(
   request: Request,
@@ -44,10 +114,22 @@ export async function POST(
       return NextResponse.json({ error: "Form not found or not published" }, { status: 404 });
     }
 
+    // Check Content-Length to prevent large payloads
+    const contentLength = parseInt(request.headers.get("content-length") || "0", 10);
+    if (contentLength > MAX_PAYLOAD_SIZE) {
+      return NextResponse.json({ error: "Payload too large (max 1MB)" }, { status: 413 });
+    }
+
     const body = await request.json();
 
     if (!body.data || typeof body.data !== "object") {
       return NextResponse.json({ error: "Submission data is required" }, { status: 400 });
+    }
+
+    // Validate JSON depth to prevent deeply nested payloads
+    const depth = getJsonDepth(body);
+    if (depth > MAX_JSON_DEPTH) {
+      return NextResponse.json({ error: `Payload too deeply nested (max depth: ${MAX_JSON_DEPTH})` }, { status: 400 });
     }
 
     // Save submission
@@ -69,15 +151,22 @@ export async function POST(
       return NextResponse.json({ error: submissionError.message }, { status: 500 });
     }
 
-    // Update submissions_count based on actual count to avoid race conditions
-    const { count: submissionCount } = await serviceClient
-      .from("form_submissions")
-      .select("*", { count: "exact", head: true })
-      .eq("form_id", form.id);
-    await serviceClient
-      .from("forms")
-      .update({ submissions_count: submissionCount || 0 })
-      .eq("id", form.id);
+    // Atomically increment submissions_count using raw SQL to avoid race conditions
+    try {
+      const { error: rpcError } = await serviceClient.rpc("increment_form_submissions_count", { form_id_param: form.id });
+      if (rpcError) throw rpcError;
+    } catch {
+      // Fallback if RPC function doesn't exist: use count-based approach
+      // This is eventually consistent under concurrent load
+      const { count: submissionCount } = await serviceClient
+        .from("form_submissions")
+        .select("*", { count: "exact", head: true })
+        .eq("form_id", form.id);
+      await serviceClient
+        .from("forms")
+        .update({ submissions_count: submissionCount || 0 })
+        .eq("id", form.id);
+    }
 
     // Auto-create lead if enabled
     if (form.auto_create_lead && form.lead_field_mapping) {
@@ -91,8 +180,15 @@ export async function POST(
         };
 
         for (const [leadField, formFieldId] of Object.entries(mapping)) {
+          // Only allow known safe fields
+          const expectedType = ALLOWED_LEAD_FIELDS[leadField];
+          if (!expectedType) continue;
+
           if (body.data[formFieldId] !== undefined) {
-            leadData[leadField] = body.data[formFieldId];
+            const sanitizedValue = sanitizeFieldValue(body.data[formFieldId], expectedType);
+            if (sanitizedValue !== null) {
+              leadData[leadField] = sanitizedValue;
+            }
           }
         }
 
@@ -116,8 +212,15 @@ export async function POST(
         };
 
         for (const [contactField, formFieldId] of Object.entries(mapping)) {
+          // Only allow known safe fields
+          const expectedType = ALLOWED_CONTACT_FIELDS[contactField];
+          if (!expectedType) continue;
+
           if (body.data[formFieldId] !== undefined) {
-            contactData[contactField] = body.data[formFieldId];
+            const sanitizedValue = sanitizeFieldValue(body.data[formFieldId], expectedType);
+            if (sanitizedValue !== null) {
+              contactData[contactField] = sanitizedValue;
+            }
           }
         }
 
@@ -153,16 +256,19 @@ export async function POST(
         .single();
 
       if (survey) {
-        // Increment survey response count
-        const { data: surveyData } = await serviceClient
-          .from("surveys")
-          .select("response_count")
-          .eq("id", survey.id)
-          .single();
-        if (surveyData) {
+        // Atomically increment survey response_count to avoid race conditions
+        try {
+          const { error: rpcError } = await serviceClient.rpc("increment_survey_response_count", { survey_id_param: survey.id });
+          if (rpcError) throw rpcError;
+        } catch {
+          // Fallback if RPC function doesn't exist: use count-based approach
+          const { count: responseCount } = await serviceClient
+            .from("form_submissions")
+            .select("*", { count: "exact", head: true })
+            .eq("form_id", form.id);
           await serviceClient
             .from("surveys")
-            .update({ response_count: (surveyData.response_count || 0) + 1 })
+            .update({ response_count: responseCount || 0 })
             .eq("id", survey.id);
         }
 

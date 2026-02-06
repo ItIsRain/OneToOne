@@ -43,8 +43,18 @@ async function getCroppedImg(
 function createImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image));
-    image.addEventListener("error", (error) => reject(error));
+    // Use onload/onerror instead of addEventListener to avoid memory leaks
+    // These are automatically cleaned up when the image is garbage collected
+    image.onload = () => {
+      image.onload = null;
+      image.onerror = null;
+      resolve(image);
+    };
+    image.onerror = (error) => {
+      image.onload = null;
+      image.onerror = null;
+      reject(error);
+    };
     image.src = url;
   });
 }

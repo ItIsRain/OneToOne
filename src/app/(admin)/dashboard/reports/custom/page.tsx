@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { CreateCustomReportModal } from "@/components/agency/modals";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const savedReports = [
   { id: 1, name: "Monthly Client Revenue", lastRun: "Jan 25, 2025", schedule: "Monthly" },
@@ -13,8 +15,9 @@ export default function CustomReportsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <FeatureGate feature="advanced_analytics">
-    <div className="space-y-6">
+    <ProtectedPage permission={PERMISSIONS.REPORTS_VIEW}>
+      <FeatureGate feature="advanced_analytics">
+        <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Custom Reports</h1>
@@ -95,8 +98,9 @@ export default function CustomReportsPage() {
         </div>
       </div>
 
-      <CreateCustomReportModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-    </div>
-    </FeatureGate>
+        <CreateCustomReportModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+        </div>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

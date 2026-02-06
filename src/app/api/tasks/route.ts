@@ -147,28 +147,28 @@ export async function POST(request: NextRequest) {
 
     // Validate assigned_to belongs to same tenant
     if (filtered.assigned_to) {
-      const { data: assignee } = await supabase
+      const { data: assignee, error: assigneeError } = await supabase
         .from("profiles")
         .select("id")
         .eq("id", filtered.assigned_to as string)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
-      if (!assignee) {
+      if (assigneeError || !assignee) {
         return NextResponse.json({ error: "Assigned user not found in your organization" }, { status: 400 });
       }
     }
 
     // Validate parent_task_id belongs to same tenant and prevent self-reference
     if (filtered.parent_task_id) {
-      const { data: parentTask } = await supabase
+      const { data: parentTask, error: parentError } = await supabase
         .from("tasks")
         .select("id")
         .eq("id", filtered.parent_task_id as string)
         .eq("tenant_id", profile.tenant_id)
         .single();
 
-      if (!parentTask) {
+      if (parentError || !parentTask) {
         return NextResponse.json({ error: "Parent task not found" }, { status: 400 });
       }
     }

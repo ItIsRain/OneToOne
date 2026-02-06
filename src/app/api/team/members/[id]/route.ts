@@ -268,6 +268,34 @@ export async function PATCH(
       if (body[field] === "") body[field] = null;
     });
 
+    // Validate custom_role_id belongs to the same tenant (security: prevent cross-tenant role assignment)
+    if (body.custom_role_id && body.custom_role_id !== null) {
+      const { data: role, error: roleError } = await supabase
+        .from("roles")
+        .select("id")
+        .eq("id", body.custom_role_id)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .single();
+
+      if (roleError || !role) {
+        return NextResponse.json({ error: "Custom role not found" }, { status: 404 });
+      }
+    }
+
+    // Validate manager_id belongs to the same tenant (security: prevent cross-tenant manager assignment)
+    if (body.manager_id && body.manager_id !== null) {
+      const { data: manager, error: managerError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", body.manager_id)
+        .eq("tenant_id", currentProfile.tenant_id)
+        .single();
+
+      if (managerError || !manager) {
+        return NextResponse.json({ error: "Manager not found" }, { status: 404 });
+      }
+    }
+
     // Build update object with allowed fields
     // Non-admins can only update limited fields
     const adminOnlyFields = [

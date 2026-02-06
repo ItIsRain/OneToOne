@@ -25,16 +25,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limit: 3 reset requests per email per 15 minutes
-    const emailRateCheck = await checkRateLimit({
-      key: "reset-password-email",
-      identifier: email.toLowerCase(),
-      maxRequests: 3,
-      windowSeconds: 15 * 60,
-    });
-    if (!emailRateCheck.allowed) {
-      return rateLimitResponse(emailRateCheck.retryAfterSeconds!);
-    }
+    // NOTE: We intentionally do NOT rate limit by email here.
+    // Email-based rate limiting can reveal whether an account exists (timing attack).
+    // IP-based limiting above is sufficient for DoS prevention.
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

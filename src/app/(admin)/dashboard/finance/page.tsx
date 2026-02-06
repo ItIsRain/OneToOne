@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Badge from "@/components/ui/badge/Badge";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface FinanceStats {
   invoiceStats: {
@@ -173,6 +175,7 @@ export default function FinanceOverviewPage() {
   const collectionGrowthPositive = (stats?.growth.collection || 0) >= 0;
 
   return (
+    <ProtectedPage permission={PERMISSIONS.FINANCE_VIEW}>
     <FeatureGate feature="finance">
     <div className="space-y-6">
       {/* Header */}
@@ -566,5 +569,6 @@ export default function FinanceOverviewPage() {
       </div>
     </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }

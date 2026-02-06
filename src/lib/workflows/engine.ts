@@ -8,19 +8,87 @@ import {
   documentSharedEmail,
 } from "@/lib/email-templates";
 
+// Default workflow execution timeout: 30 seconds per step, 5 minutes total
+const DEFAULT_STEP_TIMEOUT_MS = 30000;
+const DEFAULT_TOTAL_TIMEOUT_MS = 300000;
+
+/**
+ * Validate webhook URLs to prevent SSRF attacks.
+ * Blocks internal IPs and ensures HTTPS for external calls.
+ */
+function validateWebhookUrl(url: string): { valid: boolean; error?: string } {
+  try {
+    const parsed = new URL(url);
+
+    // Require HTTPS for security (allow HTTP only for localhost in dev)
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return { valid: false, error: "Invalid protocol - only HTTP(S) allowed" };
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block localhost and loopback
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]") {
+      return { valid: false, error: "Localhost URLs not allowed" };
+    }
+
+    // Block private IP ranges (IPv4)
+    const privateIpPatterns = [
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,     // 10.0.0.0/8
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/, // 172.16.0.0/12
+      /^192\.168\.\d{1,3}\.\d{1,3}$/,        // 192.168.0.0/16
+      /^169\.254\.\d{1,3}\.\d{1,3}$/,        // 169.254.0.0/16 (link-local)
+      /^0\.0\.0\.0$/,                         // All interfaces
+    ];
+
+    for (const pattern of privateIpPatterns) {
+      if (pattern.test(hostname)) {
+        return { valid: false, error: "Private/internal IP addresses not allowed" };
+      }
+    }
+
+    // Block common internal hostnames
+    const blockedHostnames = ["metadata", "metadata.google.internal", "169.254.169.254"];
+    if (blockedHostnames.includes(hostname)) {
+      return { valid: false, error: "Blocked internal hostname" };
+    }
+
+    // Block cloud metadata endpoints (AWS, GCP, Azure)
+    if (hostname === "169.254.169.254" || hostname.endsWith(".internal") ||
+        hostname.includes("metadata.azure") || hostname.includes("metadata.google")) {
+      return { valid: false, error: "Cloud metadata endpoints not allowed" };
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, error: "Invalid URL format" };
+  }
+}
+
 /**
  * Execute a workflow by running its steps in order.
  * Supports: create_task, create_project, create_event, send_notification,
  * update_status, update_field, assign_to, add_tag, approval, wait_delay,
  * send_email, condition, webhook
+ *
+ * @param workflowId - The workflow to execute
+ * @param triggerData - Data from the triggering event
+ * @param supabase - Supabase client
+ * @param userId - User who triggered the workflow
+ * @param tenantId - Tenant ID for isolation
+ * @param options - Optional execution options (timeouts)
  */
 export async function executeWorkflow(
   workflowId: string,
   triggerData: Record<string, unknown>,
   supabase: SupabaseClient,
   userId: string,
-  tenantId: string
+  tenantId: string,
+  options?: { stepTimeoutMs?: number; totalTimeoutMs?: number }
 ): Promise<string> {
+  const stepTimeoutMs = options?.stepTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
+  const totalTimeoutMs = options?.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
+  const startTime = Date.now();
   // Create workflow run record
   const { data: run, error: runError } = await supabase
     .from("workflow_runs")
@@ -56,7 +124,46 @@ export async function executeWorkflow(
   // Context accumulates outputs from previous steps so later steps can reference them
   const context: Record<string, unknown> = { ...triggerData };
 
+  // Track created resources for potential rollback on failure
+  const createdResources: Array<{ type: string; id: string }> = [];
+
+  // Rollback function to clean up created resources
+  async function rollbackCreatedResources() {
+    for (const resource of createdResources.reverse()) {
+      try {
+        const tableName = {
+          task: "tasks",
+          project: "projects",
+          event: "events",
+          invoice: "invoices",
+          expense: "expenses",
+          contract: "contracts",
+          lead: "leads",
+          contact: "contacts",
+        }[resource.type];
+
+        if (tableName) {
+          await supabase
+            .from(tableName)
+            .delete()
+            .eq("id", resource.id)
+            .eq("tenant_id", tenantId);
+
+          console.log(`[WORKFLOW ROLLBACK] Deleted ${resource.type} ${resource.id}`);
+        }
+      } catch (rollbackError) {
+        console.error(`[WORKFLOW ROLLBACK] Failed to delete ${resource.type} ${resource.id}:`, rollbackError);
+      }
+    }
+  }
+
   for (const step of steps) {
+    // Check total workflow timeout
+    if (Date.now() - startTime > totalTimeoutMs) {
+      await markRunStatus(supabase, runId, "failed", `Workflow exceeded maximum execution time of ${totalTimeoutMs / 1000}s`);
+      return runId;
+    }
+
     const config = step.config as Record<string, unknown>;
 
     // Create step execution record
@@ -77,7 +184,8 @@ export async function executeWorkflow(
     }
 
     try {
-      const output = await executeStep(
+      // Execute step with timeout
+      const stepPromise = executeStep(
         step.step_type,
         config,
         context,
@@ -89,6 +197,12 @@ export async function executeWorkflow(
         stepExec.id
       );
 
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Step timed out after ${stepTimeoutMs / 1000}s`)), stepTimeoutMs);
+      });
+
+      const output = await Promise.race([stepPromise, timeoutPromise]);
+
       // If the step paused execution (approval / wait_delay), stop here
       if (output?.__paused) {
         return runId;
@@ -97,6 +211,32 @@ export async function executeWorkflow(
       // Merge output into context for subsequent steps
       if (output) {
         Object.assign(context, output);
+
+        // Track created resources for potential rollback
+        if (output.created_task_id) {
+          createdResources.push({ type: "task", id: output.created_task_id as string });
+        }
+        if (output.created_project_id) {
+          createdResources.push({ type: "project", id: output.created_project_id as string });
+        }
+        if (output.created_event_id) {
+          createdResources.push({ type: "event", id: output.created_event_id as string });
+        }
+        if (output.created_invoice_id) {
+          createdResources.push({ type: "invoice", id: output.created_invoice_id as string });
+        }
+        if (output.created_expense_id) {
+          createdResources.push({ type: "expense", id: output.created_expense_id as string });
+        }
+        if (output.created_contract_id) {
+          createdResources.push({ type: "contract", id: output.created_contract_id as string });
+        }
+        if (output.created_lead_id) {
+          createdResources.push({ type: "lead", id: output.created_lead_id as string });
+        }
+        if (output.created_contact_id) {
+          createdResources.push({ type: "contact", id: output.created_contact_id as string });
+        }
       }
 
       // Mark step completed
@@ -112,6 +252,12 @@ export async function executeWorkflow(
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
+      // Attempt to rollback created resources from previous steps
+      if (createdResources.length > 0) {
+        console.log(`[WORKFLOW] Step failed, attempting rollback of ${createdResources.length} created resources`);
+        await rollbackCreatedResources();
+      }
+
       await supabase
         .from("workflow_step_executions")
         .update({
@@ -121,7 +267,7 @@ export async function executeWorkflow(
         })
         .eq("id", stepExec.id);
 
-      await markRunStatus(supabase, runId, "failed", errorMessage);
+      await markRunStatus(supabase, runId, "failed", errorMessage + (createdResources.length > 0 ? " (rollback attempted)" : ""));
       return runId;
     }
   }
@@ -607,6 +753,12 @@ async function executeStep(
       const url = resolved.url as string;
       if (!url) throw new Error("Missing webhook URL");
 
+      // SSRF protection: validate webhook URL
+      const urlValidation = validateWebhookUrl(url);
+      if (!urlValidation.valid) {
+        throw new Error(`Invalid webhook URL: ${urlValidation.error}`);
+      }
+
       const method = (resolved.method as string)?.toUpperCase() || "POST";
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (resolved.auth_header) {
@@ -811,6 +963,12 @@ async function executeStep(
     case "http_request": {
       const url = resolved.url as string;
       if (!url) throw new Error("Missing HTTP request URL");
+
+      // SSRF protection: validate URL
+      const urlValidation = validateWebhookUrl(url);
+      if (!urlValidation.valid) {
+        throw new Error(`Invalid HTTP request URL: ${urlValidation.error}`);
+      }
 
       const method = (resolved.method as string)?.toUpperCase() || "POST";
       const contentType = (resolved.content_type as string) || "application/json";
@@ -2034,11 +2192,50 @@ async function markRunStatus(supabase: SupabaseClient, runId: string, status: st
 }
 
 /**
+ * Sanitize a string value before template substitution to prevent:
+ * 1. Template injection (user data containing {{...}})
+ * 2. XSS via HTML entities
+ * 3. Control character attacks
+ * 4. DoS via extremely long strings
+ */
+const MAX_TEMPLATE_VALUE_LENGTH = 10000;
+
+function sanitizeTemplateValue(value: string): string {
+  let sanitized = value;
+
+  // 1. Limit length to prevent DoS
+  if (sanitized.length > MAX_TEMPLATE_VALUE_LENGTH) {
+    sanitized = sanitized.slice(0, MAX_TEMPLATE_VALUE_LENGTH);
+  }
+
+  // 2. Remove null bytes and other dangerous control characters
+  // Keep only printable characters, newlines, and tabs
+  sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+
+  // 3. Escape template syntax to prevent second-order template injection
+  // Users might include {{malicious}} in their data
+  sanitized = sanitized.replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }");
+
+  // 4. Escape HTML entities to prevent XSS when values end up in HTML
+  // This is safe for all contexts (JSON, text, HTML)
+  sanitized = sanitized
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+
+  return sanitized;
+}
+
+/**
  * Replace {{variable}} placeholders in config string values with context values.
  * Supports:
  * - Simple variables: {{entity_id}}
  * - Dot-notation for nested objects: {{trigger.entity_name}}
  * - Built-in variables: {{now}} (ISO date), {{today}} (YYYY-MM-DD), {{run_id}}
+ *
+ * All substituted values are sanitized to prevent injection attacks.
  */
 function resolveTemplates(
   config: Record<string, unknown>,
@@ -2049,7 +2246,7 @@ function resolveTemplates(
   for (const [key, value] of Object.entries(config)) {
     if (typeof value === "string") {
       resolved[key] = value.replace(/\{\{([\w.]+)\}\}/g, (_, varName: string) => {
-        // Built-in variables
+        // Built-in variables (safe, not user-controlled)
         if (varName === "now") return new Date().toISOString();
         if (varName === "today") return new Date().toISOString().slice(0, 10);
         if (varName === "run_id") return String(context.run_id ?? "");
@@ -2064,7 +2261,11 @@ function resolveTemplates(
           current = (current as Record<string, unknown>)[part];
         }
 
-        return current !== undefined && current !== null ? String(current) : "";
+        // Sanitize user-controlled values before substitution
+        if (current !== undefined && current !== null) {
+          return sanitizeTemplateValue(String(current));
+        }
+        return "";
       });
     } else {
       resolved[key] = value;

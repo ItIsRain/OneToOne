@@ -3,6 +3,8 @@ import React from "react";
 import { ArrowUpIcon, ArrowDownIcon } from "@/icons";
 import Badge from "@/components/ui/badge/Badge";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const salesData = [
   { month: "Jan", revenue: 45000, deals: 12, conversion: 28 },
@@ -20,8 +22,9 @@ const topClients = [
 
 export default function SalesReportsPage() {
   return (
-    <FeatureGate feature="advanced_analytics">
-    <div className="space-y-6">
+    <ProtectedPage permission={PERMISSIONS.REPORTS_VIEW}>
+      <FeatureGate feature="advanced_analytics">
+        <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white/90">Sales Reports</h1>
         <p className="text-gray-500 dark:text-gray-400">Track sales performance and trends</p>
@@ -98,8 +101,9 @@ export default function SalesReportsPage() {
             ))}
           </div>
         </div>
-      </div>
-    </div>
-    </FeatureGate>
+        </div>
+        </div>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

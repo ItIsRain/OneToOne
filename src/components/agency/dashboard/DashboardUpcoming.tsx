@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Badge from "@/components/ui/badge/Badge";
 
@@ -14,16 +14,22 @@ interface Task {
 
 interface Event {
   id: string;
-  name: string;
+  title: string;
   start_date: string;
   end_date: string | null;
   status: string;
   event_type: string | null;
 }
 
-interface UpcomingData {
+export interface UpcomingData {
   tasks: Task[];
   events: Event[];
+}
+
+interface DashboardUpcomingProps {
+  // Optional: pre-loaded data from parent (combined endpoint)
+  data?: UpcomingData | null;
+  isLoading?: boolean;
 }
 
 const priorityColors: Record<string, "success" | "warning" | "error" | "primary" | "light"> = {
@@ -43,30 +49,54 @@ const listItem = {
   show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" as const } },
 };
 
-export const DashboardUpcoming: React.FC = () => {
+export const DashboardUpcoming: React.FC<DashboardUpcomingProps> = ({
+  data: propData,
+  isLoading: propLoading,
+}) => {
   const [data, setData] = useState<UpcomingData>({ tasks: [], events: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<"tasks" | "events">("tasks");
 
-  const fetchUpcoming = useCallback(async () => {
-    try {
-      const res = await fetch("/api/dashboard/stats");
-      if (!res.ok) return;
-      const result = await res.json();
+  // Determine if we should use props or fetch ourselves
+  // If propLoading is provided (even if false), parent is managing data
+  const parentManagesData = propLoading !== undefined;
 
-      if (result.upcoming) {
-        setData(result.upcoming);
-      }
-    } catch (err) {
-      console.error("Failed to fetch upcoming items:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Use prop data if available
+  const effectiveData = propData || data;
+  const effectiveLoading = parentManagesData ? (propLoading || false) : loading;
 
   useEffect(() => {
-    fetchUpcoming();
-  }, [fetchUpcoming]);
+    // Skip fetch if parent is managing data
+    if (parentManagesData) return;
+
+    const abortController = new AbortController();
+    setLoading(true);
+    setError(false);
+
+    fetch("/api/dashboard/stats", { signal: abortController.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch");
+        return res.json();
+      })
+      .then((result) => {
+        if (!abortController.signal.aborted && result.upcoming) {
+          setData(result.upcoming);
+        }
+      })
+      .catch((err) => {
+        if (!abortController.signal.aborted && err.name !== "AbortError") {
+          setError(true);
+        }
+      })
+      .finally(() => {
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => abortController.abort();
+  }, [parentManagesData]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -107,7 +137,7 @@ export const DashboardUpcoming: React.FC = () => {
     return new Date(dateString) < new Date();
   };
 
-  if (loading) {
+  if (effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="h-6 w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
@@ -126,7 +156,25 @@ export const DashboardUpcoming: React.FC = () => {
     );
   }
 
-  const isEmpty = data.tasks.length === 0 && data.events.length === 0;
+  if (error && !parentManagesData) {
+    return (
+      <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Upcoming This Week
+        </h3>
+        <div className="text-center py-8">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-error-100 dark:bg-error-500/15 flex items-center justify-center">
+            <svg className="w-6 h-6 text-error-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Failed to load upcoming items</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isEmpty = effectiveData.tasks.length === 0 && effectiveData.events.length === 0;
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
@@ -148,7 +196,7 @@ export const DashboardUpcoming: React.FC = () => {
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            {tab === "tasks" ? "Tasks" : "Events"} ({tab === "tasks" ? data.tasks.length : data.events.length})
+            {tab === "tasks" ? "Tasks" : "Events"} ({tab === "tasks" ? effectiveData.tasks.length : effectiveData.events.length})
           </button>
         ))}
       </div>
@@ -173,13 +221,13 @@ export const DashboardUpcoming: React.FC = () => {
           >
             {activeTab === "tasks" && (
               <>
-                {data.tasks.length === 0 ? (
+                {effectiveData.tasks.length === 0 ? (
                   <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
                     No tasks due this week
                   </p>
                 ) : (
                   <motion.div className="space-y-2" variants={listContainer} initial="hidden" animate="show">
-                    {data.tasks.map((task) => {
+                    {effectiveData.tasks.map((task) => {
                       const chip = getDateChip(task.due_date);
                       const overdue = isOverdue(task.due_date);
                       return (
@@ -231,13 +279,13 @@ export const DashboardUpcoming: React.FC = () => {
 
             {activeTab === "events" && (
               <>
-                {data.events.length === 0 ? (
+                {effectiveData.events.length === 0 ? (
                   <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
                     No events this week
                   </p>
                 ) : (
                   <motion.div className="space-y-2" variants={listContainer} initial="hidden" animate="show">
-                    {data.events.map((event) => {
+                    {effectiveData.events.map((event) => {
                       const chip = getDateChip(event.start_date);
                       return (
                         <motion.div
@@ -255,7 +303,7 @@ export const DashboardUpcoming: React.FC = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                              {event.name}
+                              {event.title}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-xs text-gray-500 dark:text-gray-400">

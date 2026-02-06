@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import PortalHeader from "@/components/portal/PortalHeader";
 import PortalFooter from "@/components/portal/PortalFooter";
 import EventsListing from "./EventsListing";
+import Script from "next/script";
 import type { Metadata } from "next";
+import { generateBreadcrumbSchema, generateEventListSchema } from "@/lib/seo/schemas";
 
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantFromHeaders();
@@ -83,8 +85,44 @@ export default async function PublicEventsPage() {
     }
   }
 
+  // Generate structured data for SEO
+  const tenantUrl = `https://${tenant.subdomain}.1i1.ae`;
+
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: tenant.name || "Home", url: tenantUrl },
+    { name: "Events", url: `${tenantUrl}/events` },
+  ]);
+
+  const eventListSchema = events.length > 0
+    ? generateEventListSchema(
+        events.slice(0, 10).map((event) => ({
+          name: event.title,
+          url: `${tenantUrl}/event/${event.slug}`,
+          image: event.cover_image || undefined,
+        }))
+      )
+    : null;
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col">
+      {/* JSON-LD Structured Data */}
+      <Script
+        id="events-breadcrumb-jsonld"
+        type="application/ld+json"
+        strategy="afterInteractive"
+      >
+        {JSON.stringify(breadcrumbSchema)}
+      </Script>
+      {eventListSchema && (
+        <Script
+          id="events-list-jsonld"
+          type="application/ld+json"
+          strategy="afterInteractive"
+        >
+          {JSON.stringify(eventListSchema)}
+        </Script>
+      )}
+
       <PortalHeader
         tenantName={tenant.name || "Portal"}
         logoUrl={tenant.logoUrl}

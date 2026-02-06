@@ -127,6 +127,34 @@ export async function PATCH(
       return NextResponse.json({ error: "Only admins can approve or reimburse expenses" }, { status: 403 });
     }
 
+    // Validate expense status transitions
+    if (body.status) {
+      // Fetch current expense status
+      const { data: currentExpense } = await supabase
+        .from("expenses")
+        .select("status")
+        .eq("id", id)
+        .eq("tenant_id", profile.tenant_id)
+        .single();
+
+      if (currentExpense && body.status !== currentExpense.status) {
+        const validTransitions: Record<string, string[]> = {
+          pending: ["approved", "rejected"],
+          approved: ["reimbursed", "rejected", "pending"], // Can revert to pending if mistake
+          rejected: ["pending"], // Can resubmit after rejection
+          reimbursed: [], // Final state - cannot change
+        };
+
+        const allowed = validTransitions[currentExpense.status] || [];
+        if (!allowed.includes(body.status)) {
+          return NextResponse.json(
+            { error: `Cannot transition expense from "${currentExpense.status}" to "${body.status}"` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Validate FK references belong to the same tenant
     if (body.project_id) {
       const { data: project } = await supabase

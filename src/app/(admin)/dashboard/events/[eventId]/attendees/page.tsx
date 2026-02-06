@@ -6,6 +6,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import EventAttendeesTable from "@/components/agency/EventAttendeesTable";
 import AddAttendeeModal from "@/components/agency/modals/AddAttendeeModal";
 import AttendeeDetailsSidebar from "@/components/agency/sidebars/AttendeeDetailsSidebar";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface Attendee {
   id: string;
@@ -183,33 +185,37 @@ export default function EventAttendeesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 dark:text-gray-400">Loading attendees...</p>
+      <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-gray-500 dark:text-gray-400">Loading attendees...</p>
+          </div>
         </div>
-      </div>
+      </ProtectedPage>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button
-            onClick={() => router.push("/dashboard/events")}
-            className="text-blue-500 hover:underline"
-          >
-            Back to Events
-          </button>
+      <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <button
+              onClick={() => router.push("/dashboard/events")}
+              className="text-blue-500 hover:underline"
+            >
+              Back to Events
+            </button>
+          </div>
         </div>
-      </div>
+      </ProtectedPage>
     );
   }
 
   return (
-    <div>
+    <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
       <PageBreadcrumb pageTitle={`${event?.title || "Event"} - Attendees`} />
 
       {/* Stats Cards */}
@@ -310,6 +316,6 @@ export default function EventAttendeesPage() {
           onConvertToLead={() => handleConvertToLead(selectedAttendee.id)}
         />
       )}
-    </div>
+    </ProtectedPage>
   );
 }

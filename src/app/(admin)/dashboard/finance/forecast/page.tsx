@@ -5,6 +5,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -566,6 +568,7 @@ export default function RevenueForecasPage() {
   ];
 
   return (
+    <ProtectedPage permission={PERMISSIONS.FINANCE_VIEW}>
     <FeatureGate feature="finance">
       <div className="space-y-6">
         {/* Header */}
@@ -755,5 +758,6 @@ export default function RevenueForecasPage() {
         </div>
       </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }

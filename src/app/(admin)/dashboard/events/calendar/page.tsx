@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { EventDetailsSidebar } from "@/components/agency/sidebars";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface Event {
   id: string;
@@ -217,7 +219,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <>
+    <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
       <div className="space-y-6">
         {/* Page Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -479,6 +481,6 @@ export default function CalendarPage() {
         event={selectedEvent}
         onUpdate={fetchEvents}
       />
-    </>
+    </ProtectedPage>
   );
 }

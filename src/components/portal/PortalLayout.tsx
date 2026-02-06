@@ -118,16 +118,18 @@ export const PortalLayout: React.FC<PortalLayoutProps> = ({
                 <img
                   src={logoUrl}
                   alt={tenantName}
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="h-10 max-w-[180px] object-contain"
                 />
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold text-white">
-                  {tenantName.charAt(0).toUpperCase()}
-                </div>
+                <>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold text-white">
+                    {tenantName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-lg font-semibold text-white">
+                    {tenantName}
+                  </span>
+                </>
               )}
-              <span className="text-lg font-semibold text-white">
-                {tenantName}
-              </span>
             </div>
 
             {/* Desktop Nav */}

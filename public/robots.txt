@@ -6,19 +6,43 @@ Allow: /
 Allow: /signin
 Allow: /signup
 Allow: /subscribe
-Allow: /events/public/
+Allow: /event/
+Allow: /events
 Allow: /book/
 Allow: /portal/
 
-# Disallow admin/dashboard areas
+# Disallow admin/dashboard areas (private content)
 Disallow: /dashboard
 Disallow: /api/
 Disallow: /judge/
 Disallow: /share/
+
+# Disallow private/error pages
 Disallow: /invalid-subdomain
 Disallow: /unverified-domain
 Disallow: /reset-password
 Disallow: /update-password
 
+# Disallow invoice pages (private financial data)
+Disallow: /invoice/
+
+# Crawl-delay for politeness (optional)
+Crawl-delay: 1
+
 # Sitemap
 Sitemap: https://1i1.ae/sitemap.xml
+
+# Google-specific rules
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /invoice/
+
+# Bing-specific rules
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /invoice/
+

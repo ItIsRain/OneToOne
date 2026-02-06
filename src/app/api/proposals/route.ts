@@ -193,9 +193,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Auto-generate slug from title
+    // Auto-generate slug from title with high-entropy suffix for security
     const baseSlug = body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const randomSuffix = crypto.randomUUID().substring(0, 8);
+    // Use 24 chars from UUID for ~2^96 combinations - practically unguessable
+    const randomSuffix = crypto.randomUUID().replace(/-/g, '').substring(0, 24);
     const slug = `${baseSlug}-${randomSuffix}`;
 
     const proposalData = {

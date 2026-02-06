@@ -139,6 +139,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, stripe:
       stripe_customer_id: session.customer as string,
       current_period_start: periodStart,
       current_period_end: periodEnd,
+      is_trial: isTrialing,
+      trial_ends_at: isTrialing && subscriptionData.trial_end
+        ? new Date(subscriptionData.trial_end * 1000).toISOString()
+        : null,
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);
@@ -221,6 +225,10 @@ async function handleSubscriptionUpdated(subscriptionEvent: Stripe.Subscription,
       current_period_start: periodStart,
       current_period_end: periodEnd,
       cancel_at_period_end: subscription.cancel_at_period_end,
+      is_trial: isTrialing,
+      trial_ends_at: isTrialing && subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : null,
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId);

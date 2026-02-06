@@ -13,6 +13,7 @@ export type Profile = {
   email: string;
   avatar_url: string | null;
   role: string;
+  custom_role_id: string | null;
   phone: string | null;
   bio: string | null;
   country: string | null;
@@ -87,10 +88,63 @@ export function clearSessionOnlyCookies() {
   document.cookie = `1i1_was_session_only=; Path=/${domain}; SameSite=Lax${secure}; Max-Age=0`;
 }
 
+// Profile caching for instant load
+const PROFILE_CACHE_KEY = "profile_cache_v1";
+const PROFILE_CACHE_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+interface CachedProfile {
+  userId: string;
+  profile: Profile;
+  timestamp: number;
+}
+
+function getCachedProfile(userId: string): Profile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!cached) return null;
+    const data: CachedProfile = JSON.parse(cached);
+    if (data.userId !== userId || Date.now() - data.timestamp > PROFILE_CACHE_MAX_AGE_MS) {
+      localStorage.removeItem(PROFILE_CACHE_KEY);
+      return null;
+    }
+    return data.profile;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedProfile(userId: string, profile: Profile): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      PROFILE_CACHE_KEY,
+      JSON.stringify({ userId, profile, timestamp: Date.now() })
+    );
+  } catch {
+    // Ignore quota errors
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Load cached profile on mount (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const data: CachedProfile = JSON.parse(cached);
+        if (Date.now() - data.timestamp <= PROFILE_CACHE_MAX_AGE_MS) {
+          setProfile(data.profile);
+        }
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }, []);
 
   const supabaseRef = useRef(createClient());
   const supabase = supabaseRef.current;
@@ -104,8 +158,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isRedirectingRef = useRef(false);
   const profileUserIdRef = useRef<string | null>(null);
 
-  const fetchProfile = useCallback(async (userId: string, signal?: AbortSignal) => {
+  const fetchProfile = useCallback(async (userId: string, signal?: AbortSignal, useCacheFirst = false) => {
     if (signal?.aborted) return null;
+
+    // If useCacheFirst, show cached profile immediately while fetching fresh
+    if (useCacheFirst) {
+      const cachedProfile = getCachedProfile(userId);
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        profileUserIdRef.current = userId;
+      }
+    }
+
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
@@ -117,6 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profileData) {
       setProfile(profileData);
       profileUserIdRef.current = userId;
+      // Cache for next time
+      setCachedProfile(userId, profileData);
     }
     return profileData;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         hadSessionRef.current = true;
+        // Fetch fresh profile (cache is already loaded in useEffect if available)
         await fetchProfile(currentUser.id, signal);
       }
 
@@ -237,15 +304,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     isRedirectingRef.current = true;
-    clearSessionOnlyCookies();
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Proceed with redirect even if Supabase signOut fails
-    }
+
+    // Clear local state first to prevent any UI from showing authenticated state
     setUser(null);
     setProfile(null);
     profileUserIdRef.current = null;
+
+    // Clear all session cookies
+    clearSessionOnlyCookies();
+
+    // Attempt Supabase sign-out with retry
+    let signOutSuccess = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (!error) {
+          signOutSuccess = true;
+          break;
+        }
+      } catch {
+        // Continue to retry
+      }
+    }
+
+    // Also try to clear any remaining auth tokens and cached data from storage
+    try {
+      if (typeof window !== 'undefined') {
+        // Clear any Supabase auth tokens from localStorage
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') && key.includes('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
+        // Clear dashboard and permissions cache
+        localStorage.removeItem('dashboard_cache_v1');
+        localStorage.removeItem('permissions_cache_v1');
+        localStorage.removeItem('profile_cache_v1');
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    // Redirect regardless - local state and cookies are cleared
+    // Even if server-side sign-out failed, the session cookies are gone
+    if (!signOutSuccess) {
+      console.warn('Sign-out may not have fully completed on server, but local session cleared');
+    }
+
     window.location.href = "/signin";
   };
 

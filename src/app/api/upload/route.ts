@@ -3,6 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { validateImageUpload } from "@/lib/upload-validation";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { scanFileForMalware, calculateFileHash, checkFileHash } from "@/lib/virustotal";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -44,6 +46,18 @@ async function getSupabaseClient() {
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 avatar uploads per user per hour
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit({
+      key: "avatar-upload",
+      identifier: ip,
+      maxRequests: 10,
+      windowSeconds: 3600, // 1 hour
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
+
     const supabase = await getSupabaseClient();
 
     const {
@@ -66,7 +80,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    // Upload to Cloudinary
+    // Extract base64 data for malware scanning
+    const base64Data = image.replace(/^data:[^;]+;base64,/, "");
+    const fileBuffer = Buffer.from(base64Data, "base64");
+
+    // Malware scanning
+    const fileHash = await calculateFileHash(fileBuffer);
+    let scanResult = await checkFileHash(fileHash);
+
+    if (!scanResult) {
+      scanResult = await scanFileForMalware(base64Data, "avatar.jpg");
+    }
+
+    if (!scanResult.isSafe) {
+      console.warn(`Malicious avatar upload blocked for user ${user.id}`, {
+        stats: scanResult.stats,
+      });
+      return NextResponse.json(
+        { error: "File rejected: Security scan failed" },
+        { status: 400 }
+      );
+    }
+
+    // Upload to Cloudinary (passed security checks)
     const uploadResult = await cloudinary.uploader.upload(image, {
       folder: "avatars",
       transformation: [

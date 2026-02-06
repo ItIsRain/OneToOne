@@ -1,15 +1,15 @@
-import { Metadata } from "next";
+"use client";
 import { WorkflowsTable } from "@/components/agency";
 import FeatureGate from "@/components/ui/FeatureGate";
-
-export const metadata: Metadata = {
-  title: "Workflows | Automation",
-};
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default function WorkflowsPage() {
   return (
-    <FeatureGate feature="workflows">
-      <WorkflowsTable />
-    </FeatureGate>
+    <ProtectedPage permission={PERMISSIONS.AUTOMATION_VIEW}>
+      <FeatureGate feature="workflows">
+        <WorkflowsTable />
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

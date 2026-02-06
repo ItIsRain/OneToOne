@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -9,6 +10,8 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
+    const headersList = await headers();
+    const tenantId = headersList.get("x-tenant-id");
 
     // Rate limit: 5 decline attempts per IP per minute
     const ip = getClientIp(request);
@@ -20,6 +23,32 @@ export async function POST(
     });
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit.retryAfterSeconds!);
+    }
+
+    const body = await request.json();
+    const { reason, decliner_name } = body;
+
+    // Require a reason to ensure intentional action
+    if (!reason || typeof reason !== "string" || reason.trim().length < 5) {
+      return NextResponse.json(
+        { error: "A decline reason is required (minimum 5 characters)" },
+        { status: 400 }
+      );
+    }
+
+    if (reason.length > 1000) {
+      return NextResponse.json(
+        { error: "Decline reason must be under 1000 characters" },
+        { status: 400 }
+      );
+    }
+
+    // Validate decliner_name if provided
+    if (decliner_name && (typeof decliner_name !== "string" || decliner_name.length > 200)) {
+      return NextResponse.json(
+        { error: "Decliner name must be a string under 200 characters" },
+        { status: 400 }
+      );
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,11 +63,17 @@ export async function POST(
     // Fetch contract
     const { data: contract, error: fetchError } = await serviceClient
       .from("contracts")
-      .select("id, status")
+      .select("id, status, tenant_id")
       .eq("slug", slug)
       .single();
 
     if (fetchError || !contract) {
+      return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    // If accessed from within platform (has tenant header), validate tenant matches
+    // This prevents cross-tenant contract actions from within the platform
+    if (tenantId && contract.tenant_id !== tenantId) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
     }
 
@@ -58,6 +93,10 @@ export async function POST(
       .from("contracts")
       .update({
         status: "declined",
+        declined_reason: reason.trim(),
+        declined_by: decliner_name?.trim() || null,
+        declined_at: new Date().toISOString(),
+        declined_ip: ip,
         updated_at: new Date().toISOString(),
       })
       .eq("id", contract.id);

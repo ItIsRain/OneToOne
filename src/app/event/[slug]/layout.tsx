@@ -30,7 +30,7 @@ interface EventData {
 
 interface TenantData {
   name: string | null;
-  slug: string | null;
+  subdomain: string | null;
 }
 
 async function getEventBySlug(slug: string): Promise<{ event: EventData | null; tenant: TenantData | null }> {
@@ -55,11 +55,48 @@ async function getEventBySlug(slug: string): Promise<{ event: EventData | null; 
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, slug')
+    .select('name, subdomain')
     .eq('id', event.tenant_id)
     .single();
 
   return { event, tenant };
+}
+
+/**
+ * Pre-generate static pages for public events at build time
+ * This improves SEO by ensuring pages are crawlable without JavaScript
+ */
+export async function generateStaticParams() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return [];
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: events } = await supabase
+      .from('events')
+      .select('slug')
+      .or('is_public.is.null,is_public.eq.true')
+      .or('is_published.is.null,is_published.eq.true')
+      .not('slug', 'is', null)
+      .in('status', ['upcoming', 'in_progress', 'completed'])
+      .limit(200); // Limit for build time
+
+    if (!events) return [];
+
+    return events
+      .filter((event) => event.slug)
+      .map((event) => ({
+        slug: event.slug,
+      }));
+  } catch (error) {
+    console.error('Error generating static params for events:', error);
+    return [];
+  }
 }
 
 export async function generateMetadata(

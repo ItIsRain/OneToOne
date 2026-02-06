@@ -1114,6 +1114,103 @@ export const updateProfileSchema = z.object({
   tax_id: z.string().max(100).nullish(),
 });
 
+// ── Workflow ─────────────────────────────────────────────────────────
+
+const WORKFLOW_TRIGGER_TYPES = [
+  "manual",
+  "client_created",
+  "contact_created",
+  "lead_created",
+  "lead_status_changed",
+  "client_status_changed",
+  "task_created",
+  "task_completed",
+  "task_status_changed",
+  "project_status_changed",
+  "invoice_created",
+  "invoice_overdue",
+  "payment_received",
+  "form_created",
+  "form_published",
+  "form_submitted",
+  "proposal_created",
+  "proposal_sent",
+  "proposal_viewed",
+  "proposal_accepted",
+  "proposal_declined",
+  "contract_created",
+  "contract_sent",
+  "contract_signed",
+  "event_registration",
+  "event_ended",
+  "booking_created",
+  "booking_cancelled",
+  "booking_rescheduled",
+  "survey_response_submitted",
+  "deliverable_approved",
+  "deliverable_rejected",
+  "portal_file_uploaded",
+  "portal_client_login",
+  "vendor_created",
+  "vendor_status_changed",
+] as const;
+
+const WORKFLOW_STEP_TYPES = [
+  "create_task",
+  "create_project",
+  "create_event",
+  "create_invoice",
+  "create_client",
+  "create_lead",
+  "create_contact",
+  "send_notification",
+  "send_email",
+  "send_sms",
+  "send_whatsapp",
+  "send_banner",
+  "send_slack",
+  "update_status",
+  "update_field",
+  "assign_to",
+  "add_tag",
+  "remove_tag",
+  "approval",
+  "wait_delay",
+  "condition",
+  "webhook",
+  "http_request",
+  "log_activity",
+  "schedule_action",
+  "elevenlabs_tts",
+  "openai_generate",
+  "stripe_payment_link",
+  "google_calendar_event",
+  "zapier_trigger",
+  "ai_voice_call",
+] as const;
+
+const workflowStepSchema = z.object({
+  step_order: z.coerce.number().int().min(0),
+  step_type: z.enum(WORKFLOW_STEP_TYPES, `Invalid step type. Valid types: ${WORKFLOW_STEP_TYPES.slice(0, 10).join(", ")}...`),
+  config: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export const createWorkflowSchema = z.object({
+  name: z.string().min(1, "Workflow name is required").max(255),
+  description: z.string().max(5000).nullish(),
+  trigger_type: z.enum(WORKFLOW_TRIGGER_TYPES, `Invalid trigger type. Valid types: ${WORKFLOW_TRIGGER_TYPES.slice(0, 10).join(", ")}...`),
+  trigger_config: z.record(z.string(), z.unknown()).optional().default({}),
+  steps: z.array(workflowStepSchema).optional().default([]),
+});
+
+export const updateWorkflowSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().max(5000).nullish(),
+  status: z.enum(["draft", "active", "paused"]).optional(),
+  trigger_type: z.enum(WORKFLOW_TRIGGER_TYPES).optional(),
+  trigger_config: z.record(z.string(), z.unknown()).optional(),
+});
+
 // ── Helper to validate and return typed result ───────────────────────
 
 export function validateBody<T>(

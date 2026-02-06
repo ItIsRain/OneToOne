@@ -43,7 +43,7 @@ export async function GET(
     // Calculate progress from tasks
     const allTasks = tasks || [];
     const completedTasks = allTasks.filter(
-      (t) => t.status === "completed" || t.status === "done"
+      (t) => t.status === "completed"
     ).length;
     const progress = allTasks.length > 0
       ? Math.round((completedTasks / allTasks.length) * 100)

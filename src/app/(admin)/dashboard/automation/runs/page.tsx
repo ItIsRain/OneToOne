@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import FeatureGate from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 import {
   Table,
   TableHeader,
@@ -214,16 +216,18 @@ function RunsContent() {
 
 export default function RunsPage() {
   return (
-    <FeatureGate feature="workflows">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Workflow Runs</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Monitor the execution history of your automated workflows.
-          </p>
+    <ProtectedPage permission={PERMISSIONS.AUTOMATION_VIEW}>
+      <FeatureGate feature="workflows">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Workflow Runs</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Monitor the execution history of your automated workflows.
+            </p>
+          </div>
+          <RunsContent />
         </div>
-        <RunsContent />
-      </div>
-    </FeatureGate>
+      </FeatureGate>
+    </ProtectedPage>
   );
 }

@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { ProjectTimeline } from "@/components/agency/ProjectTimeline";
 import { FeatureGate } from "@/components/ui/FeatureGate";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 interface Project {
   id: string;
@@ -30,6 +32,7 @@ export default function TimelinePage() {
   }, []);
 
   return (
+    <ProtectedPage permission={PERMISSIONS.PROJECTS_VIEW}>
     <FeatureGate feature="timeline">
     <div className="space-y-6">
       {/* Page Header */}
@@ -120,5 +123,6 @@ export default function TimelinePage() {
       <ProjectTimeline projectId={selectedProject || undefined} />
     </div>
     </FeatureGate>
+    </ProtectedPage>
   );
 }

@@ -45,7 +45,7 @@ export async function GET(request: Request) {
           return acc;
         }, {});
         completedTaskCounts = tasks
-          .filter((t) => t.status === "completed" || t.status === "done")
+          .filter((t) => t.status === "completed")
           .reduce((acc: Record<string, number>, task) => {
             acc[task.project_id] = (acc[task.project_id] || 0) + 1;
             return acc;

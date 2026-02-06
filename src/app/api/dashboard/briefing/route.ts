@@ -86,7 +86,7 @@ export async function GET() {
         .select("id, title, due_date, priority, status, assigned_to")
         .eq("tenant_id", tenantId)
         .lt("due_date", startOfDay)
-        .not("status", "in", '("completed","done")')
+        .not("status", "in", '("completed","cancelled")')
         .order("due_date", { ascending: true })
         .limit(10),
 
@@ -116,7 +116,7 @@ export async function GET() {
         .eq("tenant_id", tenantId)
         .gte("due_date", startOfDay)
         .lt("due_date", endOfWeek)
-        .not("status", "in", '("completed","done")')
+        .not("status", "in", '("completed","cancelled")')
         .order("due_date", { ascending: true })
         .limit(8),
 

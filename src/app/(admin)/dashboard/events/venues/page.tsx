@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { ProtectedPage } from "@/components/auth";
+import { PERMISSIONS } from "@/lib/permissions";
 
 // Types for FindMyVenue API
 interface FindMyVenueBasicDetails {
@@ -436,7 +438,7 @@ function formatPrice(venue: FindMyVenue): { text: string; type: string } {
   return { text: "Contact for pricing", type: "" };
 }
 
-export default function VenuesPage() {
+function VenuesContent() {
   const [venues, setVenues] = useState<FindMyVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -913,5 +915,13 @@ export default function VenuesPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function VenuesPage() {
+  return (
+    <ProtectedPage permission={PERMISSIONS.EVENTS_VIEW}>
+      <VenuesContent />
+    </ProtectedPage>
   );
 }

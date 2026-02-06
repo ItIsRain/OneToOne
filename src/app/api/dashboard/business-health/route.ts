@@ -270,7 +270,7 @@ export async function GET() {
       (t) => t.created_at && new Date(t.created_at) >= new Date(thirtyDaysAgo)
     );
     const completedTasks = recentTasks.filter(
-      (t) => t.status === "completed" || t.status === "done"
+      (t) => t.status === "completed"
     );
     const taskCompletionRate = recentTasks.length > 0
       ? Math.round((completedTasks.length / recentTasks.length) * 100)
@@ -278,9 +278,9 @@ export async function GET() {
 
     // Overdue task ratio
     const overdueTasks = tasks.filter(
-      (t) => t.due_date && new Date(t.due_date) < now && !["completed", "done"].includes(t.status)
+      (t) => t.due_date && new Date(t.due_date) < now && !["completed", "cancelled"].includes(t.status)
     );
-    const activeTasks = tasks.filter((t) => !["completed", "done"].includes(t.status));
+    const activeTasks = tasks.filter((t) => !["completed", "cancelled"].includes(t.status));
     const overdueTaskRatio = activeTasks.length > 0
       ? overdueTasks.length / activeTasks.length
       : 0;
