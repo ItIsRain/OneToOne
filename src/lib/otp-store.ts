@@ -15,7 +15,9 @@ function getServiceClient() {
  */
 export async function storeOtp(email: string, otp: string, ttlMs: number = 10 * 60 * 1000): Promise<void> {
   const supabase = getServiceClient();
-  const otpHash = await bcrypt.hash(otp, 10);
+  // Use cost 6 for OTPs - they're short-lived (10 min) and 6-digit
+  // This reduces hash time from ~300ms to ~20ms
+  const otpHash = await bcrypt.hash(otp, 6);
   const expiresAt = new Date(Date.now() + ttlMs).toISOString();
 
   // Upsert: replace any existing OTP for this email

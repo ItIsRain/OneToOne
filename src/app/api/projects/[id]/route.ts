@@ -111,43 +111,39 @@ export async function PATCH(
     if ("budget" in body) filtered.budget_amount = body.budget;
     if ("currency" in body) filtered.budget_currency = body.currency;
 
-    // Validate FK references belong to the same tenant
-    if (filtered.client_id) {
-      const { data: client } = await supabase
-        .from("clients").select("id").eq("id", filtered.client_id as string).eq("tenant_id", profile.tenant_id).single();
-      if (!client) {
-        return NextResponse.json({ error: "Client not found" }, { status: 404 });
-      }
+    // Validate FK references belong to the same tenant (parallel with oldProject fetch)
+    const [fkChecks, oldProjectResult] = await Promise.all([
+      Promise.all([
+        filtered.client_id
+          ? supabase.from("clients").select("id").eq("id", filtered.client_id as string).eq("tenant_id", profile.tenant_id).single()
+          : Promise.resolve({ data: true }),
+        filtered.project_manager_id
+          ? supabase.from("profiles").select("id").eq("id", filtered.project_manager_id as string).eq("tenant_id", profile.tenant_id).single()
+          : Promise.resolve({ data: true }),
+        filtered.team_lead_id
+          ? supabase.from("profiles").select("id").eq("id", filtered.team_lead_id as string).eq("tenant_id", profile.tenant_id).single()
+          : Promise.resolve({ data: true }),
+        filtered.primary_contact_id
+          ? supabase.from("contacts").select("id").eq("id", filtered.primary_contact_id as string).eq("tenant_id", profile.tenant_id).single()
+          : Promise.resolve({ data: true }),
+      ]),
+      supabase.from("projects").select("status, tenant_id, name").eq("id", id).eq("tenant_id", profile.tenant_id).single(),
+    ]);
+
+    if (filtered.client_id && !fkChecks[0].data) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
-    if (filtered.project_manager_id) {
-      const { data: pm } = await supabase
-        .from("profiles").select("id").eq("id", filtered.project_manager_id as string).eq("tenant_id", profile.tenant_id).single();
-      if (!pm) {
-        return NextResponse.json({ error: "Project manager not found in your organization" }, { status: 404 });
-      }
+    if (filtered.project_manager_id && !fkChecks[1].data) {
+      return NextResponse.json({ error: "Project manager not found in your organization" }, { status: 404 });
     }
-    if (filtered.team_lead_id) {
-      const { data: tl } = await supabase
-        .from("profiles").select("id").eq("id", filtered.team_lead_id as string).eq("tenant_id", profile.tenant_id).single();
-      if (!tl) {
-        return NextResponse.json({ error: "Team lead not found in your organization" }, { status: 404 });
-      }
+    if (filtered.team_lead_id && !fkChecks[2].data) {
+      return NextResponse.json({ error: "Team lead not found in your organization" }, { status: 404 });
     }
-    if (filtered.primary_contact_id) {
-      const { data: contact } = await supabase
-        .from("contacts").select("id").eq("id", filtered.primary_contact_id as string).eq("tenant_id", profile.tenant_id).single();
-      if (!contact) {
-        return NextResponse.json({ error: "Primary contact not found" }, { status: 404 });
-      }
+    if (filtered.primary_contact_id && !fkChecks[3].data) {
+      return NextResponse.json({ error: "Primary contact not found" }, { status: 404 });
     }
 
-    // Fetch old project for status change trigger
-    const { data: oldProject } = await supabase
-      .from("projects")
-      .select("status, tenant_id, name")
-      .eq("id", id)
-      .eq("tenant_id", profile.tenant_id)
-      .single();
+    const oldProject = oldProjectResult.data;
 
     const { data: project, error } = await supabase
       .from("projects")

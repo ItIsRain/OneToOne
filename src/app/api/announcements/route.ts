@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     // Build query
     let query = supabase
       .from("announcements")
-      .select("*")
+      .select("id, created_at, updated_at, title, excerpt, content, category, is_pinned, is_published, image_url, attachments, publish_at, expires_at, created_by")
       .eq("tenant_id", profile.tenant_id)
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })

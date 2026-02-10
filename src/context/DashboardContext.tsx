@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useCallback, useMemo, useEffect, useState } from "react";
 import useSWR from "swr";
+import { swrFetcher } from "@/lib/fetch";
 
 // localStorage key for caching dashboard data
 const DASHBOARD_CACHE_KEY = "dashboard_cache_v1";
@@ -281,17 +282,8 @@ const DashboardContext = createContext<DashboardContextType>({
   mutate: () => {},
 });
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error("Session expired. Please refresh the page.");
-    }
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Failed to fetch dashboard data");
-  }
-  return res.json();
-};
+// Use shared fetcher with 401 retry logic
+const fetcher = (url: string): Promise<DashboardData> => swrFetcher<DashboardData>(url);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Load cached data synchronously on mount for instant display

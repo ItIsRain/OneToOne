@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
     const { data: vendors, error } = await supabase
       .from("vendors")
-      .select("*, event_vendors(count)")
+      .select("id, created_at, name, company, email, phone, category, category_id, status, website, city, country, tags, event_vendors(count)")
       .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false })
       .limit(500);

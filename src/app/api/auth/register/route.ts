@@ -147,43 +147,46 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create user profile linked to tenant
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      tenant_id: tenant.id,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone: phone || null,
-      role: "owner",
-    });
+    // Create profile and subscription in parallel (both depend on tenant, not each other)
+    const validPlans = ["free", "starter", "professional", "business"];
+    const selectedPlan = validPlans.includes(plan) ? plan : "free";
+    const periodDays = 30;
 
-    if (profileError) {
-      console.error("Profile error:", profileError);
+    const [profileResult, subscriptionResult] = await Promise.all([
+      supabase.from("profiles").insert({
+        id: authData.user.id,
+        tenant_id: tenant.id,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        phone: phone || null,
+        role: "owner",
+      }),
+      supabase.from("tenant_subscriptions").insert({
+        tenant_id: tenant.id,
+        plan_type: selectedPlan,
+        status: "active",
+        billing_interval: "monthly",
+        current_period_start: new Date().toISOString(),
+        current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    ]);
+
+    if (profileResult.error) {
+      console.error("Profile error:", profileResult.error);
       // Rollback: delete tenant and user if profile creation fails
-      await supabase.from("tenants").delete().eq("id", tenant.id);
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await Promise.all([
+        supabase.from("tenants").delete().eq("id", tenant.id),
+        supabase.auth.admin.deleteUser(authData.user.id),
+      ]);
       return NextResponse.json(
         { error: "Failed to create user profile" },
         { status: 500 }
       );
     }
 
-    // Create subscription for the tenant with selected plan
-    const validPlans = ["free", "starter", "professional", "business"];
-    const selectedPlan = validPlans.includes(plan) ? plan : "free";
-    const periodDays = 30;
-    const { error: subscriptionError } = await supabase.from("tenant_subscriptions").insert({
-      tenant_id: tenant.id,
-      plan_type: selectedPlan,
-      status: "active",
-      billing_interval: "monthly",
-      current_period_start: new Date().toISOString(),
-      current_period_end: new Date(Date.now() + periodDays * 24 * 60 * 60 * 1000).toISOString(),
-    });
-
-    if (subscriptionError) {
-      console.error("Subscription error:", subscriptionError);
+    if (subscriptionResult.error) {
+      console.error("Subscription error:", subscriptionResult.error);
       // Continue anyway - subscription can be created later
     }
 

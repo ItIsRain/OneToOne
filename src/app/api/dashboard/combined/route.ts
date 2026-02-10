@@ -187,7 +187,7 @@ export async function GET(request: Request) {
       sections.includes("announcements")
         ? supabase
             .from("announcements")
-            .select("*")
+            .select("id, title, excerpt, content, category, is_pinned, is_published, image_url, created_at")
             .eq("tenant_id", tenantId)
             .eq("is_published", true)
             .order("is_pinned", { ascending: false })
@@ -199,7 +199,7 @@ export async function GET(request: Request) {
       sections.includes("goals")
         ? supabase
             .from("goals")
-            .select("*")
+            .select("id, name, description, status, target_value, current_value, unit, start_date, end_date, created_at")
             .eq("tenant_id", tenantId)
             .in("status", ["active", "in_progress"])
             .order("end_date", { ascending: true, nullsFirst: false })
@@ -210,7 +210,7 @@ export async function GET(request: Request) {
       sections.includes("bookmarks")
         ? supabase
             .from("bookmarks")
-            .select("*")
+            .select("id, title, url, entity_type, entity_id, category, notes, created_at")
             .eq("tenant_id", tenantId)
             .eq("user_id", userId)
             .order("created_at", { ascending: false })

@@ -7,18 +7,6 @@ import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
-    // Rate limit by IP: 10 OTP requests per IP per 15 minutes
-    const ip = getClientIp(request);
-    const ipRateCheck = await checkRateLimit({
-      key: "send-otp-ip",
-      identifier: ip,
-      maxRequests: 10,
-      windowSeconds: 15 * 60,
-    });
-    if (!ipRateCheck.allowed) {
-      return rateLimitResponse(ipRateCheck.retryAfterSeconds!);
-    }
-
     const { email } = await request.json();
 
     if (!email) {
@@ -31,15 +19,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
     }
 
-    // Rate limit by email: 5 OTP requests per email per 15 minutes
-    const rateCheck = await checkRateLimit({
-      key: "send-otp",
-      identifier: email.toLowerCase(),
-      maxRequests: 5,
-      windowSeconds: 15 * 60,
-    });
-    if (!rateCheck.allowed) {
-      return rateLimitResponse(rateCheck.retryAfterSeconds!);
+    // Rate limit by IP and email in parallel
+    const ip = getClientIp(request);
+    const [ipRateCheck, emailRateCheck] = await Promise.all([
+      checkRateLimit({
+        key: "send-otp-ip",
+        identifier: ip,
+        maxRequests: 10,
+        windowSeconds: 15 * 60,
+      }),
+      checkRateLimit({
+        key: "send-otp",
+        identifier: email.toLowerCase(),
+        maxRequests: 5,
+        windowSeconds: 15 * 60,
+      }),
+    ]);
+
+    if (!ipRateCheck.allowed) {
+      return rateLimitResponse(ipRateCheck.retryAfterSeconds!);
+    }
+    if (!emailRateCheck.allowed) {
+      return rateLimitResponse(emailRateCheck.retryAfterSeconds!);
     }
 
     // Check if email is already affiliated with a portal

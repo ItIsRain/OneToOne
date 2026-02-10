@@ -50,33 +50,43 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    // Fetch all roles
-    const { data: roles, error } = await supabase
-      .from("roles")
-      .select("*")
-      .eq("tenant_id", profile.tenant_id)
-      .order("is_system", { ascending: false })
-      .order("created_at", { ascending: true });
+    // Fetch roles and member counts in parallel (avoid N+1)
+    const [rolesResult, profilesResult] = await Promise.all([
+      supabase
+        .from("roles")
+        .select("id, name, description, permissions, is_system, is_default, color, created_at")
+        .eq("tenant_id", profile.tenant_id)
+        .order("is_system", { ascending: false })
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("custom_role_id")
+        .eq("tenant_id", profile.tenant_id)
+        .not("custom_role_id", "is", null),
+    ]);
 
-    if (error) {
-      console.error("Fetch roles error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (rolesResult.error) {
+      console.error("Fetch roles error:", rolesResult.error);
+      return NextResponse.json({ error: rolesResult.error.message }, { status: 500 });
     }
 
-    // Get member counts for each role
-    const rolesWithCounts = await Promise.all(
-      (roles || []).map(async (role) => {
-        const { count } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", profile.tenant_id)
-          .eq("custom_role_id", role.id);
+    // Count members per role in-memory (much faster than N+1 queries)
+    const roleCounts = new Map<string, number>();
+    (profilesResult.data || []).forEach((p) => {
+      if (p.custom_role_id) {
+        roleCounts.set(p.custom_role_id, (roleCounts.get(p.custom_role_id) || 0) + 1);
+      }
+    });
 
-        return { ...role, member_count: count || 0 };
-      })
-    );
+    const rolesWithCounts = (rolesResult.data || []).map((role) => ({
+      ...role,
+      member_count: roleCounts.get(role.id) || 0,
+    }));
 
-    return NextResponse.json({ roles: rolesWithCounts });
+    const response = NextResponse.json({ roles: rolesWithCounts });
+    // Cache for 30 seconds - roles don't change often
+    response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    return response;
   } catch (error) {
     console.error("Get roles error:", error);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });

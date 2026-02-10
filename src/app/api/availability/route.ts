@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("team_availability")
-      .select("*")
+      .select("id, member_id, day_of_week, start_time, end_time, timezone, is_available")
       .eq("tenant_id", profile.tenant_id);
 
     if (memberId) {

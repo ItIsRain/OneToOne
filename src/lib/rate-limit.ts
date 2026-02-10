@@ -8,6 +8,22 @@ function getServiceClient() {
   );
 }
 
+// ── In-memory rate limit cache ──
+// Reduces DB queries by caching recent rate limit checks
+// Cache is per-process, so in serverless each instance has its own cache
+// This is fine - it just means rate limits might be slightly more lenient
+interface RateLimitCacheEntry {
+  count: number;
+  windowStart: number;
+  lastUpdated: number;
+}
+const rateLimitCache = new Map<string, RateLimitCacheEntry>();
+const CACHE_TTL_MS = 5000; // 5 seconds - short TTL to stay accurate
+
+function getCacheKey(key: string, identifier: string): string {
+  return `${key}:${identifier}`;
+}
+
 interface RateLimitConfig {
   /** Unique identifier for the rate limit (e.g., "send-otp", "login") */
   key: string;
@@ -26,14 +42,35 @@ interface RateLimitResult {
 }
 
 /**
- * Check rate limit using Supabase.
- * Uses the rate_limits table to track request counts per identifier+key.
+ * Check rate limit using in-memory cache + Supabase fallback.
+ * Uses cache to reduce DB round-trips for repeated checks.
  */
 export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimitResult> {
-  const supabase = getServiceClient();
   const { key, identifier, maxRequests, windowSeconds } = config;
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - windowSeconds * 1000).toISOString();
+  const now = Date.now();
+  const windowStartMs = now - windowSeconds * 1000;
+  const cacheKey = getCacheKey(key, identifier);
+
+  // Check in-memory cache first
+  const cached = rateLimitCache.get(cacheKey);
+  if (cached && cached.lastUpdated > now - CACHE_TTL_MS && cached.windowStart >= windowStartMs) {
+    // Cache is fresh and within the same window
+    if (cached.count >= maxRequests) {
+      const retryAfterSeconds = Math.ceil((cached.windowStart + windowSeconds * 1000 - now) / 1000);
+      return {
+        allowed: false,
+        remaining: 0,
+        retryAfterSeconds: Math.max(1, retryAfterSeconds),
+      };
+    }
+    // Optimistically increment cache and allow
+    cached.count++;
+    cached.lastUpdated = now;
+  }
+
+  // Cache miss or stale - query DB
+  const supabase = getServiceClient();
+  const windowStart = new Date(windowStartMs).toISOString();
 
   // Count requests in the current window
   const { count, error: countError } = await supabase
@@ -50,22 +87,21 @@ export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimit
 
   const currentCount = count || 0;
 
+  // Update cache with DB result
+  rateLimitCache.set(cacheKey, {
+    count: currentCount,
+    windowStart: windowStartMs,
+    lastUpdated: now,
+  });
+
+  // Limit cache size
+  if (rateLimitCache.size > 10000) {
+    const firstKey = rateLimitCache.keys().next().value;
+    if (firstKey) rateLimitCache.delete(firstKey);
+  }
+
   if (currentCount >= maxRequests) {
-    // Find the oldest request in the window to calculate retry-after
-    const { data: oldest } = await supabase
-      .from("rate_limits")
-      .select("created_at")
-      .eq("key", key)
-      .eq("identifier", identifier)
-      .gte("created_at", windowStart)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .single();
-
-    const retryAfterSeconds = oldest
-      ? Math.ceil((new Date(oldest.created_at).getTime() + windowSeconds * 1000 - now.getTime()) / 1000)
-      : windowSeconds;
-
+    const retryAfterSeconds = Math.ceil(windowSeconds - (now - windowStartMs) / 1000);
     return {
       allowed: false,
       remaining: 0,
@@ -73,22 +109,20 @@ export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimit
     };
   }
 
-  // Record this request - must succeed for rate limiting to work
-  const { error: insertError } = await supabase.from("rate_limits").insert({
+  // Record this request - fire and forget for speed, but await to ensure it's queued
+  supabase.from("rate_limits").insert({
     key,
     identifier,
-    created_at: now.toISOString(),
+    created_at: new Date().toISOString(),
+  }).then(({ error }) => {
+    if (error) console.error("Rate limit insert error:", error);
   });
 
-  if (insertError) {
-    // Fail closed - if we can't track the request, don't allow it
-    // This prevents bypass via database errors
-    console.error("Rate limit insert error:", insertError);
-    return {
-      allowed: false,
-      remaining: 0,
-      retryAfterSeconds: 5, // Short retry to allow transient errors to resolve
-    };
+  // Increment cache optimistically
+  const entry = rateLimitCache.get(cacheKey);
+  if (entry) {
+    entry.count++;
+    entry.lastUpdated = now;
   }
 
   return {

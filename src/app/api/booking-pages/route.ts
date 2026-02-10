@@ -76,7 +76,7 @@ export async function GET(request: Request) {
 
     const { data: bookingPages, error } = await supabase
       .from("booking_pages")
-      .select("*")
+      .select("id, created_at, name, slug, duration_minutes, description, location_type, is_active, color, buffer_before, buffer_after, min_notice_hours, max_advance_days, assigned_member_id, form_id")
       .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 

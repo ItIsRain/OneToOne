@@ -72,10 +72,23 @@ export default function SignInForm() {
         // Ignore query errors, just redirect to default
       }
 
-      // Force navigation with a small delay to let auth state settle
-      setTimeout(() => {
-        window.location.assign(finalRedirect);
-      }, 100);
+      // Verify session is established before redirecting
+      // This prevents "Session expired" errors from race conditions
+      let sessionVerified = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          sessionVerified = true;
+          break;
+        }
+      }
+
+      if (!sessionVerified) {
+        console.warn("Session verification failed after login, redirecting anyway");
+      }
+
+      window.location.assign(finalRedirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setIsLoading(false);

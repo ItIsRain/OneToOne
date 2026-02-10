@@ -75,7 +75,7 @@ export async function GET(request: Request) {
 
     const { data: forms, error } = await supabase
       .from("forms")
-      .select("*")
+      .select("id, created_at, updated_at, title, slug, status, description, submissions_count, auto_create_lead, auto_create_contact")
       .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 

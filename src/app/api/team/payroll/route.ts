@@ -87,16 +87,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Get items count for each run
-    const runsWithCounts = await Promise.all(
-      (payrollRuns || []).map(async (run) => {
-        const { count } = await supabase
-          .from("payroll_items")
-          .select("*", { count: "exact", head: true })
-          .eq("payroll_run_id", run.id);
-        return { ...run, employee_count: count || 0 };
-      })
-    );
+    // Extract employee_count from the already-fetched items count (no N+1 needed)
+    interface PayrollRun {
+      id: string;
+      period_start: string;
+      period_end: string;
+      status: string;
+      total_net: number;
+      items?: { count: number }[];
+      [key: string]: unknown;
+    }
+    const runsWithCounts = (payrollRuns || []).map((run: PayrollRun) => {
+      const { items, ...rest } = run;
+      return {
+        ...rest,
+        employee_count: Array.isArray(items) && items.length > 0 ? items[0].count : 0,
+      };
+    });
 
     // Calculate stats
     const currentYear = new Date().getFullYear();

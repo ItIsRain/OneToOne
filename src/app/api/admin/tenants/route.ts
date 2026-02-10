@@ -53,9 +53,10 @@ export async function GET(request: NextRequest) {
   const serviceClient = getServiceClient();
 
   try {
+    // Fetch tenants with embedded counts (avoid N+1)
     let query = serviceClient
       .from("tenants")
-      .select("*")
+      .select("*, profiles(count), projects(count)")
       .order("created_at", { ascending: false });
 
     if (status && status !== "all") {
@@ -66,23 +67,20 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Fetch counts for each tenant
-    const tenantsWithCounts = await Promise.all(
-      (tenants || []).map(async (tenant) => {
-        const [userResult, projectResult] = await Promise.all([
-          serviceClient.from("profiles").select("*", { count: "exact", head: true }).eq("tenant_id", tenant.id),
-          serviceClient.from("projects").select("*", { count: "exact", head: true }).eq("tenant_id", tenant.id),
-        ]);
-
-        return {
-          ...tenant,
-          _count: {
-            users: userResult.count || 0,
-            projects: projectResult.count || 0,
-          },
-        };
-      })
-    );
+    // Map embedded counts to _count format
+    const tenantsWithCounts = (tenants || []).map((tenant: Record<string, unknown>) => ({
+      ...tenant,
+      _count: {
+        users: Array.isArray(tenant.profiles) && tenant.profiles.length > 0
+          ? (tenant.profiles[0] as { count: number }).count
+          : 0,
+        projects: Array.isArray(tenant.projects) && tenant.projects.length > 0
+          ? (tenant.projects[0] as { count: number }).count
+          : 0,
+      },
+      profiles: undefined,
+      projects: undefined,
+    }));
 
     return NextResponse.json({ tenants: tenantsWithCounts });
   } catch (err) {

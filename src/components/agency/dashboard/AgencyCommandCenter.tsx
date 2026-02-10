@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useCountUp } from "@/hooks/useCountUp";
+import { fetchWithRetry } from "@/lib/fetch";
 import {
   CloseIcon,
   DollarLineIcon,
@@ -207,20 +208,7 @@ export const AgencyCommandCenter: React.FC<AgencyCommandCenterProps> = ({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/dashboard/command-center");
-      if (!res.ok) {
-        if (
-          res.status === 401 ||
-          res.headers.get("content-type")?.includes("text/html")
-        ) {
-          throw new Error("Session expired. Please refresh the page.");
-        }
-        const body = await res.json().catch(() => ({}));
-        throw new Error(
-          (body as Record<string, string>).error || "Failed to fetch data"
-        );
-      }
-      const json = await res.json();
+      const json = await fetchWithRetry<CommandCenterData>("/api/dashboard/command-center");
       setData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");

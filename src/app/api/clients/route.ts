@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
     const { data: clients, error } = await supabase
       .from("clients")
-      .select("*")
+      .select("id, created_at, updated_at, name, company, email, phone, status, website, city, country, industry, source, tags")
       .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 
