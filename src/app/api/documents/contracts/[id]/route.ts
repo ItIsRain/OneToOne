@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -47,23 +48,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -113,23 +110,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -152,7 +145,7 @@ export async function PATCH(
 
     // Build update object with only provided fields
     const updateData: Record<string, unknown> = {
-      updated_by: user.id,
+      updated_by: userId,
     };
 
     // Basic fields
@@ -225,7 +218,7 @@ export async function PATCH(
     if (body.sign === true && !existing.is_signed) {
       updateData.is_signed = true;
       updateData.signed_date = new Date().toISOString();
-      updateData.signed_by = user.id;
+      updateData.signed_by = userId;
       updateData.signature_ip = body.signature_ip || null;
       if (existing.status === "pending_signature") {
         updateData.status = "active";
@@ -236,7 +229,7 @@ export async function PATCH(
     if (body.counter_sign === true && !existing.counter_signed) {
       updateData.counter_signed = true;
       updateData.counter_signed_date = new Date().toISOString();
-      updateData.counter_signed_by = user.id;
+      updateData.counter_signed_by = userId;
       updateData.counter_signatory_name = body.counter_signatory_name || null;
     }
 
@@ -279,7 +272,7 @@ export async function PATCH(
       action,
       description,
       changes: { status: { old: existing.status, new: contract.status } },
-      performed_by: user.id,
+      performed_by: userId,
     });
 
     return NextResponse.json({ contract });
@@ -295,23 +288,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -352,7 +341,7 @@ export async function DELETE(
     // Log activity
     await supabase.from("activity_logs").insert({
       tenant_id: contract.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: "deleted",
       entity_type: "contract",
       entity_id: id,

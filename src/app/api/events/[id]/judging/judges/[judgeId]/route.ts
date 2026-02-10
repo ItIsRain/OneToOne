@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper to verify tenant access
-async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, eventId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Unauthorized", status: 401 };
-  }
-
+async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, eventId: string, userId: string) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("tenant_id")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (!profile?.tenant_id) {
@@ -32,7 +28,7 @@ async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, 
     return { error: "Event not found", status: 404 };
   }
 
-  return { user, profile, event };
+  return { odUserId: userId, profile, event };
 }
 
 // DELETE - Remove a judge
@@ -41,10 +37,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; judgeId: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id, judgeId } = await params;
     const supabase = await createClient();
 
-    const access = await verifyAccess(supabase, id);
+    const access = await verifyAccess(supabase, id, userId);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
@@ -74,10 +75,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string; judgeId: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id, judgeId } = await params;
     const supabase = await createClient();
 
-    const access = await verifyAccess(supabase, id);
+    const access = await verifyAccess(supabase, id, userId);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }

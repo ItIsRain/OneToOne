@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { validateBody, updateAnnouncementSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -48,23 +49,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -107,23 +104,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -148,7 +141,7 @@ export async function PATCH(
 
     // Build update object
     const updateData: Record<string, unknown> = {
-      updated_by: user.id,
+      updated_by: userId,
     };
 
     if (body.title !== undefined) updateData.title = body.title;
@@ -238,23 +231,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -302,7 +291,7 @@ export async function DELETE(
     // Log activity
     await supabase.from("activity_logs").insert({
       tenant_id: announcement.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: "deleted",
       entity_type: "announcement",
       entity_id: id,

@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateBody, updateKanbanBoardSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -55,18 +56,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -84,7 +85,7 @@ export async function PATCH(
 
     const allowedFields = ["name", "description", "project_id", "columns", "settings"];
     const updates: Record<string, unknown> = {
-      updated_by: user.id,
+      updated_by: userId,
       updated_at: new Date().toISOString(),
     };
     for (const key of allowedFields) {
@@ -118,18 +119,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

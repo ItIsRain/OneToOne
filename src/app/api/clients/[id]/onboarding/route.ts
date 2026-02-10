@@ -2,25 +2,26 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email";
 import { clientOnboardingWelcomeEmail, onboardingStepEmail } from "@/lib/email-templates";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - Get onboarding for a client
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: clientId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: clientId } = await params;
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -69,18 +70,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: clientId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: clientId } = await params;
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -154,7 +155,7 @@ export async function POST(
         template_id: body.template_id || null,
         status: "in_progress",
         steps,
-        created_by: user.id,
+        created_by: userId,
       })
       .select()
       .single();
@@ -176,18 +177,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: clientId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: clientId } = await params;
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id, first_name, last_name")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -332,22 +333,22 @@ export async function PATCH(
 
 // DELETE - Remove onboarding (reset)
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: clientId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: clientId } = await params;
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

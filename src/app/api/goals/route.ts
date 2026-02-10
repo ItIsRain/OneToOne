@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, createGoalSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,6 +32,11 @@ async function getSupabaseClient() {
 // GET - Fetch goals
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -38,20 +44,11 @@ export async function GET(request: Request) {
     const category = searchParams.get("category");
     const period = searchParams.get("period");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -211,22 +208,18 @@ async function calculateGoalProgress(
 // POST - Create goal
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -259,12 +252,12 @@ export async function POST(request: Request) {
       category: body.category || null,
       color: body.color || "#3B82F6",
       icon: body.icon || null,
-      owner_id: body.owner_id || user.id,
+      owner_id: body.owner_id || userId,
       assigned_to: body.assigned_to || [],
       milestones: body.milestones || [],
       notes: body.notes || null,
-      created_by: user.id,
-      updated_by: user.id,
+      created_by: userId,
+      updated_by: userId,
     };
 
     const { data: goal, error } = await supabase
@@ -281,7 +274,7 @@ export async function POST(request: Request) {
     // Log activity
     await supabase.from("activity_logs").insert({
       tenant_id: profile.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: "created",
       entity_type: "goal",
       entity_id: goal.id,

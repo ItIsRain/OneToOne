@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 import Stripe from "stripe";
 
 function getStripe() {
@@ -29,13 +30,13 @@ type BillingInterval = "monthly" | "yearly";
 
 export async function POST(request: NextRequest) {
   try {
-    const stripe = getStripe();
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const stripe = getStripe();
+    const supabase = await createClient();
 
     const body = await request.json();
     const { planType: rawPlanType, billingInterval: rawBillingInterval } = body;
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id, email, first_name, last_name")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -88,11 +89,11 @@ export async function POST(request: NextRequest) {
 
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
-        email: user.email || profile.email,
+        email: profile.email,
         name: tenant?.name || `${profile.first_name} ${profile.last_name}`,
         metadata: {
           tenant_id: profile.tenant_id,
-          user_id: user.id,
+          user_id: userId,
         },
       });
       stripeCustomerId = customer.id;

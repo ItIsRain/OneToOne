@@ -251,10 +251,16 @@ interface MorningBriefingProps {
 }
 
 export function MorningBriefing({ onDismiss, data: propData, isLoading: propLoading }: MorningBriefingProps) {
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<BriefingData | null>(null);
   const [loading, setLoading] = useState(propData === undefined);
   const [dismissed, setDismissed] = useState(false);
   const [error, setError] = useState(false);
+
+  // Prevent hydration mismatch from Date() calls
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Use prop data if available
   const effectiveData = propData || data;
@@ -302,8 +308,8 @@ export function MorningBriefing({ onDismiss, data: propData, isLoading: propLoad
     fetchBriefing();
   };
 
-  // Loading skeleton
-  if (effectiveLoading) {
+  // Loading skeleton - also shown during SSR to prevent hydration mismatch
+  if (!mounted || effectiveLoading) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex items-center justify-between mb-5">

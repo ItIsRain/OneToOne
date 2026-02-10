@@ -104,6 +104,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, stripe:
 
   // Get subscription details from Stripe
   const subscriptionId = session.subscription as string;
+
+  // Copy metadata from session to subscription so future webhook events can access it
+  await stripe.subscriptions.update(subscriptionId, {
+    metadata: {
+      tenant_id: tenantId,
+      plan_type: planType,
+      billing_interval: billingInterval,
+    },
+  });
+
   const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionData = subscriptionResponse as any;

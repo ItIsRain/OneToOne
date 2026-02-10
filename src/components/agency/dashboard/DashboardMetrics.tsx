@@ -54,9 +54,15 @@ function AnimatedNumber({ value, prefix = "", suffix = "", decimals = 0 }: { val
 }
 
 export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded, data: propData, isLoading: propLoading }) => {
+  const [mounted, setMounted] = useState(false);
   const [metrics, setMetrics] = useState<DashboardMetricsData | null>(null);
   const [loading, setLoading] = useState(propData === undefined);
   const [error, setError] = useState("");
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Use prop data if available
   const effectiveMetrics = propData || metrics;
@@ -97,7 +103,8 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
     }
   }, [fetchMetrics, propData]);
 
-  if (effectiveLoading) {
+  // Show skeleton during SSR and loading to prevent hydration mismatch
+  if (!mounted || effectiveLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-5">
         {[1, 2, 3, 4].map((i) => (

@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - Get company settings
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's profile to find tenant_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -75,18 +76,18 @@ export async function GET(request: NextRequest) {
 // PATCH - Update company settings
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's profile to find tenant_id and role
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -138,7 +139,7 @@ export async function PATCH(request: NextRequest) {
 
     // Enforce plan limits for branding features (logo_url, primary_color)
     if (updateData.logo_url !== undefined || updateData.primary_color !== undefined) {
-      const planInfo = await getUserPlanInfo(supabase, user.id);
+      const planInfo = await getUserPlanInfo(supabase, userId);
       const brandingAccess = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
       if (!brandingAccess.allowed) {
         // Remove branding fields from update

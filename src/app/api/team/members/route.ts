@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { getUserPlanInfo, checkTeamMemberLimit } from "@/lib/plan-limits";
 import { sendTeamInviteEmail } from "@/lib/email";
 import { validateBody, createTeamMemberSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,24 +32,20 @@ async function getSupabaseClient() {
 }
 
 // GET - Fetch all team members for the user's tenant
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (profileError) {
@@ -154,22 +151,18 @@ export async function GET() {
 // POST - Invite a new team member
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's profile with tenant_id and role
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id, role, first_name, last_name")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {
@@ -189,7 +182,7 @@ export async function POST(request: Request) {
     }
 
     // Check plan limits for team member creation
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -285,7 +278,7 @@ export async function POST(request: Request) {
       tags: body.tags || [],
       invite_token: inviteToken,
       invite_expires_at: inviteExpiresAt.toISOString(),
-      invited_by: user.id,
+      invited_by: userId,
       status: "pending",
       updated_at: new Date().toISOString(),
     };

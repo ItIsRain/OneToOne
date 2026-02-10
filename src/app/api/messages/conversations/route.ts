@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -28,29 +29,25 @@ async function getSupabaseClient() {
 }
 
 // GET - Fetch all conversations for the current user
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Check if user has a profile (needed for RLS)
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("id, tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (profileError || !profile) {
       // User doesn't have a profile yet - return empty conversations
-      console.log("User has no profile:", user.id, profileError?.message);
+      console.log("User has no profile:", userId, profileError?.message);
       return NextResponse.json({ conversations: [] });
     }
 
@@ -58,7 +55,7 @@ export async function GET() {
     const { data: participations, error: partError } = await supabase
       .from("conversation_participants")
       .select("conversation_id, last_read_at")
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (partError) {
       console.error("Fetch participations error:", partError);
@@ -126,7 +123,7 @@ export async function GET() {
 
       // Compute unread counts from the same message set
       for (const msg of recentMessages || []) {
-        if (msg.sender_id === user.id) continue;
+        if (msg.sender_id === userId) continue;
         const lastReadAt = lastReadMap[msg.conversation_id];
         if (lastReadAt && msg.created_at <= lastReadAt) continue;
         unreadCountMap.set(msg.conversation_id, (unreadCountMap.get(msg.conversation_id) || 0) + 1);
@@ -136,7 +133,7 @@ export async function GET() {
     const conversationsWithDetails = (conversations || []).map((conv) => {
       // Get the other participant(s) - exclude current user
       let otherParticipants = conv.conversation_participants
-        .filter((p: { user_id: string }) => p.user_id !== user.id)
+        .filter((p: { user_id: string }) => p.user_id !== userId)
         .map((p: { profiles: unknown }) => p.profiles);
 
       // If no other participants (self-messaging), include self
@@ -162,18 +159,14 @@ export async function GET() {
 }
 
 // POST - Create a new conversation or return existing one
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const body = await request.json();
     const { participantId } = body;
@@ -186,7 +179,7 @@ export async function POST(request: Request) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (profileError) {
@@ -213,7 +206,7 @@ export async function POST(request: Request) {
     const { data: existingConversations } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (existingConversations && existingConversations.length > 0) {
       const conversationIds = existingConversations.map((c) => c.conversation_id);
@@ -251,7 +244,7 @@ export async function POST(request: Request) {
     const { data: conversationId, error: convError } = await supabase
       .rpc("find_or_create_direct_conversation", {
         p_tenant_id: profile.tenant_id,
-        p_user1_id: user.id,
+        p_user1_id: userId,
         p_user2_id: participantId,
       });
 

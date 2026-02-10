@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Helper to get tenant and verify access
-async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, eventId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return { error: "Unauthorized", status: 401 };
-  }
-
+async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, eventId: string, userId: string) {
   const { data: profile } = await supabase
     .from("profiles")
     .select("tenant_id, email")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (!profile?.tenant_id) {
@@ -30,7 +26,7 @@ async function verifyAccess(supabase: Awaited<ReturnType<typeof createClient>>, 
     return { error: "Event not found", status: 404 };
   }
 
-  return { user, profile, event };
+  return { odUserId: userId, profile, event };
 }
 
 // GET - Get judging status and judges for an event
@@ -39,18 +35,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const supabase = await createClient();
 
-    const access = await verifyAccess(supabase, id);
+    const access = await verifyAccess(supabase, id, userId);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event, profile, user } = access;
+    const { event, profile, odUserId } = access;
 
     // Check plan feature access for judging system
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, odUserId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -127,7 +128,7 @@ export async function GET(
     const scoresCount = allScores.length;
 
     // Check if current user is a judge and get their judging URL
-    const userEmail = profile.email || user.email;
+    const userEmail = profile.email;
     const userJudge = judgesWithScores.find(j => j.email.toLowerCase() === userEmail?.toLowerCase());
     const userJudgingUrl = userJudge?.access_token
       ? `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/judge/${userJudge.access_token}`
@@ -163,18 +164,23 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const supabase = await createClient();
 
-    const access = await verifyAccess(supabase, id);
+    const access = await verifyAccess(supabase, id, userId);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event, user } = access;
+    const { event, odUserId } = access;
 
     // Check plan feature access for judging system
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, odUserId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -234,18 +240,23 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     const supabase = await createClient();
 
-    const access = await verifyAccess(supabase, id);
+    const access = await verifyAccess(supabase, id, userId);
     if ("error" in access) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const { event, user } = access;
+    const { event, odUserId } = access;
 
     // Check plan feature access for judging system
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, odUserId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },

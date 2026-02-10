@@ -49,9 +49,15 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
   data: propData,
   isLoading: propLoading,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Determine if we should use props or fetch ourselves
   // If propLoading is provided (even if false), parent is managing data
@@ -121,7 +127,8 @@ export const DashboardGoals: React.FC<DashboardGoalsProps> = ({
     return "bg-brand-500";
   };
 
-  if (effectiveLoading) {
+  // Show skeleton during SSR and loading to prevent hydration mismatch
+  if (!mounted || effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-5">

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateBody, updateVendorCategorySchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -35,29 +36,25 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await getSupabaseClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -121,29 +118,25 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await getSupabaseClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },

@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateBody, createTimeEntrySchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -32,6 +33,11 @@ async function getSupabaseClient() {
 // GET - Fetch all time entries for the user's tenant
 export async function GET(request: Request) {
   try {
+    const currentUserId = getUserIdFromRequest(request);
+    if (!currentUserId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -42,20 +48,11 @@ export async function GET(request: Request) {
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", currentUserId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -63,7 +60,7 @@ export async function GET(request: Request) {
     }
 
     // Check plan feature access for time tracking
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, currentUserId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -155,22 +152,18 @@ export async function GET(request: Request) {
 // POST - Create a new time entry
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's profile with tenant_id, hourly_rate, and role
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id, hourly_rate, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {
@@ -178,7 +171,7 @@ export async function POST(request: Request) {
     }
 
     // Check plan feature access for time tracking
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -238,7 +231,7 @@ export async function POST(request: Request) {
 
     // Validate user_id belongs to same tenant (if explicitly provided)
     // Only owners and admins can create time entries for other users
-    if (body.user_id && body.user_id !== user.id) {
+    if (body.user_id && body.user_id !== userId) {
       // Check if current user has permission to log time for others
       const allowedRoles = ["owner", "admin"];
       if (!currentProfile.role || !allowedRoles.includes(currentProfile.role)) {
@@ -290,7 +283,7 @@ export async function POST(request: Request) {
 
     // Check for overlapping time entries if start/end times are provided
     if (body.start_time && body.end_time && body.date) {
-      const entryUserId = body.user_id || user.id;
+      const entryUserId = body.user_id || userId;
 
       // Fetch existing time entries for this user on this date
       const { data: existingEntries } = await supabase
@@ -354,7 +347,7 @@ export async function POST(request: Request) {
 
     const timeEntryData = {
       tenant_id: currentProfile.tenant_id,
-      user_id: body.user_id || user.id,
+      user_id: body.user_id || userId,
       project_id: body.project_id || null,
       task_id: body.task_id || null,
       date: body.date,

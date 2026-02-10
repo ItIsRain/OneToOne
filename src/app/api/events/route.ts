@@ -4,23 +4,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserPlanInfo, checkEventLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { validateBody, createEventSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -118,20 +118,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -139,7 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan limits for event creation
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -209,7 +208,7 @@ export async function POST(request: NextRequest) {
       .from("events")
       .insert({
         tenant_id: profile.tenant_id,
-        created_by: user.id,
+        created_by: userId,
         title: body.title,
         description: body.description,
         location: body.location,
@@ -293,7 +292,7 @@ export async function POST(request: NextRequest) {
           event_date: event.start_date,
           event_type: event.event_type,
           event_client_id: event.client_id,
-        }, serviceClient, profile.tenant_id, user.id);
+        }, serviceClient, profile.tenant_id, userId);
       } catch (err) {
         console.error("Workflow trigger error:", err);
       }

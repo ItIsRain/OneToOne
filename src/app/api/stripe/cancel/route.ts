@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 import Stripe from "stripe";
 
 function getStripe() {
@@ -9,22 +10,20 @@ function getStripe() {
 }
 
 // POST - Cancel subscription in Stripe (cancel at period end)
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const stripe = getStripe();
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const stripe = getStripe();
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -73,22 +72,20 @@ export async function POST() {
 }
 
 // DELETE - Reactivate subscription (remove cancellation)
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
-    const stripe = getStripe();
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const stripe = getStripe();
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { scanFileForMalware, calculateFileHash, checkFileHash } from "@/lib/virustotal";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -93,6 +94,11 @@ function getFileTypeCategory(mimeType: string, extension: string): string {
 // GET - Fetch all files for the user's tenant
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -103,20 +109,11 @@ export async function GET(request: Request) {
     const isArchived = searchParams.get("is_archived");
     const search = searchParams.get("search");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -201,6 +198,11 @@ export async function GET(request: Request) {
 // POST - Upload a new file
 export async function POST(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Rate limit: 20 uploads per user per hour
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit({
@@ -215,20 +217,11 @@ export async function POST(request: Request) {
 
     const supabase = await getSupabaseClient();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -286,7 +279,7 @@ export async function POST(request: Request) {
         : `File rejected: Detected as malicious by ${scanResult.stats?.malicious || 0} security vendors`;
 
       console.warn(`Malicious file upload blocked: ${name}`, {
-        userId: user.id,
+        userId: userId,
         tenantId: profile.tenant_id,
         stats: scanResult.stats,
       });
@@ -346,7 +339,7 @@ export async function POST(request: Request) {
       tags: tags || [],
       is_shared: is_shared || false,
       shared_with: shared_with || [],
-      uploaded_by: user.id,
+      uploaded_by: userId,
       metadata: {
         cloudinary_format: uploadResult.format,
         cloudinary_resource_type: uploadResult.resource_type,

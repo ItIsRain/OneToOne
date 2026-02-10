@@ -2,18 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { executeWorkflow } from "@/lib/workflows/engine";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
@@ -21,7 +22,7 @@ export async function POST(
     // This prevents resource exhaustion while allowing legitimate testing
     const rateCheck = await checkRateLimit({
       key: `workflow-execute-${id}`,
-      identifier: user.id,
+      identifier: userId,
       maxRequests: 10,
       windowSeconds: 60,
     });
@@ -53,7 +54,7 @@ export async function POST(
       id,
       triggerData,
       supabase,
-      user.id,
+      userId,
       tenantId
     );
 

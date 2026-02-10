@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
@@ -49,12 +50,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
@@ -208,12 +209,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 

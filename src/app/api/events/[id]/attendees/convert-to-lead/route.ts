@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // POST - Convert attendee to CRM lead
 export async function POST(
@@ -9,20 +10,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: eventId } = await params;
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: eventId } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -92,8 +92,8 @@ export async function POST(
         status: "new",
         priority,
         notes: notes || `Converted from event attendee. Original event: ${event?.title}`,
-        created_by: user.id,
-        assigned_to: user.id,
+        created_by: userId,
+        assigned_to: userId,
       })
       .select()
       .single();
@@ -123,7 +123,7 @@ export async function POST(
           },
           serviceClient,
           profile.tenant_id,
-          user.id
+          userId
         );
       } catch (err) {
         console.error("Workflow trigger error:", err);

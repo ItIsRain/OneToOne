@@ -5,6 +5,7 @@ import { v2 as cloudinary } from "cloudinary";
 import { validateImageUpload } from "@/lib/upload-validation";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { scanFileForMalware, calculateFileHash, checkFileHash } from "@/lib/virustotal";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -58,14 +59,9 @@ export async function POST(request: Request) {
       return rateLimitResponse(rateLimit.retryAfterSeconds!);
     }
 
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -93,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     if (!scanResult.isSafe) {
-      console.warn(`Malicious avatar upload blocked for user ${user.id}`, {
+      console.warn(`Malicious avatar upload blocked for user ${userId}`, {
         stats: scanResult.stats,
       });
       return NextResponse.json(
@@ -110,11 +106,14 @@ export async function POST(request: Request) {
       ],
     });
 
+    // Create supabase client only when needed for DB operations
+    const supabase = await getSupabaseClient();
+
     // Update profile with new avatar URL
     const { data: profile, error: updateError } = await supabase
       .from("profiles")
       .update({ avatar_url: uploadResult.secure_url })
-      .eq("id", user.id)
+      .eq("id", userId)
       .select()
       .single();
 

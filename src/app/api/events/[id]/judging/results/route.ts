@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - Get judging results with rankings
 export async function GET(
@@ -7,20 +8,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    // Verify user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

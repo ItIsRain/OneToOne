@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
 import { validateImageUpload } from "@/lib/upload-validation";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -18,21 +19,19 @@ if (cloudinaryUrl) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Create supabase client for DB operations
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

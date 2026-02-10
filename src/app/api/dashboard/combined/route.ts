@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -30,22 +31,19 @@ async function getSupabaseClient() {
 // Combined dashboard endpoint - fetches all dashboard data in one request
 export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id and profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id, first_name, last_name")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -214,7 +212,7 @@ export async function GET(request: Request) {
             .from("bookmarks")
             .select("*")
             .eq("tenant_id", tenantId)
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .order("created_at", { ascending: false })
             .limit(10)
         : Promise.resolve({ data: [] }),

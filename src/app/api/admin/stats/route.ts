@@ -1,33 +1,54 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
-export async function GET() {
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+async function verifyAdmin(request: Request): Promise<{ authorized: boolean; error?: string }> {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return { authorized: false, error: "Unauthorized" };
+  }
+
+  const serviceClient = getServiceClient();
+
+  // Get user's email from profiles
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile?.email) {
+    return { authorized: false, error: "Unauthorized" };
+  }
+
+  const { data: adminRecord } = await serviceClient
+    .from("platform_admins")
+    .select("id")
+    .eq("email", profile.email.toLowerCase())
+    .maybeSingle();
+
+  if (!adminRecord) {
+    return { authorized: false, error: "Forbidden" };
+  }
+
+  return { authorized: true };
+}
+
+export async function GET(request: NextRequest) {
   try {
-    // First verify the user is a platform admin
-    const supabase = await createServerClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authCheck = await verifyAdmin(request);
+    if (!authCheck.authorized) {
+      return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
     }
 
-    // Check admin status
-    const { data: adminRecord } = await supabase
-      .from("platform_admins")
-      .select("id")
-      .eq("email", user.email.toLowerCase())
-      .maybeSingle();
-
-    if (!adminRecord) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    // Use service role client for cross-tenant queries
-    const serviceClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const serviceClient = getServiceClient();
 
     // Date calculations
     const now = new Date();
@@ -74,7 +95,6 @@ export async function GET() {
 
       // Top tenants
       topTenantsByUsers,
-      topTenantsByProjects,
 
       // Activity this week
       newProjectsThisWeek,
@@ -113,7 +133,6 @@ export async function GET() {
       serviceClient.from("tenants").select("plan"),
 
       // Top tenants by activity
-      serviceClient.from("tenants").select("id, name, subdomain, plan").limit(100),
       serviceClient.from("tenants").select("id, name, subdomain, plan").limit(100),
 
       // Activity this week
@@ -172,7 +191,7 @@ export async function GET() {
     }
 
     // Count tenants by month
-    const tenantGrowth = last6Months.map((month, idx) => {
+    const tenantGrowth = last6Months.map((_, idx) => {
       const targetDate = new Date();
       targetDate.setMonth(targetDate.getMonth() - (5 - idx));
       const targetMonth = targetDate.getMonth();
@@ -185,7 +204,7 @@ export async function GET() {
     });
 
     // Count users by month
-    const userGrowth = last6Months.map((month, idx) => {
+    const userGrowth = last6Months.map((_, idx) => {
       const targetDate = new Date();
       targetDate.setMonth(targetDate.getMonth() - (5 - idx));
       const targetMonth = targetDate.getMonth();

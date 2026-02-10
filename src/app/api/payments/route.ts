@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { createPaymentSchema, validateBody } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,24 +32,20 @@ async function getSupabaseClient() {
 }
 
 // GET - Fetch all payments for the user's tenant
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -81,22 +78,18 @@ export async function GET() {
 // POST - Create a new payment
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -186,7 +179,7 @@ export async function POST(request: Request) {
       reference_number: v.reference_number || null,
       status: v.status,
       notes: v.notes || null,
-      created_by: user.id,
+      created_by: userId,
     };
 
     const { data: payment, error } = await supabase
@@ -247,7 +240,7 @@ export async function POST(request: Request) {
           payment_method: payment.payment_method,
           payment_invoice_id: payment.invoice_id,
           payment_client_id: payment.client_id,
-        }, serviceClient, profile.tenant_id, user.id);
+        }, serviceClient, profile.tenant_id, userId);
       } catch (err) {
         console.error("Workflow trigger error (payment_received):", err);
       }

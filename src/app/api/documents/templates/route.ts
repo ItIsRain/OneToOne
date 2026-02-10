@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { getUserPlanInfo, checkDocumentTemplateLimit } from "@/lib/plan-limits";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -74,6 +75,11 @@ function getFileTypeCategory(mimeType: string, extension: string): string {
 // GET - Fetch all templates
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -81,19 +87,10 @@ export async function GET(request: Request) {
     const search = searchParams.get("search");
     const isActive = searchParams.get("is_active");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -160,21 +157,17 @@ export async function GET(request: Request) {
 // POST - Create a new template
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -182,7 +175,7 @@ export async function POST(request: Request) {
     }
 
     // Check plan limits for document templates
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -256,8 +249,8 @@ export async function POST(request: Request) {
       tags: body.tags || [],
       is_public: body.is_public !== false,
       allowed_roles: body.allowed_roles || [],
-      created_by: user.id,
-      updated_by: user.id,
+      created_by: userId,
+      updated_by: userId,
     };
 
     const { data: template, error } = await supabase

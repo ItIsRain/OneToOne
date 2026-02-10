@@ -1,22 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {

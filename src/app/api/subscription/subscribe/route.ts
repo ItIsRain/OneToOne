@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Hardcoded discount codes
 const DISCOUNT_CODES: Record<string, { discount_percent: number }> = {
@@ -9,12 +10,12 @@ const DISCOUNT_CODES: Record<string, { discount_percent: number }> = {
 // POST - Subscribe to a plan
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const body = await request.json();
     const { plan_type, billing_interval, discount_code } = body;
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

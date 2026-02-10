@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -29,27 +30,23 @@ async function getSupabaseClient() {
 
 // GET - Fetch messages for a conversation
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: conversationId } = await params;
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: conversationId } = await params;
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -61,7 +58,7 @@ export async function GET(
       .from("conversation_participants")
       .select("id")
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     if (!participation) {
@@ -101,7 +98,7 @@ export async function GET(
       .from("conversation_participants")
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("tenant_id", profile.tenant_id);
 
     // Get conversation participants for header display
@@ -123,7 +120,7 @@ export async function GET(
 
     // Get other participants, or self for self-messaging
     let otherParticipants = participants
-      ?.filter((p) => p.user_id !== user.id)
+      ?.filter((p) => p.user_id !== userId)
       .map((p) => p.profiles) || [];
 
     // If no other participants (self-messaging), include self
@@ -134,7 +131,7 @@ export async function GET(
     return NextResponse.json({
       messages: messages || [],
       participants: otherParticipants,
-      currentUserId: user.id,
+      currentUserId: userId,
     });
   } catch (error) {
     console.error("Get messages error:", error);
@@ -144,27 +141,23 @@ export async function GET(
 
 // POST - Send a message to a conversation
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: conversationId } = await params;
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: conversationId } = await params;
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -176,7 +169,7 @@ export async function POST(
       .from("conversation_participants")
       .select("id")
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("tenant_id", profile.tenant_id)
       .single();
 
@@ -201,7 +194,7 @@ export async function POST(
       .from("messages")
       .insert({
         conversation_id: conversationId,
-        sender_id: user.id,
+        sender_id: userId,
         tenant_id: profile.tenant_id,
         content: content || null,
         type,
@@ -237,7 +230,7 @@ export async function POST(
       .from("conversation_participants")
       .update({ last_read_at: new Date().toISOString() })
       .eq("conversation_id", conversationId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("tenant_id", profile.tenant_id);
 
     return NextResponse.json({ message }, { status: 201 });

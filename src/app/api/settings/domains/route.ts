@@ -10,22 +10,23 @@ import {
   getSSLStatusMessage,
   isCustomHostnameActive,
 } from "@/lib/cloudflare";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - Get domain settings (subdomain + custom domain)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's profile to find tenant_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has access to custom domains feature (Business plan)
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     const customDomainAccess = planInfo
       ? checkFeatureAccess(planInfo.planType, "white_label")
       : { allowed: false, reason: "No active subscription" };
@@ -104,18 +105,18 @@ export async function GET(request: NextRequest) {
 // PATCH - Set or update custom domain (Business plan only)
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's profile to find tenant_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -123,7 +124,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Check plan feature access for custom domains (white_label feature)
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -259,18 +260,18 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Remove custom domain
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's profile to find tenant_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

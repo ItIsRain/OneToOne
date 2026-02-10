@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 import Stripe from "stripe";
 
 function getStripe() {
@@ -15,23 +16,20 @@ const COUPON_ID = "UPGRADE50_FIRST_MONTH";
  * Generates a unique Stripe promotion code (50% off first month)
  * for the current tenant. Returns the existing code if already created.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const stripe = getStripe();
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const stripe = getStripe();
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

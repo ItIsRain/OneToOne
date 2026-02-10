@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -62,6 +63,11 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 // GET - Fetch all file shares
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -70,19 +76,10 @@ export async function GET(request: Request) {
     const shareType = searchParams.get("share_type");
     const search = searchParams.get("search");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -158,21 +155,17 @@ export async function GET(request: Request) {
 // POST - Create a new file share
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -230,7 +223,7 @@ export async function POST(request: Request) {
       message: body.message || null,
       notify_on_access: body.notify_on_access || false,
       notify_on_download: body.notify_on_download || false,
-      shared_by: user.id,
+      shared_by: userId,
     };
 
     const { data: share, error } = await supabase

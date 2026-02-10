@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getUserPlanInfo, checkAttendeeLimit } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { validateBody, createAttendeeSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - List all attendees for an event (admin only)
 export async function GET(
@@ -12,19 +13,19 @@ export async function GET(
 ) {
   try {
     const { id: eventId } = await params;
-    const supabase = await createClient();
 
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -173,13 +174,13 @@ export async function POST(
 ) {
   try {
     const { id: eventId } = await params;
-    const supabase = await createClient();
 
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const body = await request.json();
 
@@ -192,7 +193,7 @@ export async function POST(
     const { email, name, phone, company, job_title, skills, bio, status = "confirmed" } = validation.data;
 
     // Check plan limits for attendees per event
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -286,7 +287,7 @@ export async function POST(
             },
             serviceClient,
             eventData.tenant_id,
-            user.id
+            userId
           );
         } catch (err) {
           console.error("Workflow trigger error:", err);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { ALL_PERMISSION_IDS, DEFAULT_MEMBER_PERMISSIONS } from '@/lib/permissions';
+import { getUserIdFromRequest } from '@/hooks/useTenantFromHeaders';
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -36,24 +37,20 @@ async function getSupabaseClient() {
  * - member with custom_role_id: permissions from that role
  * - member without custom role: default limited permissions
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's profile with role and custom_role_id
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role, custom_role_id, tenant_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (profileError || !profile) {

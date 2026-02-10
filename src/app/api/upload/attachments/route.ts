@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { validateAttachmentUpload } from "@/lib/upload-validation";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Configure Cloudinary - support both URL format and separate env vars
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -66,9 +67,9 @@ function sanitizePublicId(fileName: string): string {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -149,14 +150,9 @@ export async function POST(request: Request) {
 // Handle multiple file uploads
 export async function PUT(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

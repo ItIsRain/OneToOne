@@ -1,19 +1,34 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user?.email) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ isAdmin: false, reason: "not_authenticated" });
     }
 
-    const userEmail = user.email.toLowerCase();
+    const serviceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Get user's email from profiles
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!profile?.email) {
+      return NextResponse.json({ isAdmin: false, reason: "not_authenticated" });
+    }
+
+    const userEmail = profile.email.toLowerCase();
 
     // Check if user email exists in platform_admins table
-    const { data: adminRecord, error } = await supabase
+    const { data: adminRecord, error } = await serviceClient
       .from("platform_admins")
       .select("id")
       .eq("email", userEmail)

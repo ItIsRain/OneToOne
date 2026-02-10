@@ -94,8 +94,14 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({
   data: propData,
   isLoading: propLoading,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Determine if we should use props or fetch ourselves
   // If propLoading is provided (even if false), parent is managing data
@@ -150,7 +156,8 @@ export const DashboardBookmarks: React.FC<DashboardBookmarksProps> = ({
     return "#";
   };
 
-  if (effectiveLoading) {
+  // Show skeleton during SSR and loading to prevent hydration mismatch
+  if (!mounted || effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="flex items-center justify-between mb-4">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, createActivityLogSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,6 +32,12 @@ async function getSupabaseClient() {
 // GET - Fetch activity logs
 export async function GET(request: Request) {
   try {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -38,20 +45,11 @@ export async function GET(request: Request) {
     const offset = parseInt(searchParams.get("offset") || "0");
     const entityType = searchParams.get("entity_type");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -94,22 +92,19 @@ export async function GET(request: Request) {
 // POST - Create activity log
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -126,7 +121,7 @@ export async function POST(request: Request) {
 
     const activityData = {
       tenant_id: profile.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: body.action,
       entity_type: body.entity_type,
       entity_id: body.entity_id || null,

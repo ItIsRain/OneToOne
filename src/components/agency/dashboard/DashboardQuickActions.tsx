@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { GroupIcon, CalenderIcon, TaskIcon, DollarLineIcon } from "@/icons";
@@ -59,6 +59,30 @@ const item = {
 };
 
 export const DashboardQuickActions: React.FC = () => {
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch from framer-motion animations
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Show skeleton during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="flex flex-col items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-900 animate-pulse"
+          >
+            <div className="w-11 h-11 rounded-xl bg-gray-100 dark:bg-gray-800" />
+            <div className="h-4 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <motion.div
       className="grid grid-cols-2 gap-3 sm:grid-cols-4"

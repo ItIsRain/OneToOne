@@ -1,43 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
-async function verifyAdmin() {
-  const supabase = await createServerClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !user?.email) {
-    return { authorized: false, error: "Unauthorized", email: null };
-  }
-
-  const serviceClient = createClient(
+function getServiceClient() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+}
+
+async function verifyAdmin(request: Request): Promise<{ authorized: boolean; error?: string; email?: string }> {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return { authorized: false, error: "Unauthorized" };
+  }
+
+  const serviceClient = getServiceClient();
+
+  // Get user's email from profiles
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile?.email) {
+    return { authorized: false, error: "Unauthorized" };
+  }
 
   const { data: adminRecord } = await serviceClient
     .from("platform_admins")
     .select("id")
-    .eq("email", user.email.toLowerCase())
+    .eq("email", profile.email.toLowerCase())
     .maybeSingle();
 
   if (!adminRecord) {
-    return { authorized: false, error: "Forbidden", email: user.email };
+    return { authorized: false, error: "Forbidden" };
   }
 
-  return { authorized: true, email: user.email };
+  return { authorized: true, email: profile.email };
 }
 
-export async function GET() {
-  const authCheck = await verifyAdmin();
+export async function GET(request: NextRequest) {
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     const { data: admins, error } = await serviceClient
@@ -55,15 +65,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const authCheck = await verifyAdmin();
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     const { email, name } = await request.json();
@@ -90,15 +97,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const authCheck = await verifyAdmin();
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     const { id, email } = await request.json();

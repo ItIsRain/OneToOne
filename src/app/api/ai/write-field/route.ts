@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { fieldConfigs } from "@/config/ai-field-prompts";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // In-memory rate limiter: userId -> { count, resetAt }
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -25,31 +24,12 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server component context
-          }
-        },
-      },
-    }
-  );
-}
-
 export async function POST(request: Request) {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -58,17 +38,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = await getSupabaseClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!checkRateLimit(user.id)) {
+  if (!checkRateLimit(userId)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please wait a moment before trying again." },
       { status: 429 }

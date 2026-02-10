@@ -61,3 +61,24 @@ export function getTenantContextFromRequest(request: Request): TenantContext {
     isSubdomainAccess: !!tenantId,
   };
 }
+
+/**
+ * Helper function to read user ID from request headers in API routes.
+ * The middleware sets this after validating the user, so routes can skip
+ * calling getUser() again.
+ *
+ * @param request NextRequest object
+ * @returns User ID or null if not authenticated
+ */
+export function getUserIdFromRequest(request: Request): string | null {
+  return request.headers.get("x-user-id");
+}
+
+/**
+ * Server-side function to read user ID from middleware-injected headers.
+ * Use this in Server Components and API routes.
+ */
+export async function getUserIdFromHeaders(): Promise<string | null> {
+  const headersList = await headers();
+  return headersList.get("x-user-id");
+}

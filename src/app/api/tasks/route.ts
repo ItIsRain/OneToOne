@@ -3,23 +3,23 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { NextRequest, NextResponse } from "next/server";
 import { validateBody, createTaskSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -103,20 +103,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -179,7 +178,7 @@ export async function POST(request: NextRequest) {
       .insert({
         ...filtered,
         tenant_id: profile.tenant_id,
-        created_by: user.id,
+        created_by: userId,
       })
       .select(`
         *,
@@ -231,7 +230,7 @@ export async function POST(request: NextRequest) {
             task_priority: task.priority,
             task_assignee_id: task.assigned_to,
             task_project_id: task.project_id,
-          }, serviceClient, profile.tenant_id, user.id);
+          }, serviceClient, profile.tenant_id, userId);
         } catch (err) {
           console.error("Workflow trigger error (task_created):", err);
         }

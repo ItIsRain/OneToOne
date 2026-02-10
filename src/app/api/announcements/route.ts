@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
 import { validateBody, createAnnouncementSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -45,6 +46,11 @@ async function getSupabaseClient() {
 // GET - Fetch announcements
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -52,20 +58,11 @@ export async function GET(request: Request) {
     const includeUnpublished = searchParams.get("include_unpublished") === "true";
     const category = searchParams.get("category");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -112,22 +109,18 @@ export async function GET(request: Request) {
 // POST - Create announcement
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -198,8 +191,8 @@ export async function POST(request: Request) {
       expires_at: body.expires_at || null,
       target_roles: body.target_roles || [],
       target_users: body.target_users || [],
-      created_by: user.id,
-      updated_by: user.id,
+      created_by: userId,
+      updated_by: userId,
     };
 
     const { data: announcement, error } = await supabase
@@ -216,7 +209,7 @@ export async function POST(request: Request) {
     // Log activity
     await supabase.from("activity_logs").insert({
       tenant_id: profile.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: "created",
       entity_type: "announcement",
       entity_id: announcement.id,

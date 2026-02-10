@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { sendWithProvider } from '@/lib/email/providers';
 import { EmailProvider } from '@/lib/email/types';
+import { getUserIdFromRequest } from '@/hooks/useTenantFromHeaders';
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -32,22 +33,18 @@ async function getSupabaseClient() {
 // POST - Send test email
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's email and profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('tenant_id, first_name, email')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -57,8 +54,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { test_email } = body;
 
-    // Use provided test email or user's email
-    const recipientEmail = test_email || user.email;
+    // Use provided test email or profile email
+    const recipientEmail = test_email || profile.email;
 
     if (!recipientEmail) {
       return NextResponse.json({ error: 'No email address provided' }, { status: 400 });

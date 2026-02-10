@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, updateTimeEntrySchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -34,23 +35,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -92,23 +89,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's profile with tenant_id and role
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {
@@ -136,7 +129,7 @@ export async function PATCH(
     }
 
     const isAdmin = ["owner", "admin"].includes(currentProfile.role);
-    const isOwner = existingEntry.user_id === user.id;
+    const isOwner = existingEntry.user_id === userId;
 
     // Only the owner or admin can edit entries
     if (!isAdmin && !isOwner) {
@@ -208,7 +201,7 @@ export async function PATCH(
 
       // Handle approval
       if (body.status === "approved" && existingEntry.status !== "approved") {
-        updates.approved_by = user.id;
+        updates.approved_by = userId;
         updates.approved_at = new Date().toISOString();
       }
     }
@@ -255,23 +248,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await getSupabaseClient();
-    const { id } = await params;
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
+    const { id } = await params;
 
     // Get user's profile with tenant_id and role
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {
@@ -291,7 +280,7 @@ export async function DELETE(
     }
 
     const isAdmin = ["owner", "admin"].includes(currentProfile.role);
-    const isOwner = existingEntry.user_id === user.id;
+    const isOwner = existingEntry.user_id === userId;
 
     // Only owner or admin can delete
     if (!isAdmin && !isOwner) {

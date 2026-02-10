@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 interface RouteParams {
   params: Promise<{
@@ -13,15 +14,13 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     // Fetch call with RLS enforcement
     const { data: call, error } = await supabase
@@ -56,15 +55,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     const body = await request.json();
 
@@ -118,15 +115,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     const { error } = await supabase
       .from("voice_agent_calls")

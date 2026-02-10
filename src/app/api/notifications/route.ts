@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
     const read = searchParams.get("read");
     const type = searchParams.get("type");
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       const { count: unreadCount, error } = await supabase
         .from("notifications")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("read", false);
 
       if (error) {
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("notifications")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -59,10 +60,10 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const supabase = await createClient();
     const body = await request.json();
     const { ids, all } = body;
 
@@ -70,7 +71,7 @@ export async function PATCH(request: NextRequest) {
       const { error } = await supabase
         .from("notifications")
         .update({ read: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("read", false);
 
       if (error) {
@@ -84,7 +85,7 @@ export async function PATCH(request: NextRequest) {
       const { error } = await supabase
         .from("notifications")
         .update({ read: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .in("id", ids);
 
       if (error) {
@@ -103,10 +104,10 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const supabase = await createClient();
     const body = await request.json();
     const { ids, all } = body;
 
@@ -114,7 +115,7 @@ export async function DELETE(request: NextRequest) {
       const { error } = await supabase
         .from("notifications")
         .delete()
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -127,7 +128,7 @@ export async function DELETE(request: NextRequest) {
       const { error } = await supabase
         .from("notifications")
         .delete()
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .in("id", ids);
 
       if (error) {

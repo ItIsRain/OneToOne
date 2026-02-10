@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { createInvoiceSchema, validateBody } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -82,6 +83,12 @@ async function generateUniqueInvoiceNumber(
 // GET - Fetch all invoices for the user's tenant
 export async function GET(request: Request) {
   try {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -90,20 +97,11 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));
     const offset = (page - 1) * limit;
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -111,7 +109,7 @@ export async function GET(request: Request) {
     }
 
     // Check plan feature access for invoicing
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -171,22 +169,19 @@ export async function GET(request: Request) {
 // POST - Create a new invoice
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -194,7 +189,7 @@ export async function POST(request: Request) {
     }
 
     // Check plan feature access for invoicing
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -356,7 +351,7 @@ export async function POST(request: Request) {
       po_number: body.po_number || null,
       reference_number: body.reference_number || null,
       tags: body.tags || null,
-      created_by: user.id,
+      created_by: userId,
     };
 
     const { data: invoice, error } = await supabase
@@ -420,7 +415,7 @@ export async function POST(request: Request) {
           invoice_amount: invoice.total,
           invoice_client_id: invoice.client_id,
           invoice_due_date: invoice.due_date,
-        }, serviceClient, profile.tenant_id, user.id);
+        }, serviceClient, profile.tenant_id, userId);
       } catch (err) {
         console.error("Workflow trigger error (invoice_created):", err);
       }

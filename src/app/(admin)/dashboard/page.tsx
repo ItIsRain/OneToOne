@@ -230,7 +230,16 @@ function DashboardContent() {
     if (!isVisible(key)) return null;
     switch (key) {
       case "greeting":
-        return <DashboardGreeting key="greeting" firstName={data?.user?.firstName} />;
+        return (
+          <DashboardGreeting
+            key="greeting"
+            firstName={data?.user?.firstName}
+            overdueTasks={data?.metrics?.overdueTasks || 0}
+            todayEvents={data?.briefing?.todaySchedule?.length || 0}
+            unpaidInvoices={data?.metrics?.overdueInvoices || 0}
+            isLoading={isLoading}
+          />
+        );
       case "briefing":
         return <MorningBriefing key={`briefing-${refreshKey}`} data={data?.briefing} isLoading={isLoading} />;
       case "metrics":

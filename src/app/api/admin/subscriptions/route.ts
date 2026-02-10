@@ -1,38 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
-async function verifyAdmin() {
-  const supabase = await createServerClient();
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
-  if (userError || !user?.email) {
-    return { authorized: false, error: "Unauthorized", userId: null };
+async function verifyAdmin(request: Request): Promise<{ authorized: boolean; error?: string; userId?: string }> {
+  const userId = getUserIdFromRequest(request);
+  if (!userId) {
+    return { authorized: false, error: "Unauthorized" };
   }
 
-  const { data: adminRecord } = await supabase
+  const serviceClient = getServiceClient();
+
+  // Get user's email from profiles
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!profile?.email) {
+    return { authorized: false, error: "Unauthorized" };
+  }
+
+  const { data: adminRecord } = await serviceClient
     .from("platform_admins")
     .select("id")
-    .eq("email", user.email.toLowerCase())
+    .eq("email", profile.email.toLowerCase())
     .maybeSingle();
 
   if (!adminRecord) {
-    return { authorized: false, error: "Forbidden", userId: null };
+    return { authorized: false, error: "Forbidden" };
   }
 
-  return { authorized: true, userId: user.id };
+  return { authorized: true, userId };
 }
 
-export async function GET() {
-  const authCheck = await verifyAdmin();
+export async function GET(request: NextRequest) {
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     // Fetch tenants with their subscriptions
@@ -78,7 +93,6 @@ export async function GET() {
       const sub = subscriptionMap.get(t.id);
       const now = new Date();
       const trialEndsAt = sub?.trial_ends_at ? new Date(sub.trial_ends_at) : null;
-      const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end) : null;
 
       // Determine subscription type
       // Priority: granted > expired trial > active trial > paid > free
@@ -179,15 +193,12 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const authCheck = await verifyAdmin();
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     const { id, plan } = await request.json();
@@ -234,15 +245,12 @@ export async function PATCH(request: NextRequest) {
 
 // POST - Grant subscription to tenant
 export async function POST(request: NextRequest) {
-  const authCheck = await verifyAdmin();
+  const authCheck = await verifyAdmin(request);
   if (!authCheck.authorized || !authCheck.userId) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.error === "Forbidden" ? 403 : 401 });
   }
 
-  const serviceClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const serviceClient = getServiceClient();
 
   try {
     const { tenant_id, plan, days, reason } = await request.json();

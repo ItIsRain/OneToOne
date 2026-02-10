@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, createBookmarkSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,26 +32,22 @@ async function getSupabaseClient() {
 // GET - Fetch user's bookmarks
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
     const entityType = searchParams.get("entity_type");
     const folder = searchParams.get("folder");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Build query
     let query = supabase
       .from("bookmarks")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
 
@@ -82,22 +79,18 @@ export async function GET(request: Request) {
 // POST - Create bookmark
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -117,7 +110,7 @@ export async function POST(request: Request) {
       const { data: existing } = await supabase
         .from("bookmarks")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("entity_type", body.entity_type)
         .eq("entity_id", body.entity_id)
         .single();
@@ -132,7 +125,7 @@ export async function POST(request: Request) {
 
     const bookmarkData = {
       tenant_id: profile.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       entity_type: body.entity_type,
       entity_id: body.entity_id || null,
       entity_name: body.entity_name,

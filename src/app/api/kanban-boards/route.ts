@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateBody, createKanbanBoardSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     // Get user's tenant_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -55,17 +56,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     const allowedFields = ["name", "description", "project_id", "columns", "settings"];
     const insertData: Record<string, unknown> = {
       tenant_id: profile.tenant_id,
-      created_by: user.id,
+      created_by: userId,
     };
     for (const key of allowedFields) {
       if (body[key] !== undefined) {

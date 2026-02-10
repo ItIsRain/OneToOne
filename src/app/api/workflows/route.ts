@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateBody, createWorkflowSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const supabase = await createClient();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
@@ -47,15 +48,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = getUserIdFromRequest(request);
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", user.id).single();
+    const supabase = await createClient();
+    const { data: profile } = await supabase.from("profiles").select("tenant_id").eq("id", userId).single();
     if (!profile?.tenant_id) return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     const tenantId = profile.tenant_id;
 
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       .from("workflows")
       .insert({
         tenant_id: tenantId,
-        created_by: user.id,
+        created_by: userId,
         name: v.name,
         description: v.description || null,
         trigger_type: v.trigger_type,

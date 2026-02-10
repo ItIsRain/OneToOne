@@ -1,32 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { getIntegrationProvider } from '@/config/integrationProviders';
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
+import { getUserIdFromRequest } from '@/hooks/useTenantFromHeaders';
 
 function maskValue(value: string): string {
   if (!value || value.length < 8) return '••••••••';
@@ -59,23 +34,19 @@ function maskConfig(
 }
 
 // GET - Fetch all integration configs for current tenant
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('tenant_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -108,21 +79,17 @@ export async function GET() {
 // POST - Save/update an integration config
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from('profiles')
       .select('tenant_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (!profile?.tenant_id) {

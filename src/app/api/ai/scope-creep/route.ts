@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Rate limiter: 10 requests per 60 seconds per user
 const rateMap = new Map<string, { count: number; reset: number }>();
@@ -24,20 +25,18 @@ function safeRelation(row: any): any {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -304,24 +303,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "AI not configured" }, { status: 503 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Use user ID from middleware header (already validated) to skip getUser() call
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!checkRate(user.id)) {
+    if (!checkRate(userId)) {
       return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
     }
+
+    const supabase = await createClient();
 
     const { data: userProfile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!userProfile?.tenant_id) {

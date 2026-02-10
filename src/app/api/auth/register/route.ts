@@ -76,28 +76,21 @@ export async function POST(request: Request) {
       },
     });
 
-    // Check if subdomain is reserved
-    const { data: reservedSubdomain } = await supabase
-      .from("reserved_subdomains")
-      .select("subdomain, reason")
-      .eq("subdomain", subdomain.toLowerCase())
-      .single();
+    // Check subdomain availability in parallel (reserved + existing tenant)
+    const [reservedResult, existingResult] = await Promise.all([
+      supabase
+        .from("reserved_subdomains")
+        .select("subdomain")
+        .eq("subdomain", subdomain.toLowerCase())
+        .single(),
+      supabase
+        .from("tenants")
+        .select("id")
+        .eq("subdomain", subdomain)
+        .single(),
+    ]);
 
-    if (reservedSubdomain) {
-      return NextResponse.json(
-        { error: "This subdomain is not available" },
-        { status: 400 }
-      );
-    }
-
-    // Check if subdomain is already taken
-    const { data: existingTenant } = await supabase
-      .from("tenants")
-      .select("id")
-      .eq("subdomain", subdomain)
-      .single();
-
-    if (existingTenant) {
+    if (reservedResult.data || existingResult.data) {
       return NextResponse.json(
         { error: "This subdomain is not available" },
         { status: 400 }
@@ -119,8 +112,15 @@ export async function POST(request: Request) {
 
     if (authError) {
       console.error("Auth error:", authError);
+      // Handle specific auth errors with user-friendly messages
+      let errorMessage = authError.message;
+      if (authError.code === "phone_exists") {
+        errorMessage = "This phone number is already registered. Please use a different phone number or sign in.";
+      } else if (authError.code === "email_exists") {
+        errorMessage = "This email is already registered. Please sign in instead.";
+      }
       return NextResponse.json(
-        { error: authError.message },
+        { error: errorMessage },
         { status: 400 }
       );
     }

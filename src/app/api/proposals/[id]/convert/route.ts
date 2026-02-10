@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { mapProposalToContractSections } from "@/lib/pipeline/utils";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -35,23 +36,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -87,7 +84,7 @@ export async function POST(
 
     if (body.mode === "pipeline") {
       // Pipeline mode: create a contract from the proposal
-      const planInfo = await getUserPlanInfo(supabase, user.id);
+      const planInfo = await getUserPlanInfo(supabase, userId);
       if (!planInfo) {
         return NextResponse.json(
           { error: "No active subscription found", upgrade_required: true },
@@ -134,7 +131,7 @@ export async function POST(
           sections: contractSections,
           description: `Generated from proposal: ${proposal.title}`,
           tags: ["pipeline:auto-generated"],
-          created_by: user.id,
+          created_by: userId,
         })
         .select("*")
         .single();
@@ -202,7 +199,7 @@ export async function POST(
         status: "planning",
         budget_amount: proposal.total || 0,
         budget_currency: proposal.currency || "USD",
-        created_by: user.id,
+        created_by: userId,
       })
       .select()
       .single();
@@ -257,7 +254,7 @@ export async function POST(
         amount: invoiceTotal,
         status: "draft",
         currency: proposal.currency || "USD",
-        created_by: user.id,
+        created_by: userId,
       })
       .select()
       .single();

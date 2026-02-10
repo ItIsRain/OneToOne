@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, createPayrollRunSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -31,6 +32,11 @@ async function getSupabaseClient() {
 // GET - Fetch all payroll runs for the user's tenant
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -38,20 +44,11 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const year = searchParams.get("year");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id and role from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -126,22 +123,18 @@ export async function GET(request: Request) {
 // POST - Create a new payroll run
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's profile with tenant_id and role
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("tenant_id, role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!currentProfile?.tenant_id) {
@@ -178,7 +171,7 @@ export async function POST(request: Request) {
       name: body.name || `Payroll ${body.period_start} - ${body.period_end}`,
       status: "draft",
       notes: body.notes || null,
-      created_by: user.id,
+      created_by: userId,
     };
 
     const { data: payrollRun, error } = await supabase

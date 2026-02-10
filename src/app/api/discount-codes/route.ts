@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Hardcoded discount codes (can be moved to database later)
 const DISCOUNT_CODES: Record<string, { discount_percent: number; description: string; max_uses?: number; expires_at?: string }> = {
@@ -13,10 +13,8 @@ const DISCOUNT_CODES: Record<string, { discount_percent: number; description: st
 // POST - Validate and apply discount code
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

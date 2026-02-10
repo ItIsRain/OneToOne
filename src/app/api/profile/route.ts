@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { validateBody, updateProfileSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -28,23 +29,19 @@ async function getSupabaseClient() {
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (profileError) {
@@ -60,16 +57,12 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const updates = await request.json();
 
@@ -102,7 +95,7 @@ export async function PATCH(request: Request) {
     const { data: profile, error: updateError } = await supabase
       .from("profiles")
       .update(sanitizedUpdates)
-      .eq("id", user.id)
+      .eq("id", userId)
       .select()
       .single();
 

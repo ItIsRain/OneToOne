@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateBody, createContractSchema } from "@/lib/validations";
 import { checkTriggers } from "@/lib/workflows/triggers";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 async function getSupabaseClient() {
   const cookieStore = await cookies();
@@ -34,6 +35,11 @@ async function getSupabaseClient() {
 // GET - Fetch contracts for the user's tenant with pagination
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -47,26 +53,17 @@ export async function GET(request: Request) {
     const clientId = searchParams.get("client_id");
     const search = searchParams.get("search");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -142,28 +139,24 @@ export async function GET(request: Request) {
 // POST - Create a new contract
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
       return NextResponse.json({ error: "No tenant found" }, { status: 400 });
     }
 
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     if (!planInfo) {
       return NextResponse.json(
         { error: "No active subscription found", upgrade_required: true },
@@ -222,7 +215,7 @@ export async function POST(request: Request) {
 
     const contractData = {
       tenant_id: profile.tenant_id,
-      created_by: user.id,
+      created_by: userId,
       name: body.title,
       slug,
       client_id: body.client_id || null,
@@ -264,7 +257,7 @@ export async function POST(request: Request) {
           contract_title: contract.name,
           client_id: contract.client_id,
           total: contract.value || 0,
-        }, serviceClient, profile.tenant_id, user.id);
+        }, serviceClient, profile.tenant_id, userId);
       } catch (err) {
         console.error("Workflow trigger error:", err);
       }

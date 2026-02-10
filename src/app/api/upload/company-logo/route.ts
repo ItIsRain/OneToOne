@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateImageUpload } from "@/lib/upload-validation";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -19,22 +20,20 @@ if (cloudinaryUrl) {
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Create supabase client for DB operations
+    const supabase = await createClient();
 
     // Get tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -42,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // Check plan allows custom branding
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     const brandingCheck = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
     if (!brandingCheck.allowed) {
       return NextResponse.json(
@@ -90,23 +89,21 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Fast auth check from middleware header
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Create supabase client for DB operations
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -114,7 +111,7 @@ export async function DELETE() {
     }
 
     // Check plan allows custom branding
-    const planInfo = await getUserPlanInfo(supabase, user.id);
+    const planInfo = await getUserPlanInfo(supabase, userId);
     const brandingCheck = checkFeatureAccess(planInfo?.planType || "free", "custom_branding");
     if (!brandingCheck.allowed) {
       return NextResponse.json(

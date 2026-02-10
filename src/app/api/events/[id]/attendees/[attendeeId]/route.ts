@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { validateBody, updateAttendeeSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // GET - Get single attendee details (admin only)
 export async function GET(
@@ -8,20 +9,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string; attendeeId: string }> }
 ) {
   try {
-    const { id: eventId, attendeeId } = await params;
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: eventId, attendeeId } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -114,20 +114,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; attendeeId: string }> }
 ) {
   try {
-    const { id: eventId, attendeeId } = await params;
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: eventId, attendeeId } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -190,20 +189,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; attendeeId: string }> }
 ) {
   try {
-    const { id: eventId, attendeeId } = await params;
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id: eventId, attendeeId } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

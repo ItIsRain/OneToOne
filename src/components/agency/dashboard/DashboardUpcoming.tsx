@@ -53,10 +53,16 @@ export const DashboardUpcoming: React.FC<DashboardUpcomingProps> = ({
   data: propData,
   isLoading: propLoading,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<UpcomingData>({ tasks: [], events: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<"tasks" | "events">("tasks");
+
+  // Prevent hydration mismatch from Date() calls
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Determine if we should use props or fetch ourselves
   // If propLoading is provided (even if false), parent is managing data
@@ -137,7 +143,8 @@ export const DashboardUpcoming: React.FC<DashboardUpcomingProps> = ({
     return new Date(dateString) < new Date();
   };
 
-  if (effectiveLoading) {
+  // Show skeleton during SSR and loading to prevent hydration mismatch
+  if (!mounted || effectiveLoading) {
     return (
       <div className="rounded-xl border border-gray-100 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 md:p-6">
         <div className="h-6 w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />

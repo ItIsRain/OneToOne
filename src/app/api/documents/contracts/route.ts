@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { v2 as cloudinary } from "cloudinary";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 // Parse CLOUDINARY_URL
 const cloudinaryUrl = process.env.CLOUDINARY_URL;
@@ -44,6 +45,11 @@ async function getSupabaseClient() {
 // GET - Fetch all contracts for the user's tenant
 export async function GET(request: Request) {
   try {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = await getSupabaseClient();
     const { searchParams } = new URL(request.url);
 
@@ -55,20 +61,11 @@ export async function GET(request: Request) {
     const search = searchParams.get("search");
     const expiringSoon = searchParams.get("expiring_soon");
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -168,22 +165,18 @@ export async function GET(request: Request) {
 // POST - Create a new contract
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const supabase = await getSupabaseClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -253,8 +246,8 @@ export async function POST(request: Request) {
       reminder_enabled: body.reminder_enabled !== false,
       reminder_days_before: body.reminder_days_before || 30,
       metadata: body.metadata || {},
-      created_by: user.id,
-      updated_by: user.id,
+      created_by: userId,
+      updated_by: userId,
     };
 
     const { data: contract, error } = await supabase
@@ -278,13 +271,13 @@ export async function POST(request: Request) {
       contract_id: contract.id,
       action: "created",
       description: `Contract "${contract.name}" was created`,
-      performed_by: user.id,
+      performed_by: userId,
     });
 
     // Also log to activity_logs
     await supabase.from("activity_logs").insert({
       tenant_id: profile.tenant_id,
-      user_id: user.id,
+      user_id: userId,
       action: "created",
       entity_type: "contract",
       entity_id: contract.id,

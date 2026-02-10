@@ -3,27 +3,26 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { validateBody, updateTaskSchema } from "@/lib/validations";
+import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -89,21 +88,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {
@@ -355,14 +352,14 @@ export async function PATCH(
           task_project_id: task.project_id,
         };
         try {
-          await checkTriggers("task_status_changed", triggerData, serviceClient, oldTask.tenant_id, user.id);
+          await checkTriggers("task_status_changed", triggerData, serviceClient, oldTask.tenant_id, userId);
         } catch (err) {
           console.error("Workflow trigger error:", err);
         }
         // Also fire task_completed trigger when completing
         if (body.status === "completed") {
           try {
-            await checkTriggers("task_completed", triggerData, serviceClient, oldTask.tenant_id, user.id);
+            await checkTriggers("task_completed", triggerData, serviceClient, oldTask.tenant_id, userId);
           } catch (err) {
             console.error("Workflow trigger error (task_completed):", err);
           }
@@ -385,21 +382,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const userId = getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { id } = await params;
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single();
 
     if (!profile?.tenant_id) {

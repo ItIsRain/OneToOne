@@ -4,6 +4,41 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getMainDomains, extractSubdomain, getCookieDomain, getMainUrl, isLocalDev } from "@/lib/url";
 
+// ── Tenant cache (in-memory with TTL) ──
+// Reduces DB queries from every request to once per 2 minutes per subdomain
+interface TenantCache {
+  data: {
+    id: string;
+    subdomain: string;
+    name: string;
+    logo_url: string | null;
+    primary_color: string | null;
+    custom_domain: string | null;
+    custom_domain_verified: boolean | null;
+  };
+  expiresAt: number;
+}
+const tenantCache = new Map<string, TenantCache>();
+const TENANT_CACHE_TTL = 120000; // 2 minutes
+
+function getCachedTenant(key: string): TenantCache["data"] | null {
+  const cached = tenantCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  if (cached) tenantCache.delete(key);
+  return null;
+}
+
+function setCachedTenant(key: string, data: TenantCache["data"]): void {
+  // Limit cache size to prevent memory issues
+  if (tenantCache.size > 1000) {
+    const firstKey = tenantCache.keys().next().value;
+    if (firstKey) tenantCache.delete(firstKey);
+  }
+  tenantCache.set(key, { data, expiresAt: Date.now() + TENANT_CACHE_TTL });
+}
+
 // ── Subscription cache token helpers ──
 // Uses HMAC to sign the token so it can't be forged by clients
 async function createSubCacheToken(userId: string, tenantId: string, secret: string): Promise<string> {
@@ -221,29 +256,43 @@ export async function middleware(request: NextRequest) {
 
   // ── Step 1: Tenant header injection (subdomain / custom domain) ──
   if (!isMainDomain && isSupabaseConfigured) {
-    const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
-
     let tenant = null;
+    const cacheKey = subdomain ? `sub:${subdomain}` : isCustomDomain ? `dom:${hostname.split(":")[0]}` : null;
 
-    if (subdomain) {
-      const { data } = await serviceClient
-        .from("tenants")
-        .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
-        .eq("subdomain", subdomain)
-        .single();
-      tenant = data;
-    } else if (isCustomDomain) {
-      const customDomain = hostname.split(":")[0];
-      const { data } = await serviceClient
-        .from("tenants")
-        .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
-        .eq("custom_domain", customDomain)
-        .single();
-      tenant = data;
+    // Try cache first
+    if (cacheKey) {
+      tenant = getCachedTenant(cacheKey);
+    }
 
-      if (tenant && !tenant.custom_domain_verified) {
-        return applySecurityHeaders(NextResponse.redirect(new URL("/unverified-domain", request.url)));
+    // Cache miss - query database
+    if (!tenant && cacheKey) {
+      const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!);
+
+      if (subdomain) {
+        const { data } = await serviceClient
+          .from("tenants")
+          .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
+          .eq("subdomain", subdomain)
+          .single();
+        tenant = data;
+      } else if (isCustomDomain) {
+        const customDomain = hostname.split(":")[0];
+        const { data } = await serviceClient
+          .from("tenants")
+          .select("id, subdomain, name, logo_url, primary_color, custom_domain, custom_domain_verified")
+          .eq("custom_domain", customDomain)
+          .single();
+        tenant = data;
       }
+
+      // Cache the result (even null for invalid subdomains - but with shorter TTL)
+      if (tenant) {
+        setCachedTenant(cacheKey, tenant);
+      }
+    }
+
+    if (isCustomDomain && tenant && !tenant.custom_domain_verified) {
+      return applySecurityHeaders(NextResponse.redirect(new URL("/unverified-domain", request.url)));
     }
 
     if (!tenant && (subdomain || isCustomDomain)) {
@@ -377,6 +426,11 @@ export async function middleware(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
+
+  // Pass user ID to downstream routes to avoid redundant getUser() calls
+  if (user) {
+    requestHeaders.set("x-user-id", user.id);
+  }
 
   // ── Local dev: auto-detect tenant from authenticated user ──
   if (isMainDomain && isLocalDev() && user && !requestHeaders.has("x-tenant-id") && isSupabaseConfigured) {
