@@ -428,8 +428,14 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   // Pass user ID to downstream routes to avoid redundant getUser() calls
+  // Must recreate response after setting header since NextResponse.next() clones headers
   if (user) {
     requestHeaders.set("x-user-id", user.id);
+    const existingCookies = response.cookies.getAll();
+    response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    existingCookies.forEach((c) => response.cookies.set(c.name, c.value));
   }
 
   // ── Local dev: auto-detect tenant from authenticated user ──
