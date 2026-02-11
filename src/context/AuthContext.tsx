@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { getBaseDomain, isLocalDev } from "@/lib/url";
 
 export type Profile = {
   id: string;
@@ -51,15 +50,18 @@ function getCookie(name: string): string | null {
 
 /**
  * Cookie domain for cross-subdomain sharing.
- * Returns ".; Domain=.{baseDomain}" in production, empty for localhost.
+ * Returns "; Domain=.{baseDomain}" for production and "; Domain=.localhost" for local dev.
  */
 function getCookieDomainAttr(): string {
   if (typeof window === "undefined") return "";
-  if (isLocalDev()) return "";
-  const base = getBaseDomain();
   const host = window.location.hostname;
-  if (host === base || host.endsWith(`.${base}`)) {
-    return `; Domain=.${base}`;
+  // Production: .1i1.ae
+  if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
+    return "; Domain=.1i1.ae";
+  }
+  // Local dev: .localhost for subdomain support (e.g., lunarltd.localhost)
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return "; Domain=.localhost";
   }
   return "";
 }

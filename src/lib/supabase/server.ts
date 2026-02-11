@@ -6,6 +6,10 @@ function getCookieDomain(headerStore: Headers): string | undefined {
   if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
     return ".1i1.ae";
   }
+  // For *.localhost subdomains, share cookies across all localhost subdomains
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return ".localhost";
+  }
   return undefined;
 }
 

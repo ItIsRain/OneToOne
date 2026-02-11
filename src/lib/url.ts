@@ -52,14 +52,17 @@ export function getSubdomainSuffix(): string {
 /**
  * Cookie domain for cross-subdomain auth.
  *   Production: ".1i1.ae"  (shared across subdomains)
- *   Local:      undefined  (default browser behavior)
+ *   Local:      ".localhost" (shared across *.localhost subdomains)
  */
 export function getCookieDomain(hostname: string): string | undefined {
-  const base = getBaseDomain();
-  if (isLocalDev()) return undefined;
   const host = hostname.split(":")[0];
-  if (host === base || host.endsWith(`.${base}`)) {
-    return `.${base}`;
+  // Production: .1i1.ae
+  if (host === "1i1.ae" || host.endsWith(".1i1.ae")) {
+    return ".1i1.ae";
+  }
+  // Local dev: .localhost for subdomain support (e.g., lunarltd.localhost)
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return ".localhost";
   }
   return undefined;
 }
