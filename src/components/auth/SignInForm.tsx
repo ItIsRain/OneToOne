@@ -51,10 +51,12 @@ export default function SignInForm() {
       if (redirectPath) {
         try {
           const redirectUrl = new URL(redirectPath);
-          // Full URL - validate it's our domain
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://1i1.ae";
-          const appHost = new URL(appUrl).hostname;
-          if (redirectUrl.hostname === appHost || redirectUrl.hostname.endsWith(`.${appHost}`)) {
+          // Full URL - validate it's our domain (check for 1i1.ae regardless of env var)
+          const allowedDomains = ["1i1.ae", "localhost"];
+          const isAllowed = allowedDomains.some(domain =>
+            redirectUrl.hostname === domain || redirectUrl.hostname.endsWith(`.${domain}`)
+          );
+          if (isAllowed) {
             finalRedirect = redirectPath;
             redirectIsFullUrl = true;
           }
@@ -66,29 +68,36 @@ export default function SignInForm() {
         }
       }
 
-      // If redirect is not a full URL, try to get tenant subdomain
-      if (!redirectIsFullUrl) {
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("tenant_id")
-            .eq("id", authData.user.id)
+      // For full URL redirects (cross-subdomain), skip REST queries to avoid CORS issues
+      // Auth cookies are cross-subdomain (.1i1.ae), so session will work on destination
+      if (redirectIsFullUrl) {
+        // Small delay to let auth cookies settle, then redirect
+        await new Promise(resolve => setTimeout(resolve, 100));
+        window.location.assign(finalRedirect);
+        return;
+      }
+
+      // For path-only redirects, look up tenant to build full URL
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("tenant_id")
+          .eq("id", authData.user.id)
+          .single();
+
+        if (profile?.tenant_id) {
+          const { data: tenant } = await supabase
+            .from("tenants")
+            .select("subdomain")
+            .eq("id", profile.tenant_id)
             .single();
 
-          if (profile?.tenant_id) {
-            const { data: tenant } = await supabase
-              .from("tenants")
-              .select("subdomain")
-              .eq("id", profile.tenant_id)
-              .single();
-
-            if (tenant?.subdomain) {
-              finalRedirect = getTenantUrl(tenant.subdomain, finalRedirect);
-            }
+          if (tenant?.subdomain) {
+            finalRedirect = getTenantUrl(tenant.subdomain, finalRedirect);
           }
-        } catch {
-          // Ignore query errors, just redirect to default
         }
+      } catch {
+        // Ignore query errors, just redirect to default
       }
 
       // Verify session is established before redirecting
