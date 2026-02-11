@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import { SessionExpiredError } from "@/lib/fetch";
 
 interface Activity {
   id: string;
@@ -142,7 +143,7 @@ export const DashboardActivity: React.FC<DashboardActivityProps> = ({ data: prop
 
       if (!res.ok) {
         if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
-          throw new Error("Session expired. Please refresh the page.");
+          throw new SessionExpiredError();
         }
         const data = await res.json().catch(() => ({}));
         throw new Error((data as Record<string, string>).error || "Failed to fetch activities");

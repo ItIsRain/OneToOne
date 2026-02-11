@@ -1,11 +1,33 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, memo } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { Modal } from "@/components/ui/modal";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
 import TextArea from "@/components/form/input/TextArea";
 import Label from "@/components/form/Label";
+
+// Moved outside component to avoid recreation on every render
+function formatDate(dateString: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const diffTime = date.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+  if (diffDays < 0) return `${Math.abs(diffDays)}d ago`;
+  if (diffDays <= 7) return `${diffDays}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isOverdue(dateString: string, status: string): boolean {
+  if (!dateString || status === "completed") return false;
+  return new Date(dateString) < new Date();
+}
 
 // ===============================
 // TYPES
@@ -153,7 +175,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     }
   }, [selectedProjectId]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const response = await fetch("/api/projects");
       if (response.ok) {
@@ -163,9 +185,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     } catch (err) {
       console.error("Error fetching projects:", err);
     }
-  };
+  }, []);
 
-  const fetchProfiles = async () => {
+  const fetchProfiles = useCallback(async () => {
     try {
       const response = await fetch("/api/profiles");
       if (response.ok) {
@@ -175,27 +197,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     } catch (err) {
       console.error("Error fetching profiles:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTasks();
     fetchProjects();
     fetchProfiles();
-  }, [fetchTasks]);
+  }, [fetchTasks, fetchProjects, fetchProfiles]);
 
-  // Filter tasks
-  const filteredTasks = tasks.filter((task) => {
+  // Filter tasks - memoized
+  const filteredTasks = useMemo(() => tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.task_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.description?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
-  });
+  }), [tasks, searchQuery]);
 
-  // Get tasks by column
-  const getColumnTasks = (columnKey: string) => {
-    return filteredTasks.filter((t) => t.status === columnKey);
-  };
+  // Get tasks by column - memoized by column
+  const tasksByColumn = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const col of defaultColumns) {
+      map.set(col.key, filteredTasks.filter((t) => t.status === col.key));
+    }
+    return map;
+  }, [filteredTasks]);
+
+  const getColumnTasks = useCallback((columnKey: string) => {
+    return tasksByColumn.get(columnKey) || [];
+  }, [tasksByColumn]);
 
   // Task status update
   const handleStatusChange = async (taskId: string, newStatus: string, newPosition?: number) => {
@@ -271,36 +301,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
     }
   };
 
-  // Format helpers
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (date.toDateString() === today.toDateString()) return "Today";
-    if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-    if (diffDays < 0) return `${Math.abs(diffDays)}d ago`;
-    if (diffDays <= 7) return `${diffDays}d`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const isOverdue = (dateString: string, status: string) => {
-    if (!dateString || status === "completed") return false;
-    return new Date(dateString) < new Date();
-  };
-
-  // Stats
-  const stats = {
+  // Stats - memoized
+  const stats = useMemo(() => ({
     total: filteredTasks.length,
     todo: filteredTasks.filter((t) => t.status === "todo" || t.status === "backlog").length,
     inProgress: filteredTasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length,
     completed: filteredTasks.filter((t) => t.status === "completed").length,
     overdue: filteredTasks.filter((t) => isOverdue(t.due_date, t.status)).length,
-  };
+  }), [filteredTasks]);
 
   // Quick add task handler
   const openQuickAdd = (columnKey: string) => {
@@ -435,8 +443,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId }) => {
                     onDragEnd={handleDragEnd}
                     onClick={() => setSelectedTask(task)}
                     isDragging={draggedTask?.id === task.id}
-                    formatDate={formatDate}
-                    isOverdue={isOverdue}
                   />
                 ))}
 
@@ -506,19 +512,15 @@ interface TaskCardProps {
   onDragEnd: (e: React.DragEvent) => void;
   onClick: () => void;
   isDragging: boolean;
-  formatDate: (date: string) => string;
-  isOverdue: (date: string, status: string) => boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({
+const TaskCard = memo<TaskCardProps>(function TaskCard({
   task,
   onDragStart,
   onDragEnd,
   onClick,
   isDragging,
-  formatDate,
-  isOverdue,
-}) => {
+}) {
   return (
     <div
       draggable
@@ -641,7 +643,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 // ===============================
 // QUICK ADD TASK MODAL

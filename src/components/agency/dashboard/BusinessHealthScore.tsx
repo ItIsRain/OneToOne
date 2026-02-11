@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface CategoryDetails {
@@ -185,7 +185,7 @@ function formatDetailValue(key: string, value: string | number | null | undefine
   return value.toLocaleString();
 }
 
-function CircularGauge({ score, size = 200 }: { score: number; size?: number }) {
+const CircularGauge = memo(function CircularGauge({ score, size = 200 }: { score: number; size?: number }) {
   const animatedScore = useCountUp(score, 2000);
   const color = getScoreColor(score);
   const strokeWidth = 12;
@@ -257,9 +257,9 @@ function CircularGauge({ score, size = 200 }: { score: number; size?: number }) 
       </div>
     </div>
   );
-}
+});
 
-function MiniBar({ score, color }: { score: number; color: string }) {
+const MiniBar = memo(function MiniBar({ score, color }: { score: number; color: string }) {
   const [width, setWidth] = useState(0);
 
   useEffect(() => {
@@ -278,7 +278,7 @@ function MiniBar({ score, color }: { score: number; color: string }) {
       />
     </div>
   );
-}
+});
 
 export function BusinessHealthScore() {
   const [data, setData] = useState<BusinessHealthData | null>(null);
@@ -286,7 +286,7 @@ export function BusinessHealthScore() {
   const [error, setError] = useState("");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -299,11 +299,15 @@ export function BusinessHealthScore() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  // Memoize derived values - must be called unconditionally (before early returns)
+  const scoreColor = useMemo(() => data ? getScoreColor(data.score) : null, [data]);
+  const categories = useMemo(() => data ? Object.entries(data.categories) as [string, Category][] : [], [data]);
 
   if (loading) {
     return (
@@ -342,10 +346,7 @@ export function BusinessHealthScore() {
     );
   }
 
-  if (!data) return null;
-
-  const scoreColor = getScoreColor(data.score);
-  const categories = Object.entries(data.categories) as [string, Category][];
+  if (!data || !scoreColor) return null;
 
   return (
     <motion.div

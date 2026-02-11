@@ -1,33 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { validateBody, updateBudgetSchema } from "@/lib/validations";
 import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Fetch single budget
 export async function GET(
@@ -40,7 +14,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
     const { id } = await params;
 
     // Get user's tenant_id from profile
@@ -114,7 +88,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
     const { id } = await params;
 
     // Get user's tenant_id from profile
@@ -241,7 +215,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
     const { id } = await params;
 
     // Get user's tenant_id from profile

@@ -1,34 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from "@/lib/supabase/server";
 import { sendWithProvider } from '@/lib/email/providers';
 import { EmailProvider } from '@/lib/email/types';
 import { getUserIdFromRequest } from '@/hooks/useTenantFromHeaders';
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
 
 // POST - Send test email
 export async function POST(request: Request) {
@@ -38,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's email and profile
     const { data: profile } = await supabase

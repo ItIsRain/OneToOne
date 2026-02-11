@@ -1,33 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Fetch a single survey with form and event data
 export async function GET(
@@ -41,7 +15,7 @@ export async function GET(
     }
 
     const { id } = await params;
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
@@ -96,7 +70,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase
@@ -209,7 +183,7 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase

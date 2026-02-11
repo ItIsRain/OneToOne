@@ -5,9 +5,18 @@
  */
 
 export class SessionExpiredError extends Error {
-  constructor() {
+  constructor(shouldRedirect = true) {
     super("Session expired. Please refresh the page.");
     this.name = "SessionExpiredError";
+
+    // Auto-redirect to signin when session expires (client-side only)
+    if (shouldRedirect && typeof window !== "undefined") {
+      const currentPath = window.location.pathname;
+      const isAuthPage = ["/signin", "/signup", "/reset-password", "/update-password"].includes(currentPath);
+      if (!isAuthPage) {
+        window.location.href = `/signin?redirect=${encodeURIComponent(currentPath)}`;
+      }
+    }
   }
 }
 

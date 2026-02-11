@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Badge from "@/components/ui/badge/Badge";
+import { SessionExpiredError } from "@/lib/fetch";
 
 export interface Announcement {
   id: string;
@@ -89,7 +90,7 @@ export const DashboardAnnouncements: React.FC<DashboardAnnouncementsProps> = ({
 
       if (!res.ok) {
         if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
-          throw new Error("Session expired. Please refresh the page.");
+          throw new SessionExpiredError();
         }
         const data = await res.json().catch(() => ({}));
         throw new Error((data as Record<string, string>).error || "Failed to fetch announcements");

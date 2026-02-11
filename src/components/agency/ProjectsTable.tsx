@@ -1,8 +1,34 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { AddProjectModal } from "@/components/agency/modals";
 import { ProjectDetailsSidebar } from "@/components/agency/sidebars";
+
+// Moved outside component to avoid recreation on every render
+function formatDate(dateString: string): string {
+  if (!dateString) return "Not set";
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatCurrency(amount: number, currency: string = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount || 0);
+}
+
+function getProgressColor(progress: number): string {
+  if (progress >= 75) return "bg-success-500";
+  if (progress >= 50) return "bg-brand-500";
+  if (progress >= 25) return "bg-warning-500";
+  return "bg-gray-400";
+}
 
 interface Project {
   id: string;
@@ -77,7 +103,7 @@ export const ProjectsTable: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/projects");
@@ -91,13 +117,13 @@ export const ProjectsTable: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+  }, [fetchProjects]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to delete this project?")) return;
 
     try {
@@ -107,13 +133,13 @@ export const ProjectsTable: React.FC = () => {
       if (!response.ok) {
         throw new Error("Failed to delete project");
       }
-      setProjects(projects.filter((p) => p.id !== id));
+      setProjects((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete project");
     }
-  };
+  }, []);
 
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = useMemo(() => projects.filter((project) => {
     const matchesSearch =
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       project.project_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,40 +148,15 @@ export const ProjectsTable: React.FC = () => {
     const matchesStatus = statusFilter === "all" || project.status === statusFilter;
     const matchesPriority = priorityFilter === "all" || project.priority === priorityFilter;
     return matchesSearch && matchesStatus && matchesPriority;
-  });
+  }), [projects, searchQuery, statusFilter, priorityFilter]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "Not set";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  const formatCurrency = (amount: number, currency: string = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount || 0);
-  };
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 75) return "bg-success-500";
-    if (progress >= 50) return "bg-brand-500";
-    if (progress >= 25) return "bg-warning-500";
-    return "bg-gray-400";
-  };
-
-  // Stats
-  const stats = {
+  // Stats - memoized
+  const stats = useMemo(() => ({
     total: projects.length,
     inProgress: projects.filter((p) => p.status === "in_progress").length,
     completed: projects.filter((p) => p.status === "completed").length,
     totalBudget: projects.reduce((sum, p) => sum + (p.budget_amount || 0), 0),
-  };
+  }), [projects]);
 
   if (loading) {
     return (

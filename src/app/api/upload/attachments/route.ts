@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
 import { validateAttachmentUpload } from "@/lib/upload-validation";
 import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
@@ -30,31 +29,6 @@ if (!cloudinaryConfigured && process.env.CLOUDINARY_CLOUD_NAME) {
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
   cloudinaryConfigured = true;
-}
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
 }
 
 // Sanitize filename for Cloudinary public_id

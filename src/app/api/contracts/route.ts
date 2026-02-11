@@ -1,36 +1,10 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
 import { getUserPlanInfo, checkFeatureAccess } from "@/lib/plan-limits";
 import { validateBody, createContractSchema } from "@/lib/validations";
 import { checkTriggers } from "@/lib/workflows/triggers";
 import { getUserIdFromRequest } from "@/hooks/useTenantFromHeaders";
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
 
 // GET - Fetch contracts for the user's tenant with pagination
 export async function GET(request: Request) {
@@ -40,7 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
 
     // Pagination parameters
@@ -144,7 +118,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     const { data: profile } = await supabase
       .from("profiles")

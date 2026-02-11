@@ -1,33 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { ALL_PERMISSION_IDS, DEFAULT_MEMBER_PERMISSIONS } from '@/lib/permissions';
 import { getUserIdFromRequest } from '@/hooks/useTenantFromHeaders';
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
-}
 
 /**
  * GET /api/permissions/me
@@ -44,7 +18,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's profile with role and custom_role_id
     const { data: profile, error: profileError } = await supabase

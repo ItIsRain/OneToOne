@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useCountUp } from "@/hooks/useCountUp";
 import Badge from "@/components/ui/badge/Badge";
+import { SessionExpiredError } from "@/lib/fetch";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -77,7 +78,7 @@ export const DashboardMetrics: React.FC<DashboardMetricsProps> = ({ onDataLoaded
 
       if (!res.ok) {
         if (res.status === 401 || res.headers.get("content-type")?.includes("text/html")) {
-          throw new Error("Session expired. Please refresh the page.");
+          throw new SessionExpiredError();
         }
         const data = await res.json().catch(() => ({}));
         throw new Error((data as Record<string, string>).error || "Failed to fetch metrics");

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import { v2 as cloudinary } from "cloudinary";
 import { scanFileForMalware, calculateFileHash, checkFileHash } from "@/lib/virustotal";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
@@ -17,31 +16,6 @@ if (cloudinaryUrl) {
       api_secret: matches[2],
     });
   }
-}
-
-async function getSupabaseClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Ignore in Server Components
-          }
-        },
-      },
-    }
-  );
 }
 
 // Helper to determine file type category
@@ -99,7 +73,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
 
     // Optional filters
@@ -215,7 +189,7 @@ export async function POST(request: Request) {
       return rateLimitResponse(rateLimit.retryAfterSeconds!);
     }
 
-    const supabase = await getSupabaseClient();
+    const supabase = await createClient();
 
     // Get user's tenant_id from profile
     const { data: profile } = await supabase

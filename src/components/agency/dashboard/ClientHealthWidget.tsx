@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { SessionExpiredError } from "@/lib/fetch";
 
 interface ScoreBreakdown {
   payment: number;
@@ -247,7 +248,7 @@ export function ClientHealthWidget() {
           res.status === 401 ||
           res.headers.get("content-type")?.includes("text/html")
         ) {
-          throw new Error("Session expired. Please refresh the page.");
+          throw new SessionExpiredError();
         }
         const errData = await res.json().catch(() => ({}));
         throw new Error(

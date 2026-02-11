@@ -1,8 +1,28 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import { AddTaskModal } from "@/components/agency/modals";
 import { TaskDetailsSidebar } from "@/components/agency/sidebars";
+
+// Moved outside component to avoid recreation on every render
+function formatDate(dateString: string): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const today = new Date();
+  const diffTime = date.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays <= 7) return `${diffDays}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isOverdue(dateString: string): boolean {
+  if (!dateString) return false;
+  return new Date(dateString) < new Date();
+}
 
 interface Task {
   id: string;
@@ -96,7 +116,7 @@ export const TasksTable: React.FC = () => {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/tasks");
@@ -110,9 +130,9 @@ export const TasksTable: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const response = await fetch("/api/projects");
       if (response.ok) {
@@ -122,14 +142,14 @@ export const TasksTable: React.FC = () => {
     } catch (err) {
       console.error("Error fetching projects:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTasks();
     fetchProjects();
-  }, []);
+  }, [fetchTasks, fetchProjects]);
 
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
@@ -137,14 +157,14 @@ export const TasksTable: React.FC = () => {
         body: JSON.stringify({ status: newStatus }),
       });
       if (response.ok) {
-        setTasks(tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
       }
     } catch (err) {
       console.error("Error updating task status:", err);
     }
-  };
+  }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to delete this task?")) return;
 
     try {
@@ -154,13 +174,13 @@ export const TasksTable: React.FC = () => {
       if (!response.ok) {
         throw new Error("Failed to delete task");
       }
-      setTasks(tasks.filter((t) => t.id !== id));
+      setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete task");
     }
-  };
+  }, []);
 
-  const filteredTasks = tasks.filter((task) => {
+  const filteredTasks = useMemo(() => tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       task.task_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,35 +189,16 @@ export const TasksTable: React.FC = () => {
     const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
     const matchesProject = projectFilter === "all" || task.project?.id === projectFilter;
     return matchesSearch && matchesStatus && matchesPriority && matchesProject;
-  });
+  }), [tasks, searchQuery, statusFilter, priorityFilter, projectFilter]);
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const today = new Date();
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return `${Math.abs(diffDays)}d overdue`;
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Tomorrow";
-    if (diffDays <= 7) return `${diffDays}d`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const isOverdue = (dateString: string) => {
-    if (!dateString) return false;
-    return new Date(dateString) < new Date() && dateString;
-  };
-
-  // Stats
-  const stats = {
+  // Stats - memoized to prevent recalculation on unrelated state changes
+  const stats = useMemo(() => ({
     total: tasks.length,
     todo: tasks.filter((t) => t.status === "todo" || t.status === "backlog").length,
     inProgress: tasks.filter((t) => t.status === "in_progress" || t.status === "in_review").length,
     completed: tasks.filter((t) => t.status === "completed").length,
     overdue: tasks.filter((t) => isOverdue(t.due_date) && t.status !== "completed").length,
-  };
+  }), [tasks]);
 
   if (loading) {
     return (
