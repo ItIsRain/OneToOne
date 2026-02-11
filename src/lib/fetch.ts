@@ -14,7 +14,10 @@ export class SessionExpiredError extends Error {
       const currentPath = window.location.pathname;
       const isAuthPage = ["/signin", "/signup", "/reset-password", "/update-password"].includes(currentPath);
       if (!isAuthPage) {
-        window.location.href = `/signin?redirect=${encodeURIComponent(currentPath)}`;
+        // Use main app URL for signin to ensure proper cross-subdomain auth
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const currentFullUrl = window.location.href;
+        window.location.href = `${appUrl}/signin?redirect=${encodeURIComponent(currentFullUrl)}`;
       }
     }
   }

@@ -44,32 +44,51 @@ export default function SignInForm() {
       }
 
       // Determine where to redirect
-      const safeRedirect = redirectPath && redirectPath.startsWith("/") && !redirectPath.startsWith("//")
-        ? redirectPath
-        : "/dashboard";
+      // Handle both full URLs (from cross-subdomain redirect) and paths
+      let finalRedirect = "/dashboard";
+      let redirectIsFullUrl = false;
 
-      // Try to get tenant subdomain, but don't let it block navigation
-      let finalRedirect = safeRedirect;
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("tenant_id")
-          .eq("id", authData.user.id)
-          .single();
-
-        if (profile?.tenant_id) {
-          const { data: tenant } = await supabase
-            .from("tenants")
-            .select("subdomain")
-            .eq("id", profile.tenant_id)
-            .single();
-
-          if (tenant?.subdomain) {
-            finalRedirect = getTenantUrl(tenant.subdomain, safeRedirect);
+      if (redirectPath) {
+        try {
+          const redirectUrl = new URL(redirectPath);
+          // Full URL - validate it's our domain
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://1i1.ae";
+          const appHost = new URL(appUrl).hostname;
+          if (redirectUrl.hostname === appHost || redirectUrl.hostname.endsWith(`.${appHost}`)) {
+            finalRedirect = redirectPath;
+            redirectIsFullUrl = true;
+          }
+        } catch {
+          // Not a full URL, check if it's a valid path
+          if (redirectPath.startsWith("/") && !redirectPath.startsWith("//")) {
+            finalRedirect = redirectPath;
           }
         }
-      } catch {
-        // Ignore query errors, just redirect to default
+      }
+
+      // If redirect is not a full URL, try to get tenant subdomain
+      if (!redirectIsFullUrl) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("tenant_id")
+            .eq("id", authData.user.id)
+            .single();
+
+          if (profile?.tenant_id) {
+            const { data: tenant } = await supabase
+              .from("tenants")
+              .select("subdomain")
+              .eq("id", profile.tenant_id)
+              .single();
+
+            if (tenant?.subdomain) {
+              finalRedirect = getTenantUrl(tenant.subdomain, finalRedirect);
+            }
+          }
+        } catch {
+          // Ignore query errors, just redirect to default
+        }
       }
 
       // Verify session is established before redirecting
